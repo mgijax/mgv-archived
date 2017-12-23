@@ -15,3 +15,16 @@ line.chr {
     stroke : none;
     shape-rendering: crispEdges;
 }
+
+#genomeView {
+    display: inline-block;
+    background-color: #ccc;
+}
+#zoomView {
+    display: inline-block;
+    background-color: #ccc;
+    border: thin solid black;
+}
+.zoomRegion line {
+    stroke: black;
+}

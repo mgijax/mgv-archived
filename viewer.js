@@ -1,20 +1,20 @@
 (function () {
  
 let svgs = {
-  "genomeView" : {
-    selector : "#genomeView",
-    margin : {top: 35, right: 10, bottom: 20, left: 30},
+  genomeView : {
+    selector : "#genomeView svg",
+    margin : {top: 35, right: 10, bottom: 20, left: 10},
     outerWidth : 600,
     outerHeight : 250,
     width : -1,
     height : -1,
     svg : null
     },
-  "zoomView" : {
-    selector : "#zoomView",
-    margin : {top: 35, right: 10, bottom: 20, left: 30},
+  zoomView : {
+    selector : "#zoomView svg",
+    margin : {top: 10, right: 10, bottom: 10, left: 10},
     outerWidth : 800,
-    outerHeight : 600,
+    outerHeight : 200,
     width : -1,
     height : -1,
     svg : null
@@ -23,8 +23,11 @@ let svgs = {
 
 let allStrains = []; // list of all strain names
 let strainData = {}; // map from strain name -> strain data obj
+let rStrain = null; // thereference strain
+let cStrains = []; // comparison strains
 let rsName = null;      // reference strain name
 let csNames = [];     // list of comparison strain names
+let brushChr = null;  // chromosome with current brush
 
 let dur = 1500;         // anomation duration
 let cwidth = 20;        // chromosome width
@@ -140,6 +143,7 @@ function processChromosomes (d) {
                .on("brushend",brushend);
 	  });
         strainData[s] = {
+	    name : s,
             chromosomes : chrs,
             maxlen : maxlen,
             xscale : xs,
@@ -153,10 +157,14 @@ function processChromosomes (d) {
 function brushstart(c){
     clearBrushes(c.brush);
     d3.event.sourceEvent.stopPropagation();
+    brushChr = c;
 }
 
 function brushend(c){
-    if(c.brush.empty()) return;
+    if(c.brush.empty()) {
+	brushChr = null;
+	return;
+    }
     var xtnt = c.brush.extent();
     drawZoomView(c, Math.floor(xtnt[0]), Math.ceil(xtnt[1]))
 }
@@ -172,23 +180,31 @@ function clearBrushes(except){
 //----------------------------------------------
 //
 function go() {
+    console.log("GO!");
     // reference strain
     let rs = d3.select("#refStrain");
     rsName = rs[0][0].value
+    rStrain = strainData[rsName]
     // comparison strains
     let cs = d3.select("#compStrains");
     // cs.select(`option[value="${rsName}"]`).property('selected', true);
     let csos = cs[0][0].selectedOptions;
     csNames = [];
-    for (let i = 0; i < csos.length; i++)
-        csNames.push(csos[i].value); 
+    cStrains = [];
+    for (let i = 0; i < csos.length; i++){
+	let csn = csos[i].value;
+        csNames.push(csn);
+	cStrains.push(strainData[csn]);
+    }
     //
     console.log("Ref strain=", rsName);
     console.log("Comparison strains", csNames);
     //
     drawGenomeView();
+    if (brushChr) brushend(brushChr);
 }
 
+//----------------------------------------------
 function drawGenomeView() {
 
     let svg = svgs.genomeView;
@@ -252,13 +268,54 @@ function drawGenomeView() {
 	;
 }
 
+//----------------------------------------------
 function drawZoomView(c, start, end){
+
+    console.log("Draw zoom view");
+
+    //
     let dataString = `strain=${rsName}&chr=${c.name}&start=${start}&end=${end}`
     let url = "./bin/getFeatures.cgi?" + dataString;
-    console.log(url);
     d3.json(url, processFeatures);
+
+    //
+    let view = svgs.zoomView;
+
+    // construct data array. First el is the ref strain. Following are any comparison
+    // strains. Remove rStrain from cStrains, if present (avoid dup).
+    let strains = [].concat(cStrains)
+    let ri = strains.lastIndexOf(rStrain)
+    if (ri >= 0) strains.splice(ri,1)
+    let data = [rStrain].concat(strains);
+    let dy = view.height / (data.length + 1);
+    //
+    let zrs = view.svg.selectAll("g.zoomRegion")
+              .data(data);
+    let newZrs = zrs.enter()
+        .append("svg:g")
+            .attr("class", "zoomRegion");
+    newZrs.append("line") ;
+    newZrs.append("text") ;
+    zrs.exit().remove();
+    zrs.select("line")
+	.attr("x1", 0)
+	.attr("y1", (d,i) => (i+1) * dy)
+	.attr("x2", view.width)
+	.attr("y2", (d,i) => (i+1) * dy);
+    zrs.select("text")
+	.attr("x", 10)
+	.attr("y", (d,i) => (i+1) * dy)
+	.attr("font-family","sans-serif")
+	.attr("font-size", 10)
+        .text(s =>s .name);
+
 }
 
+function drawZoomFeatures(feats){
+    
+}
+
+//----------------------------------------------
 function processFeatures (data) {
     let feats = data.map(d => {
         return {
@@ -273,11 +330,13 @@ function processFeatures (data) {
 	  symbol  : d[8],
 	};
     });
-    console.log("DATA:", feats)
+    drawZoomFeatures(feats);
 }
 
 
-//
+//----------------------------------------------
+
 setup();
 
+//----------------------------------------------
 })();
