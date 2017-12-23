@@ -172,7 +172,6 @@ function clearBrushes(except){
 //----------------------------------------------
 //
 function go() {
-    console.log("GO!");
     // reference strain
     let rs = d3.select("#refStrain");
     rsName = rs[0][0].value
@@ -254,33 +253,27 @@ function drawGenomeView() {
 }
 
 function drawZoomView(c, start, end){
-    console.log("Draw zoom view.", c, start, end);
-    let dataString = 'foo=bar';
-    d3.xhr("./cgi-bin/test")
-        .get(function(error, data){
-            if (error) {
-                console.log("error");
-                console.log(error);
-            }
-            else { 
-                console.log("succesfully called script");
-                console.log(data);
-            }
+    let dataString = `strain=${rsName}&chr=${c.name}&start=${start}&end=${end}`
+    let url = "./bin/getFeatures.cgi?" + dataString;
+    console.log(url);
+    d3.json(url, processFeatures);
+}
+
+function processFeatures (data) {
+    let feats = data.map(d => {
+        return {
+	  chr     : d[0],
+	  start   : d[1],
+	  end	  : d[2],
+	  strand  : d[3],
+	  type    : d[4],
+	  biotype : d[5],
+	  mgpid   : d[6],
+	  mgiid   : d[7],
+	  symbol  : d[8],
+	};
     });
-    /*
-    d3.xhr("./cgi-bin/test")
-        .header("Content-Type", "application/x-www-form-url-encoded")
-        .post(dataString,function(error, data){
-            if (error) {
-                console.log("error");
-                console.log(error);
-            }
-            else { 
-                console.log("succesfully called script");
-                console.log(data);
-            }
-    });
-    */
+    console.log("DATA:", feats)
 }
 
 

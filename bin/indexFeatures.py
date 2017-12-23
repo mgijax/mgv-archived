@@ -131,29 +131,21 @@ def validate(ff, xf) :
     print
 
 def lookup(ff, xf, chr, start, end):
-    #print "LOOKING UP:", chr, start, end
     answer = []
     ix = readIndexFile(xf)
     cblocks = ix.get(chr,None)
     if not cblocks:
         raise RuntimeError("No such chromosome: " + chr)
-    #print "cblocks", map(str, cblocks)
     #
     for i,b in enumerate(cblocks):
-        #print "CHECKING", str(b), start
-        if start <= b.end and end >= b.start:
-            #print "FOUND IT", i, str(b)
-            break
+        if start <= b.end and end >= b.start: break
     else:
         return []
-
-    #print "HERE"
     #
     while i < len(cblocks):
         b = cblocks[i]
         ff.seek(b.startIndex)
         s = ff.read(b.endIndex-b.startIndex+1)
-        #print s
         lines = s[:-1].split('\n')
         for l in lines:
             toks = l.split('\t')
@@ -164,6 +156,7 @@ def lookup(ff, xf, chr, start, end):
             elif ls > end:
                 return answer
         i += 1
+    #
     return answer
 
 
@@ -227,7 +220,6 @@ def main():
     ff = open(args.featureFile,'r') if args.featureFile else sys.stdin
     #
     if args.action == "lookup":
-        print "Lookup"
         if not args.position:
             raise RuntimeError("No coordinates specified.")
         coordRange_re = re.compile(r'([^:]+):(\d+)[^0-9]+(\d+)')
@@ -253,4 +245,5 @@ def main():
         print args
 
 #
-main()
+if __name__ == "__main__":
+    main()
