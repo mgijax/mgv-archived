@@ -1,0 +1,37 @@
+#!/bin/bash
+
+source config.sh
+strainList="strainlist.tsv"
+
+function download {
+   strain=$1
+   fname=$2
+   url="${BASEURL}/${strain}/${fname}"
+   featFile="${strain}-features.tsv"
+   chrFile="${strain}-chromosomes.tsv"
+   ixFile="${strain}-index.tsv"
+   echo ${strain}
+   echo ${strain} >> "${strainList}"
+   echo "Downloading:" "${url}" to "${fname}"
+   curl -R -z ${fname} -o ${fname} $url
+   gunzip -c "${fname}" \
+       | grep -v "^#" \
+       | grep -v "Parent=" \
+       | grep -v biological_region \
+       | python "${DIR}/bin/prepStrainFile.py" -o "${featFile}" -c "${chrFile}"
+   python "${DIR}/bin/indexFeatures.py" -f "${featFile}" -x "${strain}-index.tsv" -a create
+}
+
+mkdir -p ${DIR}/data
+cd ${DIR}/data
+echo "strain" > "${strainList}"
+
+
+for sn in "${ALL_STRAIN_NAMES[@]}"
+do : 
+    # For every strain name, there is an env var of that name containing the file name for that strain
+    # This gets the file name.
+    eval fname=\$$sn
+    # call the download function for this pair
+    download "${sn}" "${fname}"
+done

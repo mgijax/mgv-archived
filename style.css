@@ -1,0 +1,17 @@
+body {
+    background-color: #eee;
+}
+
+line.chr {
+    stroke: black;
+}
+
+.chrlabel {
+    text-anchor : middle;
+}
+
+.brush .extent {
+    fill-opacity : 0.3;
+    stroke : none;
+    shape-rendering: crispEdges;
+}
