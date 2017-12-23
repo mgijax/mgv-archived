@@ -238,7 +238,7 @@ def main():
             raise RuntimeError("No index file specified.")
         xf = open(args.indexFile, 'r')
         ans = lookup(ff, xf, m.group(1), int(m.group(2)), int(m.group(3)))
-        print ans
+        print json.dumps(ans)
     elif args.action == "validate":
         print "Validating index..."
         if not args.indexFile:

@@ -158,7 +158,7 @@ function brushstart(c){
 function brushend(c){
     if(c.brush.empty()) return;
     var xtnt = c.brush.extent();
-    console.log("Brush end.", c.name, xtnt)
+    drawZoomView(c, Math.floor(xtnt[0]), Math.ceil(xtnt[1]))
 }
 
 function clearBrushes(except){
@@ -252,6 +252,37 @@ function drawGenomeView() {
         .each(function(d){d3.select(this).call(d.brush);})
 	;
 }
+
+function drawZoomView(c, start, end){
+    console.log("Draw zoom view.", c, start, end);
+    let dataString = 'foo=bar';
+    d3.xhr("./cgi-bin/test")
+        .get(function(error, data){
+            if (error) {
+                console.log("error");
+                console.log(error);
+            }
+            else { 
+                console.log("succesfully called script");
+                console.log(data);
+            }
+    });
+    /*
+    d3.xhr("./cgi-bin/test")
+        .header("Content-Type", "application/x-www-form-url-encoded")
+        .post(dataString,function(error, data){
+            if (error) {
+                console.log("error");
+                console.log(error);
+            }
+            else { 
+                console.log("succesfully called script");
+                console.log(data);
+            }
+    });
+    */
+}
+
 
 //
 setup();
