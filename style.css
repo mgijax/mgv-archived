@@ -26,5 +26,10 @@ line.chr {
     border: thin solid black;
 }
 .zoomRegion line {
-    stroke: black;
+    stroke: #aaa;
+    fill: none;
+}
+rect.feature {
+    fill : #aaa;
+    stroke: none;
 }

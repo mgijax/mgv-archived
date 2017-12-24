@@ -17,7 +17,8 @@ let svgs = {
     outerHeight : 200,
     width : -1,
     height : -1,
-    svg : null
+    svg : null,
+    strains : [] // strains in zoom view, top-to-bottom order
     }
 }
 
@@ -148,7 +149,8 @@ function processChromosomes (d) {
             maxlen : maxlen,
             xscale : xs,
             yscale : ys,
-            cscale : cs
+            cscale : cs,
+	    zoomY  : -1
         };
     });
 }
@@ -273,55 +275,89 @@ function drawZoomView(c, start, end){
 
     console.log("Draw zoom view");
 
-    //
+    // Get the features in the brush region, then draw them
     let dataString = `strain=${rsName}&chr=${c.name}&start=${start}&end=${end}`
     let url = "./bin/getFeatures.cgi?" + dataString;
-    d3.json(url, processFeatures);
+    d3.json(url, function(data) {
+        drawZoomFeatures(processFeatures(data), rStrain, c, start, end);
+    });
 
     //
-    let view = svgs.zoomView;
+    let v = svgs.zoomView;
 
     // construct data array. First el is the ref strain. Following are any comparison
     // strains. Remove rStrain from cStrains, if present (avoid dup).
     let strains = [].concat(cStrains)
     let ri = strains.lastIndexOf(rStrain)
     if (ri >= 0) strains.splice(ri,1)
-    let data = [rStrain].concat(strains);
-    let dy = view.height / (data.length + 1);
     //
-    let zrs = view.svg.selectAll("g.zoomRegion")
-              .data(data);
+    v.strains = [rStrain].concat(strains);
+    // zoom regions
+    let zrs = v.svg
+              .selectAll("g.zoomRegion")
+              .data(v.strains, d => d.name);
     let newZrs = zrs.enter()
         .append("svg:g")
-            .attr("class", "zoomRegion");
-    newZrs.append("line") ;
-    newZrs.append("text") ;
+            .attr("class", "zoomRegion")
+	    .attr("name", s => s.name);
     zrs.exit().remove();
+    //
+    let dy = v.height / (v.strains.length + 1);
+    v.strains.forEach( (s,i) => s.zoomY = (i + 1) * dy );
+    //
+    newZrs.append("g")
+        .attr("class", "features");
+    // lines
+    newZrs.append("line") ;
     zrs.select("line")
 	.attr("x1", 0)
-	.attr("y1", (d,i) => (i+1) * dy)
-	.attr("x2", view.width)
-	.attr("y2", (d,i) => (i+1) * dy);
+	.attr("y1", d => d.zoomY )
+	.attr("x2", v.width)
+	.attr("y2", d => d.zoomY )
+    // strain labels
+    newZrs.append("text") ;
     zrs.select("text")
-	.attr("x", 10)
-	.attr("y", (d,i) => (i+1) * dy)
+	.attr("x", 0)
+	.attr("y", d => d.zoomY + 10)
 	.attr("font-family","sans-serif")
 	.attr("font-size", 10)
         .text(s =>s .name);
 
 }
 
-function drawZoomFeatures(feats){
-    
+function drawZoomFeatures(feats, strain, c, start, end){
+    console.log("Draw zoom features", feats)
+
+    let v = svgs.zoomView;
+
+    let xscale = d3.scale.linear()
+        .domain([start,end])
+	.range([0,v.width]);
+
+    let rects = v.svg.select(`g.zoomRegion[name="${strain.name}"] .features`)
+      .selectAll('rect.feature')
+      .data(feats, f => f.mgpid);
+    rects.exit().remove();
+    //
+    let newRs = rects.enter()
+      .append("rect")
+        .attr("class","feature");
+    //
+    let rHeight = 20;
+    rects
+      .attr("x", f => xscale(f.start))
+      .attr("y", strain.zoomY - rHeight/2)
+      .attr("width", f => xscale(f.end)-xscale(f.start)+1)
+      .attr("height", rHeight);
 }
 
 //----------------------------------------------
 function processFeatures (data) {
-    let feats = data.map(d => {
+    return data.map(d => {
         return {
 	  chr     : d[0],
-	  start   : d[1],
-	  end	  : d[2],
+	  start   : parseInt(d[1]),
+	  end	  : parseInt(d[2]),
 	  strand  : d[3],
 	  type    : d[4],
 	  biotype : d[5],
@@ -330,7 +366,6 @@ function processFeatures (data) {
 	  symbol  : d[8],
 	};
     });
-    drawZoomFeatures(feats);
 }
 
 
