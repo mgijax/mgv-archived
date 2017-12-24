@@ -9,7 +9,7 @@ from indexFeatures import lookup
 import json
 
 mgvdir = os.path.dirname(__file__)
-datadir = os.path.join(mgvdir, '../data')
+datadir = os.path.join(mgvdir, '../data/straindata')
 
 
 form   = cgi.FieldStorage()

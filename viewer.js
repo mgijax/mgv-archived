@@ -81,12 +81,12 @@ function setup () {
     d3.select("#refStrain").on("change", go);
     d3.select("#compStrains").on("change", go);
     //
-    d3tsv("./data/strainlist.tsv").then(function(data){
+    d3tsv("./data/strainList.tsv").then(function(data){
         allStrains = data.map(s => s.strain);
         initOptList("#refStrain", allStrains);
         initOptList("#compStrains", allStrains, null, null, true);
         //
-        return Promise.all(allStrains.map(s => d3tsv(`./data/${s}-chromosomes.tsv`)));
+        return Promise.all(allStrains.map(s => d3tsv(`./data/straindata/${s}-chromosomes.tsv`)));
     })
     .then(function (data) {
         processChromosomes(data);
