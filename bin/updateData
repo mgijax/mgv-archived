@@ -8,7 +8,6 @@ for sn in "${ALL_STRAIN_NAMES[@]}"
 do : 
     echo "${sn}" >> "${strainList}"
 done
-exit
 
 BDIR="${DIR}/bin"
 DDIR="${DIR}/data/downloads"
@@ -25,7 +24,6 @@ function download {
    chrFile="${SDIR}/${strain}-chromosomes.tsv"
    ixFile="${SDIR}/${strain}-index.tsv"
    echo ${strain}
-   echo ${strain} >> "${strainList}"
    echo "Downloading:" "${url}" to "${fname}"
    curl -R -z ${fname} -o ${fname} $url
    echo "Generating:" "${featFile}" "${chrFile}" "${ixFile}"
@@ -36,6 +34,7 @@ function download {
        | python "${BDIR}/prepStrainFile.py" -o "${featFile}" -c "${chrFile}"
    python "${BDIR}/indexFeatures.py" -f "${featFile}" -x "${ixFile}" -a create
 }
+
 
 for sn in "${ALL_STRAIN_NAMES[@]}"
 do : 

@@ -19,6 +19,7 @@ line.chr {
 #genomeView {
     display: inline-block;
     background-color: #ccc;
+    border: thin solid black;
 }
 #zoomView {
     display: inline-block;

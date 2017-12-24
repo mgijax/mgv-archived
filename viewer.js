@@ -4,7 +4,7 @@ let svgs = {
   genomeView : {
     selector : "#genomeView svg",
     margin : {top: 35, right: 10, bottom: 20, left: 10},
-    outerWidth : 600,
+    outerWidth : 800,
     outerHeight : 250,
     width : -1,
     height : -1,
@@ -14,7 +14,7 @@ let svgs = {
     selector : "#zoomView svg",
     margin : {top: 10, right: 10, bottom: 10, left: 10},
     outerWidth : 800,
-    outerHeight : 200,
+    outerHeight : 250,
     width : -1,
     height : -1,
     svg : null,
