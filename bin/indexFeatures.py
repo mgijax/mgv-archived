@@ -115,8 +115,7 @@ def readIndexFile(xf) :
     #
     return ix
 #
-def validate(ff, xf) :
-    ix = readIndexFile(xf)
+def validate(ff, ix) :
     items = ix.items()
     items.sort()
     for (c,blocks) in items:
@@ -130,9 +129,8 @@ def validate(ff, xf) :
                 print ".",
     print
 
-def lookup(ff, xf, chr, start, end):
+def lookup(ff, ix, chr, start, end):
     answer = []
-    ix = readIndexFile(xf)
     cblocks = ix.get(chr,None)
     if not cblocks:
         raise RuntimeError("No such chromosome: " + chr)
@@ -229,14 +227,16 @@ def main():
         if not args.indexFile:
             raise RuntimeError("No index file specified.")
         xf = open(args.indexFile, 'r')
-        ans = lookup(ff, xf, m.group(1), int(m.group(2)), int(m.group(3)))
+	ix = readIndexFile(xf)
+        ans = lookup(ff, ix, m.group(1), int(m.group(2)), int(m.group(3)))
         print json.dumps(ans)
     elif args.action == "validate":
         print "Validating index..."
         if not args.indexFile:
             raise RuntimeError("No index file specified.")
         xf = open(args.indexFile, 'r')
-        validate(ff, xf)
+	ix = readIndexFile(xf)
+        validate(ff, ix)
     elif args.action == "create":
         print "Creating index..."
         xf = open(args.indexFile, 'w') if args.indexFile else sys.stdout

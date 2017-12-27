@@ -2,34 +2,45 @@
 
 import os
 import sys 
+import json
 import cgi 
 import cgitb
-#cgitb.enable()
-from indexFeatures import lookup
-import json
+cgitb.enable()
+from indexFeatures import lookup, readIndexFile
 
-mgvdir = os.path.dirname(__file__)
-datadir = os.path.join(mgvdir, '../data/straindata')
-
-
+# extract the form data: a strain name and one or more sets of coordinates
 form   = cgi.FieldStorage()
 strain = form['strain'].value
-chr    = form['chr'].value
-start  = int(form['start'].value)
-end    = int(form['end'].value)
+coords = form['coords'].value
 '''
 strain = "mus_caroli"
-chr    = "7"
-start  = 2000000
-end    = 4000000
+coords = "7:2000000..4000000,8:4000000..6000000,X:64000000..68000000"
 '''
 
+# find the data directory
+mgvdir = os.path.dirname(__file__)
+datadir = os.path.join(mgvdir, '../data/straindata')
 featfile = os.path.join(datadir, '%s-features.tsv' % strain)
 indexfile = os.path.join(datadir, '%s-index.tsv' % strain)
 ff = open(featfile,'r')
 xf = open(indexfile,'r')
-feats = lookup(ff, xf, chr, start, end)
+ix = readIndexFile(xf)
 
 print "Content-type: application/json"
 print
-print json.dumps(feats)
+
+allFeats = []
+for c in coords.split(","):
+    chr, rest = c.split(":")
+    s,e = rest.split("..")
+    start = int(s)
+    end = int(e)
+    feats = lookup(ff, ix, chr, start, end)
+    blk = {
+      "chr" : chr,
+      "start" : start,
+      "end" : end,
+      "features" : feats
+    }
+    allFeats.append(blk)
+print json.dumps(allFeats)

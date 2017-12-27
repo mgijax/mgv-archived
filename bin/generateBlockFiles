@@ -12,17 +12,13 @@
 
 source config.sh
 
-datadir=${DIR}/data
+datadir=${DIR}/data/straindata
 outdir=${DIR}/data/blockfiles
 
 mkdir -p ${outdir}
 
 # get the list of feature files
 declare -a arr=(`ls ${datadir}/mus_*-features.tsv`)
-
-#
-slist="${outdir}/strainList.tsv"
-echo "strain" > ${slist}
 
 # 
 lim=$((${#arr[@]} - 1))
@@ -37,7 +33,6 @@ for i in `seq 0 ${lim}`; do
     afn=$(basename "${a}")
     afn="${afn%.*}"
     jstart=$(($i))
-    echo "${afn}" >> "${slist}"
     if [ ${jstart} -le ${lim} ]; then
         for j in `seq ${jstart} ${lim}`; do
             # extract the B strain name

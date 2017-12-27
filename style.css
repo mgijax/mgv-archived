@@ -1,5 +1,6 @@
 body {
     background-color: #eee;
+    font-family: sans-serif;
 }
 
 line.chr {
@@ -34,3 +35,45 @@ rect.feature {
     fill : #aaa;
     stroke: none;
 }
+
+.colorKey {
+    align-items: flex-start !important;
+    padding: 6px;
+    font-family: sans-serif;
+    font-size: 12px;
+}
+
+.swatch {
+    width: 20px;
+    height: 20px;
+}
+
+.spacer1 { flex-grow: 1; }
+.spacer2 { flex-grow: 2; }
+.spacer3 { flex-grow: 3; }
+.spacer5 { flex-grow: 5; }
+.spacer8 { flex-grow: 8; }
+.spacer13 { flex-grow: 13; }
+
+.flexrow {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: nowrap;
+}
+
+.flexrow > * {
+    margin: 2px;
+}
+
+.flexcolumn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-wrap: nowrap;
+}
+
+.flexcolumn > * {
+    margin: 2px;
+}
+

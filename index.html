@@ -7,13 +7,26 @@
 </head>
 <body>
 <h3>Genome Rearrangement Viewer</h3>
-Reference strain: <select id="refStrain"></select>
-Comparison strains: <select id="compStrains"></select>
-<div id="genomeView">
-    <svg></svg>
-</div>
-<div id="zoomView">
-    <svg></svg>
+<div class="flexrow" style="align-items: flex-start;">
+    <div class="flexcolumn">
+	<div class="flexcolumn">
+	    <label>Reference strain:</label>
+	    <select id="refStrain"></select>
+	</div>
+	<div class="flexcolumn">
+	    <label>Comparison strains:</label>
+	    <select id="compStrains"></select>
+	</div>
+	<div class="colorKey flexcolumn"></div>
+    </div>
+    <div class="flexcolumn">
+	<div id="genomeView">
+	    <svg></svg>
+	</div>
+	<div id="zoomView">
+	    <svg></svg>
+	</div>
+    </div>
 </div>
 <script src="viewer.js"></script>
 </body>

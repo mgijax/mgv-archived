@@ -427,7 +427,6 @@ class SyntenyBlockGenerator:
               "bEnd",
               "aIndex",
               "bIndex",
-              "ids",
             ]
         sys.stdout.write( '\t'.join(map(lambda x:str(x),b)) + '\n' )
         for block in self.blocks:
@@ -435,7 +434,6 @@ class SyntenyBlockGenerator:
             alen = fields['a']['end']-fields['a']['start']+1
             blen = fields['b']['end']-fields['b']['start']+1
             blkRatio = (1.0 * min(alen,blen)) / max(alen,blen);
-	    ids = list(ids)[0:5]
             r = [
               blkid,
               blkcount,
@@ -451,7 +449,6 @@ class SyntenyBlockGenerator:
               fields['b']['end'],
               fields['a']['index'],
               fields['b']['index'] - (blkcount-1 if ori == 1 else 0),
-              ','.join(ids),
             ]
             sys.stdout.write( '\t'.join(map(lambda x:str(x),r)) + '\n' )
 
