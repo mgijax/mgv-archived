@@ -1,0 +1,7 @@
+This is a prototype viewer for genome annotations from the Mouse Genomes Project.
+Pick one of the 19 annotated mouse strains as the "reference" strain and any number of the the others as "comparison"
+strains. Compare genome organizations! Spot annotation issues! Look at cool patterns and pretty colors!
+
+Try it out here: http://proto.informatics.jax.org/prototypes/mgv/
+
+
