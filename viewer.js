@@ -14,11 +14,12 @@ let svgs = {
     selector : "#zoomView svg",
     margin : {top: 10, right: 10, bottom: 10, left: 10},
     outerWidth : 800,
-    outerHeight : 250,
+    outerHeight : 100,
     width : -1,
     height : -1,
     svg : null,
-    strains : [] // strains in zoom view, top-to-bottom order
+    strains : [], // strains in zoom view, top-to-bottom order
+    stripHeight: 60 // height per strain in the zoom view
     }
 }
 
@@ -37,13 +38,27 @@ let bwidth = cwidth/2;  // block width
 //
 // Promisifies a call to d3.tsv.
 // Args:
+//   url (string) The url of the tsv resource
+// Returns:
+//   a promise that resolves to the list of row objects
+function d3tsv(url) {
+    return new Promise(function(resolve, reject) {
+        d3.tsv(url, function(error, val){
+            error ? reject({ status: error.status, statusText: error.statusText}) : resolve(val);
+        })  
+    }); 
+}
+
+//
+// Promisifies a call to d3.json.
+// Args:
 //   url (string) The url of the json resource
 // Returns:
 //   a promise that resolves to the json object value, or rejects with an error
-function d3tsv(url) {
+function d3json(url) {
     return new Promise(function(resolve, reject) {
-        d3.tsv(url, function(error, tsv){
-            error ? reject({ status: error.status, statusText: error.statusText}) : resolve(tsv);
+        d3.json(url, function(error, val){
+            error ? reject({ status: error.status, statusText: error.statusText}) : resolve(val);
         })  
     }); 
 }
@@ -83,6 +98,18 @@ function setup () {
     //
     drawColorKey();
     //
+    d3.select("#mgiFacet").on("change", function(){setMgiFacet(this.value);});
+    //
+    d3.select("#zoomCoords").on("change", function () {
+        let coords = parseCoords(this.value);
+	if (! coords) {
+	    alert("Please enter a coordinate range formatted as 'chr:start..end'. For example, '5:10000000..50000000'.");
+	    this.value = "";
+	    return;
+	}
+	setZoomCoords(coords);
+    });
+    //
     d3tsv("./data/strainList.tsv").then(function(data){
         allStrains = data.map(s => s.strain);
         initOptList("#refStrain", allStrains);
@@ -98,6 +125,23 @@ function setup () {
         console.log("ERROR!", error)
     });
 
+}
+
+function formatCoords (chr, start, end) {
+    return `${chr}:${start}..${end}`
+}
+function parseCoords (coords) {
+    let re = /([^:]+):(\d+)\.\.(\d+)/;
+    let m = coords.match(re);
+    return m ? {chr:m[1], start:parseInt(m[2]), end:parseInt(m[3])} : null;
+}
+function setZoomCoords (coords) {
+    d3.select("#zoomCoords")[0][0].value = formatCoords(coords.chr, coords.start, coords.end);
+    svgs.genomeView.svg.select(`g.brush[name="${ coords.chr }"]`).each(function(chr){
+	chr.brush.extent([coords.start,coords.end]);
+	chr.brush(d3.select(this));
+    });
+    updateZoomView(rStrain, coords.chr, coords.start, coords.end, cStrains)
 }
 
 function setupSvgs() {
@@ -139,9 +183,9 @@ function processChromosomes (d) {
         let ys = d3.scale.linear().domain([1,maxlen]).range([0, svgs.genomeView.height]);
         let cs = d3.scale.category20().domain(chrs.map(function(x){return x.name;}));
 
-	chrs.forEach(function(c){
-	    var sc = d3.scale.linear().domain([1,c.length]).range([0, ys(c.length)]);
-            c.brush = d3.svg.brush().y(sc)
+	chrs.forEach(function(chr){
+	    var sc = d3.scale.linear().domain([1,chr.length]).range([0, ys(chr.length)]);
+            chr.brush = d3.svg.brush().y(sc)
                .on("brushstart",brushstart)
                .on("brushend",brushend);
 	  });
@@ -158,33 +202,32 @@ function processChromosomes (d) {
 }
 
 
-function brushstart(c){
-    clearBrushes(c.brush);
+function brushstart(chr){
+    clearBrushes(chr.brush);
     d3.event.sourceEvent.stopPropagation();
-    brushChr = c;
+    brushChr = chr;
 }
 
-function brushend(c){
-    if(c.brush.empty()) {
+function brushend(chr){
+    if(chr.brush.empty()) {
 	brushChr = null;
 	return;
     }
-    var xtnt = c.brush.extent();
-    drawZoomView(rStrain, c, Math.floor(xtnt[0]), Math.ceil(xtnt[1]), cStrains)
+    var xtnt = chr.brush.extent();
+    setZoomCoords({ chr:chr.name, start:Math.floor(xtnt[0]), end: Math.ceil(xtnt[1]) });
 }
 
 function clearBrushes(except){
-    d3.selectAll('.brush').each(function(c){
-        if (c.brush !== except) {
-            c.brush.clear();
-            c.brush(d3.select(this));
+    d3.selectAll('.brush').each(function(chr){
+        if (chr.brush !== except) {
+            chr.brush.clear();
+            chr.brush(d3.select(this));
         }
     });
 }
 //----------------------------------------------
 //
 function go() {
-    console.log("GO!");
     // reference strain
     let rs = d3.select("#refStrain");
     rsName = rs[0][0].value
@@ -200,9 +243,6 @@ function go() {
         csNames.push(csn);
 	cStrains.push(strainData[csn]);
     }
-    //
-    console.log("Ref strain=", rsName);
-    console.log("Comparison strains", csNames);
     //
     drawGenomeView();
     if (brushChr) brushend(brushChr);
@@ -267,7 +307,7 @@ class BlockFile {
 	// 
 	let blks = this.blocks
 	    // First filter for blocks that overlap the given coordinate range in the from strain
-	    .filter(blk => blk[fromC] === chr.name && blk[fromS] <= end && blk[fromE] >= start)
+	    .filter(blk => blk[fromC] === chr && blk[fromS] <= end && blk[fromE] >= start)
 	    // map each block. 
 	    .map(blk => {
 		// coord range on the from side.
@@ -280,12 +320,16 @@ class BlockFile {
 		    chr:   blk[toC],
 		    start: Math.min(s2,e2),
 		    end:   Math.max(s2,e2),
-		    ori:   blk.blockOri
-		    };
+		    ori:   blk.blockOri,
+		    // also return the fromStrain coordinates corresponding to this piece of the translation
+		    fChr:   blk[fromC],
+		    fStart: s,
+		    fEnd:   e,
+		    // include the block id corresponding to this piece
+		    blockId: blk.blockId
+		};
 	    })
 	// 
-        console.log("Translation from:", this[from+"Strain"].name, chr.name, start, end);
-        console.log("Translation to:",   this[to+"Strain"].name, blks);
 	return blks;
     }
 }
@@ -354,6 +398,7 @@ function drawGenomeView() {
       .remove();
     ccels.enter().append('line')
       .attr('class','chr')
+      .attr('name', c => c.name)
       .attr("x1", xf)
       .attr("y1", svg.height)
       .attr("x2", xf)
@@ -388,7 +433,9 @@ function drawGenomeView() {
     brushes = svg.svg.selectAll("g.brush")
         .data(sdata.chromosomes, function(x){return x.name;});
     brushes.exit().remove();
-    brushes.enter().append('g').attr('class','brush')
+    brushes.enter().append('g')
+        .attr('class','brush')
+        .attr('name',c=>c.name)
         .each(function(d){d3.select(this).call(d.brush);})
 	.selectAll('rect')
 	 .attr('width',10)
@@ -400,32 +447,17 @@ function drawGenomeView() {
 	;
 }
 
-let featUrlCache = {}; // map from url -> list of features
 let featCache = {};    // global index from mgpid -> feature
-function getFeatures(strain, chr, start, end){
-    let dataString = `strain=${strain.name}&coords=${chr.name}:${start}..${end}`
-    let url = "./bin/getFeatures.cgi?" + dataString;
-    let d = featUrlCache[url];
-
-    if (d) 
-        drawZoomFeatures(d, strain, chr, start, end);
-    else
-	d3.json(url, function(data) {
-	    let d = featUrlCache[url] = processFeatures(data[0].features);
-	    drawZoomFeatures(d, strain, chr, start, end);
-	});
-}
-
-function getCompFeatures(strain, ranges){
+function getFeatures(strain, ranges){
     let coordsArg = ranges.map(r => `${r.chr}:${r.start}..${r.end}`).join(',');
     let dataString = `strain=${strain.name}&coords=${coordsArg}`;
     let url = "./bin/getFeatures.cgi?" + dataString;
-    console.log(url);
-    d3.json(url, function(data) {
-	let s = data.forEach( d => {
-	    d.features = processFeatures( d.features )
+    return d3json(url).then(function(data) {
+	let s = data.forEach( (d,i) => {
+	    let r = ranges[i];
+	    r.features = processFeatures( d.features )
 	});
-	drawZoomFeatures(data[0].features, strain, data[0].chr, data[0].start, data[0].end)
+	return { strain, blocks:ranges };
     });
 }
 
@@ -452,65 +484,152 @@ function processFeatures (feats) {
 
 
 //----------------------------------------------
-function drawZoomView(rStrain, c, start, end, cStrains){
+function updateZoomView(rStrain, chr, start, end, cStrains){
 
+    // make sure we've loaded the coordinate mapping data for these strains
+    getBlockFiles(rStrain, cStrains).then(function(){
+	// OK, got the maps.
+	// Now issue requests for features. One request per strain, each request specifies one or more
+	// coordinate ranges.
+	// Wait for all the data to become available, then draw.
+	//
+	let promises = [];
+
+	// First request is for the the reference strain. Get all the features in the range.
+	promises.push(getFeatures(rStrain, [{
+	    chr    : chr,
+	    start  : start,
+	    end    : end,
+	    fChr   : chr,
+	    fStart : start,
+	    fEnd   : end,
+	    ori    : "+"
+	    }]));
+	// Add a request for each comparison strain, using translated coordinates. 
+	cStrains.forEach(cStrain => {
+	    // get the right block file
+	    let blkFile = (rcBlocks[rStrain.name] || {})[cStrain.name];
+	    if (!blkFile) throw "Internal error. No block file found in index."
+	    // translate!
+	    let ranges = blkFile.translate(rStrain, chr, start, end);
+	    promises.push(getFeatures(cStrain, ranges))
+	});
+	// when everything is ready, call the draw function
+	Promise.all(promises).then( drawZoomView );
+    });
+
+}
+
+function drawZoomView(data) {
+    // data = [ zoomStrip_data ]
+    // zoomStrip_data = { strain [ zoomBlock_data ] }
+    // zoomBlock_data = { xscale, chr, start, end, fChr, fStart, fEnd, ori, [ feature_data ] }
+    // feature_data = { mgpid, mgiid, symbol, chr, start, end, strand, type, biotype }
     //
     let v = svgs.zoomView;
 
-    // construct data array. First el is the ref strain. Following are any comparison
-    // strains. Remove rStrain from cStrains, if present (avoid dup).
-    let strains = [].concat(cStrains)
-    let ri = strains.lastIndexOf(rStrain)
-    if (ri >= 0) strains.splice(ri,1)
     //
-    v.strains = [rStrain].concat(strains);
-    // zoom regions
+    let rBlock = data[0].blocks[0];
+
+    // x-scale
+    v.xscale = d3.scale.linear()
+        .domain([rBlock.start,rBlock.end])
+	.range([0,v.width]);
+
+
+    // zoom strip (contain 0 or more zoom blocks)
     let zrs = v.svg
-              .selectAll("g.zoomRegion")
-              .data(v.strains, d => d.name);
+              .selectAll("g.zoomStrip")
+              .data(data, d => d.strain.name);
     let newZrs = zrs.enter()
         .append("svg:g")
-            .attr("class", "zoomRegion")
-	    .attr("name", s => s.name);
+            .attr("class", "zoomStrip")
+	    .attr("name", d => d.strain.name);
     zrs.exit().remove();
+
+    // y-coords for each strain in the zoom view
+    let dy = v.stripHeight;
+    d3.select(svgs.zoomView.selector)
+        .attr("height", dy*(data.length+1));
+    data.forEach( (d,i) => d.strain.zoomY = 45 + (i * dy) );
     //
-    let dy = v.height / (v.strains.length + 1);
-    v.strains.forEach( (s,i) => s.zoomY = 15 + (i * dy) );
-    //
-    newZrs.append("g")
-        .attr("class", "features");
-    // horiz. lines
-    newZrs.append("line") ;
-    zrs.select("line")
-	.attr("x1", 0)
-	.attr("y1", d => d.zoomY )
-	.attr("x2", v.width)
-	.attr("y2", d => d.zoomY )
     // strain labels
     newZrs.append("text") ;
     zrs.select("text")
 	.attr("x", 0)
-	.attr("y", d => d.zoomY + 18)
+	.attr("y", d => d.strain.zoomY - 18)
 	.attr("font-family","sans-serif")
 	.attr("font-size", 10)
-        .text(s =>s .name);
+        .text(d => d.strain.name);
 
-    //
-    getFeatures(rStrain, c, start, end);
-    //
-    if( cStrains.length ) {
-	getBlockFiles(rStrain, cStrains).then(function(){
-	    cStrains.forEach( cs => {
-	        let blkFile = (rcBlocks[rStrain.name] || {})[cs.name];
-		if (!blkFile) throw "Internal error. No block file found in index."
-		let ranges = blkFile.translate(rStrain, c, start, end);
-		getCompFeatures(cs, ranges);
-	    });
-	   
-	});
+    // zoom blocks
+    let zbs = zrs.selectAll(".zoomBlock")
+        .data(d => d.blocks, d => d.blockId);
+    zbs.exit().remove();
+    let newZbs = zbs.enter().append("g")
+        .attr("class", b => "zoomBlock" + (b.ori==="+" ? " plus" : " minus"))
+	.attr("name", d=>d.blockId);
+    // rectangle for the whole block
+    newZbs.append("rect").attr("class", "block");
+    // group to hold features
+    newZbs.append('g').attr('class','features');
+    // the axis line
+    newZbs.append("line").attr("class","axis") ;
+    // label
+    newZbs.append("text") ;
+
+    // To line each chunk up with the corresponding chunk in the reference strain,
+    // create the appropriate x scales.
+    zbs.each( b => {
+	let x1 = v.xscale(b.fStart);
+	let x2 = v.xscale(b.fEnd);
+	b.xscale = d3.scale.linear().domain([b.start, b.end]).range([x1, x2]);
+    });
+    // draw the zoom block outline
+    zbs.select("rect.block")
+      .attr("x", b => {
+          return b.xscale(b.start)
+      })
+      .attr("y", (b,i,j) => {
+	  return data[j].strain.zoomY - 15;
+      })
+      .attr("width", b=>b.xscale(b.end)-b.xscale(b.start))
+      .attr("height", 30);
+
+    // axis line
+    zbs.select("line")
+	.attr("x1", b => b.xscale.range()[0])
+	.attr("y1", (b,i,j) => data[j].strain.zoomY )
+	.attr("x2", b => b.xscale.range()[1])
+	.attr("y2", (b,i,j) => data[j].strain.zoomY )
+
+    // features
+    let feats = zbs.select('.features').selectAll(".feature")
+        .data(d=>d.features, d=>d.mgpid);
+    feats.exit().remove();
+    let newFeats = feats.enter().append("rect")
+        .attr("class", f => "feature" + (f.strand==="-" ? " minus" : " plus"))
+	.on("mouseover", highlight);
+
+    // draw the rectangles
+    let rHeight = 10;
+    let fBlock = function (featElt) {
+        let blkElt = featElt.parentNode.parentNode;
+	return blkElt.__data__;
     }
+    let fStrain = function (featElt) {
+        let blkElt = featElt.parentNode.parentNode;
+	let stripElt = blkElt.parentNode;
+	return stripElt.__data__.strain;
+    }
+    feats
+      .attr("x", function (f) { return fBlock(this).xscale(f.start) })
+      .attr("y", function (f) { return fStrain(this).zoomY - (f.strand === "-" ? 0 : rHeight) })
+      .attr("width", function (f) { return fBlock(this).xscale(f.end)-fBlock(this).xscale(f.start)+1 })
+      .attr("height", rHeight)
+      .style("fill", f => cscale(getMungedType(f)));
 
-}
+};
 
 let cscale = d3.scale.category10().domain([
         "protein_coding_gene",
@@ -521,47 +640,34 @@ let cscale = d3.scale.category10().domain([
 	"other_feature_type"
     ]);
 
-function drawZoomFeatures(feats, strain, c, start, end){
-    console.log("Draw zoom features", feats)
-
-    // the view
-    let v = svgs.zoomView;
-
-    // x-scale
-    v.xscale = d3.scale.linear()
-        .domain([start,end])
-	.range([0,v.width]);
-
-    // bind feature data
-    let rects = v.svg.select(`g.zoomRegion[name="${strain.name}"] .features`)
-      .selectAll('rect.feature')
-      .data(feats, f => f.mgpid);
-
-    // new rectangles
-    let newRs = rects.enter()
-      .append("rect")
-        .attr("class","feature");
-
-    // draw the rectangles
-    let rHeight = 10;
-    rects
-      .attr("x", f => v.xscale(f.start))
-      .attr("y", f => strain.zoomY - (f.strand === "-" ? 0 : rHeight))
-      .attr("width", f => v.xscale(f.end)-v.xscale(f.start)+1)
-      .attr("height", rHeight)
-      .style("fill", f => cscale(getMungedType(f)));
-
-    // tooltips
-    newRs.append("title")
-	.text( f => f.symbol === "." ?
+function fText(f){
+    return f.symbol === "." ?
 	    `${f.mgpid}\n${f.type}/${f.biotype}`
 	    :
-	    `${f.symbol}\n${f.mgiid}\n${f.mgpid}\n${f.type}/${f.biotype}` );
-	
-    // Remove exiting 
-    rects.exit().remove();
+	    `${f.symbol}\n${f.mgiid}\n${f.mgpid}\n${f.type}/${f.biotype}` ;
 }
-  
+
+function updateFeatureDetails (f) {
+    let fd = d3.select('.featureDetails');
+    fd.select('.mgpid span').text(f.mgpid)
+    fd.select('.type span').text(f.type)
+    fd.select('.biotype span').text(f.biotype)
+    fd.select('.mgiid span').text(f.mgiid)
+    fd.select('.symbol span').text(f.symbol)
+    fd.select('.coordinates span').text(`${f.strand}${f.chr}:${f.start}..${f.end}`)
+}
+
+function highlight(f) {
+    updateFeatureDetails(f);
+    let hls = [];
+    svgs.zoomView.svg.selectAll(".feature")
+        .classed("highlight", function(ff) {
+	    let v = (f.mgiid && f.mgiid !== "." && f.mgiid === ff.mgiid) || f === ff;
+	    v && hls.push(this);
+	    return v;
+	});
+}
+
 function drawColorKey() {
     let colors = cscale.domain().map(lbl => {
         return { lbl:lbl, clr:cscale(lbl) };
@@ -578,18 +684,52 @@ function drawColorKey() {
 	.attr("name", "featureType")
 	.property("type", "checkbox")
 	.property("value", c => c.lbl)
-	.on("change", selectedFeatureTypes);
-    ncs.append("label")
+	.on("change", function () {
+	    // get all the currently checked feature types
+	    let fts = []
+	    d3.selectAll('input[type="checkbox"][name="featureType"]')
+		.each(function(d){
+		    if (this.checked) fts.push(this.value);
+		});
+	    setFeatureTypeFacet(fts);
+	});
+    ncs.append("span")
 	.text(c => c.lbl);
 }
 
-function selectedFeatureTypes(){
-    let cbs = d3.selectAll('input[type="checkbox"][name="featureType"]');
-    let fts = [];
-    cbs.each(function(d){
-        if (this.checked) fts.push(this.value);
-    });
-    console.log(fts);
+
+// ---------------------------------------------
+// ---------------------------------------------
+let facets = {
+  featureTypes: [],
+  mgiIds: "",
+};
+
+function setMgiFacet(v) {
+    facets.mgiIds = v;
+    applyFacets();
+}
+
+function setFeatureTypeFacet(ftypes) {
+    facets.featureTypes = ftypes;
+    applyFacets();
+}
+
+function applyFacets() {
+    let show = null;
+    let hide = "none";
+    //
+    let fts = facets.featureTypes;
+    function ftFilter (f) {
+	return fts.length===0 || fts.indexOf(getMungedType(f)) >= 0 
+    };
+    //
+    let mgi = facets.mgiIds;
+    function mgiFilter (f) {
+	return mgi === "yes" ? (f.mgiid && f.mgiid !== ".") : mgi === "no" ? (!f.mgiid || f.mgiid === ".") : true;
+    };
+    svgs.zoomView.svg.selectAll('rect.feature')
+        .style("display", f => (ftFilter(f) && mgiFilter(f)) ? show : hide);
 
 }
 
@@ -621,7 +761,7 @@ function getMungedType(f) {
 			"other_feature_type";
 }
 
-
+// ---------------------------------------------
 //----------------------------------------------
 setup();
 

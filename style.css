@@ -11,6 +11,10 @@ line.chr {
     text-anchor : middle;
 }
 
+.featureDetails {
+    font-size: 12px;
+}
+
 .brush .extent {
     fill-opacity : 0.3;
     stroke : none;
@@ -27,13 +31,24 @@ line.chr {
     background-color: #ccc;
     border: thin solid black;
 }
-.zoomRegion line {
+.zoomStrip line {
     stroke: #aaa;
     fill: none;
 }
+.zoomBlock > rect.block {
+    stroke: black;
+    fill: #ddd;
+}
+.zoomBlock.minus > rect.block {
+    stroke: red;
+}
+
 rect.feature {
     fill : #aaa;
     stroke: none;
+}
+rect.feature.highlight {
+    stroke: red;
 }
 
 .colorKey {
@@ -69,7 +84,6 @@ rect.feature {
 .flexcolumn {
     display: flex;
     flex-direction: column;
-    align-items: center;
     flex-wrap: nowrap;
 }
 
@@ -77,3 +91,32 @@ rect.feature {
     margin: 2px;
 }
 
+label {
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.featureDetails div label {
+    font-size: 12px;
+}
+
+label::after {
+    content: ":";
+}
+
+.leftcolumn {
+    width: 200px;
+}
+.rightcolumn {
+    min-width: 200px;
+}
+.leftcolumn > div,
+.rightcolumn > div {
+    background-color: #ccc;
+    border: thin solid black;
+    padding: 6px;
+}
+
+.zoomBlock text {
+   font-size: 12px;
+}
