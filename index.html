@@ -10,11 +10,11 @@
 <div class="flexrow" style="align-items: flex-start;">
     <div class="leftcolumn flexcolumn">
 	<div class="refStrain flexcolumn">
-	    <label>Reference strain</label>
+	    <label>Reference genome</label>
 	    <select id="refStrain"></select>
 	</div>
 	<div class="compStrains flexcolumn">
-	    <label>Comparison strains</label>
+	    <label>Comparison genomes</label>
 	    <select id="compStrains" size="20"></select>
 	</div>
 	<div class="colorKey flexcolumn">
@@ -34,9 +34,21 @@
 	    <svg></svg>
 	</div>
 	<div id="zoomView" class="flexcolumn">
-	    <div class="mgiFacet flexrow">
-		<label>Coords</label>
-		<input id="zoomCoords" size="30" type="text"></input>
+	    <div class="flexrow">
+		<div class="zoomCoords flexrow">
+		    <label>Coords</label>
+		    <input id="zoomCoords" size="30" type="text"></input>
+		</div>
+		<div class="zoomBtns flexrow">
+		    <label>Zoom</label>
+		    <button id="zoomOut">Out</input>
+		    <button id="zoomIn">In</input>
+		</div>
+		<div class="panBtns flexrow">
+		    <label>Pan</label>
+		    <button id="panLeft">Left</input>
+		    <button id="panRight">Right</input>
+		</div>
 	    </div>
 	    <svg></svg>
 	</div>

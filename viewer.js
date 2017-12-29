@@ -33,7 +33,9 @@ let brushChr = null;  // chromosome with current brush
 
 let dur = 1500;         // anomation duration
 let cwidth = 20;        // chromosome width
+let featHeight = 10;	// height of a rectangle representing a feature
 let bwidth = cwidth/2;  // block width
+let zoomCoords = null;  // current zoom coordinates
 
 //
 // Promisifies a call to d3.tsv.
@@ -110,6 +112,12 @@ function setup () {
 	setZoomCoords(coords);
     });
     //
+    d3.select("#zoomOut").on("click", () => zoom(2));
+    d3.select("#zoomIn") .on("click", () => zoom(.5));
+    //
+    d3.select("#panLeft") .on("click", () => pan(+0.5));
+    d3.select("#panRight").on("click", () => pan(-0.5));
+    //
     d3tsv("./data/strainList.tsv").then(function(data){
         allStrains = data.map(s => s.strain);
         initOptList("#refStrain", allStrains);
@@ -135,15 +143,41 @@ function parseCoords (coords) {
     let m = coords.match(re);
     return m ? {chr:m[1], start:parseInt(m[2]), end:parseInt(m[3])} : null;
 }
+
 function setZoomCoords (coords) {
+    zoomCoords = coords;
     d3.select("#zoomCoords")[0][0].value = formatCoords(coords.chr, coords.start, coords.end);
     svgs.genomeView.svg.select(`g.brush[name="${ coords.chr }"]`).each(function(chr){
 	chr.brush.extent([coords.start,coords.end]);
 	chr.brush(d3.select(this));
     });
-    updateZoomView(rStrain, coords.chr, coords.start, coords.end, cStrains)
+    updateZoomView();
 }
 
+// Zooms in/out by factor. New zoom width is factor * the current zoom width.
+// Factor > 1 zooms out, 0 < factor < 1 zooms in.
+function zoom (factor) {
+    let z = zoomCoords;
+    if (!z) return;
+    let len = z.end - z.start + 1;
+    let newlen = Math.round(factor * len);
+    let x = (z.start + z.end)/2;
+    let newstart = Math.round(x - newlen/2);
+    setZoomCoords({ chr: z.chr, start: newstart, end: newstart + newlen - 1 });
+}
+
+// Pans the view left or right by factor. The distance moved is factor times the current zoom width.
+// Negative values pan left. Positive values pan right. (Note that panning moves the "camera". Panning to the
+// right makes the objects in the scene appear to move to the left, and vice versa.)
+//
+function pan (factor) {
+    let z = zoomCoords;
+    if (!z) return;
+    let d = Math.round(factor * (z.end - z.start + 1));
+    setZoomCoords({ chr: z.chr, start: z.start + d, end: z.end + d });
+}
+
+//
 function setupSvgs() {
     for(let n in svgs){
         let c = svgs[n];
@@ -484,7 +518,13 @@ function processFeatures (feats) {
 
 
 //----------------------------------------------
-function updateZoomView(rStrain, chr, start, end, cStrains){
+function updateZoomView() {
+
+    if (!zoomCoords) return;
+
+    let chr = zoomCoords.chr;
+    let start = zoomCoords.start;
+    let end = zoomCoords.end;
 
     // make sure we've loaded the coordinate mapping data for these strains
     getBlockFiles(rStrain, cStrains).then(function(){
@@ -612,7 +652,6 @@ function drawZoomView(data) {
 	.on("mouseover", highlight);
 
     // draw the rectangles
-    let rHeight = 10;
     let fBlock = function (featElt) {
         let blkElt = featElt.parentNode.parentNode;
 	return blkElt.__data__;
@@ -624,11 +663,13 @@ function drawZoomView(data) {
     }
     feats
       .attr("x", function (f) { return fBlock(this).xscale(f.start) })
-      .attr("y", function (f) { return fStrain(this).zoomY - (f.strand === "-" ? 0 : rHeight) })
+      .attr("y", function (f) { return fStrain(this).zoomY - (f.strand === "-" ? 0 : featHeight) })
       .attr("width", function (f) { return fBlock(this).xscale(f.end)-fBlock(this).xscale(f.start)+1 })
-      .attr("height", rHeight)
+      .attr("height", featHeight)
       .style("fill", f => cscale(getMungedType(f)));
-
+    
+    //
+    applyFacets();
 };
 
 let cscale = d3.scale.category10().domain([
@@ -659,11 +700,12 @@ function updateFeatureDetails (f) {
 
 function highlight(f) {
     updateFeatureDetails(f);
-    let hls = [];
     svgs.zoomView.svg.selectAll(".feature")
         .classed("highlight", function(ff) {
 	    let v = (f.mgiid && f.mgiid !== "." && f.mgiid === ff.mgiid) || f === ff;
-	    v && hls.push(this);
+	    d3.select(this)
+		.attr("transform", (v && ff.strand === "+") ?  `translate(0, ${-featHeight/2})` : null)
+		.attr("height", featHeight * (v ? 1.5 : 1));
 	    return v;
 	});
 }

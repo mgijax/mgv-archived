@@ -36,11 +36,11 @@ line.chr {
     fill: none;
 }
 .zoomBlock > rect.block {
-    stroke: black;
+    stroke: none;
     fill: #ddd;
 }
 .zoomBlock.minus > rect.block {
-    stroke: red;
+    fill: #aaa;
 }
 
 rect.feature {
@@ -48,7 +48,6 @@ rect.feature {
     stroke: none;
 }
 rect.feature.highlight {
-    stroke: red;
 }
 
 .colorKey {
