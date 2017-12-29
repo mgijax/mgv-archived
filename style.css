@@ -119,3 +119,9 @@ label::after {
 .zoomBlock text {
    font-size: 12px;
 }
+
+.fiducials .fiducial {
+   stroke : none;
+   fill: blue;
+   fill-opacity: 0.3;
+}

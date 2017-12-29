@@ -147,7 +147,7 @@ function parseCoords (coords) {
 function setZoomCoords (coords) {
     zoomCoords = coords;
     d3.select("#zoomCoords")[0][0].value = formatCoords(coords.chr, coords.start, coords.end);
-    svgs.genomeView.svg.select(`g.brush[name="${ coords.chr }"]`).each(function(chr){
+    svgs.genomeView.svg.select("g.strips").select(`g.brush[name="${ coords.chr }"]`).each(function(chr){
 	chr.brush.extent([coords.start,coords.end]);
 	chr.brush(d3.select(this));
     });
@@ -189,6 +189,11 @@ function setupSvgs() {
           .append("g")
             .attr("transform", "translate(" + c.margin.left + "," + c.margin.top + ")")
           .append("g");
+	
+	c.svg.append("g")
+	  .attr("class","strips");
+	c.svg.append("g")
+	  .attr("class","fiducials");
     }
 }
 
@@ -577,8 +582,8 @@ function drawZoomView(data) {
 	.range([0,v.width]);
 
 
-    // zoom strip (contain 0 or more zoom blocks)
-    let zrs = v.svg
+    // zoom strips (contain 0 or more zoom blocks)
+    let zrs = v.svg.select("g.strips")
               .selectAll("g.zoomStrip")
               .data(data, d => d.strain.name);
     let newZrs = zrs.enter()
@@ -670,6 +675,8 @@ function drawZoomView(data) {
     
     //
     applyFacets();
+    //
+    drawFiducials();
 };
 
 let cscale = d3.scale.category10().domain([
@@ -700,14 +707,62 @@ function updateFeatureDetails (f) {
 
 function highlight(f) {
     updateFeatureDetails(f);
-    svgs.zoomView.svg.selectAll(".feature")
+    svgs.zoomView.svg.select("g.strips").selectAll(".feature")
         .classed("highlight", function(ff) {
 	    let v = (f.mgiid && f.mgiid !== "." && f.mgiid === ff.mgiid) || f === ff;
+	    return v;
 	    d3.select(this)
 		.attr("transform", (v && ff.strand === "+") ?  `translate(0, ${-featHeight/2})` : null)
 		.attr("height", featHeight * (v ? 1.5 : 1));
 	    return v;
 	});
+    drawFiducials();
+}
+
+function unhighlight (f) {
+    d3.select(this)
+        .attr("transform", null)
+	.attr("height", featHeight);
+    hideFiducials();
+}
+
+function drawFiducials() {
+    let items = svgs.zoomView.svg.select("g.strips").selectAll(".feature.highlight")[0];
+    items.sort( (a,b) => parseFloat(a.getAttribute("y")) - parseFloat(b.getAttribute("y")) );
+    let v = svgs.zoomView.svg;
+    v.select("g.fiducials")
+        .classed("hidden", false);
+    let pairs = items.map((item, i) => [item,items[i+1]]);
+    pairs.splice(pairs.length - 1, 1);
+    //
+    let pgons = v.select("g.fiducials")
+        .selectAll("polygon")
+	.data(pairs)
+	;
+    pgons.exit().remove();
+    pgons.enter().append("polygon")
+        .attr("class","fiducial")
+	;
+    pgons.attr("points", p => {
+        let x1 = parseFloat(p[0].getAttribute("x"));
+        let y1 = parseFloat(p[0].getAttribute("y"));
+	let w1 = parseFloat(p[0].getAttribute("width"));
+	let h1 = parseFloat(p[0].getAttribute("height"));
+	//
+        let x2 = parseFloat(p[1].getAttribute("x"));
+        let y2 = parseFloat(p[1].getAttribute("y"));
+	let w2 = parseFloat(p[1].getAttribute("width"));
+	let h2 = parseFloat(p[1].getAttribute("height"));
+	//
+	let s = `${x1},${y1} ${x2},${y2} ${x2+w2},${y2} ${x1+w1},${y1}`
+	//
+	return s;
+    });
+}
+function hideFiducials() {
+    let v = svgs.zoomView.svg;
+    v.select("g.fiducials")
+        .classed("hidden", true);
 }
 
 function drawColorKey() {
@@ -770,7 +825,7 @@ function applyFacets() {
     function mgiFilter (f) {
 	return mgi === "yes" ? (f.mgiid && f.mgiid !== ".") : mgi === "no" ? (!f.mgiid || f.mgiid === ".") : true;
     };
-    svgs.zoomView.svg.selectAll('rect.feature')
+    svgs.zoomView.svg.select("g.strips").selectAll('rect.feature')
         .style("display", f => (ftFilter(f) && mgiFilter(f)) ? show : hide);
 
 }
