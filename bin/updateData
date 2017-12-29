@@ -1,13 +1,11 @@
 #!/bin/bash
+#
+# Update data
+#
+# Main script for building/updating the data files used by the viewer.
+#
 
 source config.sh
-
-strainList="${DIR}/data/strainList.tsv"
-echo "strain" > "${strainList}"
-for sn in "${ALL_STRAIN_NAMES[@]}"
-do : 
-    echo "${sn}" >> "${strainList}"
-done
 
 BDIR="${DIR}/bin"
 DDIR="${DIR}/data/downloads"
@@ -15,6 +13,14 @@ SDIR="${DIR}/data/straindata"
 
 mkdir -p ${DDIR}
 mkdir -p ${SDIR}
+
+# generate strain list file (a simple table of strain names)
+strainList="${DIR}/data/strainList.tsv"
+echo "strain" > "${strainList}"
+for sn in "${ALL_STRAIN_NAMES[@]}"
+do : 
+    echo "${sn}" >> "${strainList}"
+done
 
 function download {
    strain=$1

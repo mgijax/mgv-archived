@@ -125,3 +125,8 @@ label::after {
    fill: blue;
    fill-opacity: 0.3;
 }
+
+.footer {
+   position: static;
+   bottom: 0px;
+}
