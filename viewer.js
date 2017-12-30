@@ -507,7 +507,8 @@ function getFeatures(strain, ranges){
     return d3json(url).then(function(data) {
 	let s = data.forEach( (d,i) => {
 	    let r = ranges[i];
-	    r.features = processFeatures( d.features, strain )
+	    r.features = processFeatures( d.features, strain );
+	    r.strain = strain;
 	});
 	return { strain, blocks:ranges };
     });
@@ -624,7 +625,7 @@ function drawZoomView(data) {
     // zoom blocks
     let zbs = zrs.selectAll(".zoomBlock")
         .data(d => d.blocks, d => d.blockId);
-    zbs.exit().remove();
+    //
     let newZbs = zbs.enter().append("g")
         .attr("class", b => "zoomBlock" + (b.ori==="+" ? " plus" : " minus"))
 	.attr("name", d=>d.blockId);
@@ -635,7 +636,12 @@ function drawZoomView(data) {
     // the axis line
     newZbs.append("line").attr("class","axis") ;
     // label
-    newZbs.append("text") ;
+    newZbs.append("text")
+        .attr("class","blockLabel") 
+	.text(b => b.chr);
+
+    //
+    zbs.exit().remove();
 
     // To line each chunk up with the corresponding chunk in the reference strain,
     // create the appropriate x scales.
@@ -658,9 +664,13 @@ function drawZoomView(data) {
     // axis line
     zbs.select("line")
 	.attr("x1", b => b.xscale.range()[0])
-	.attr("y1", (b,i,j) => data[j].strain.zoomY )
+	.attr("y1", b => b.strain.zoomY )
 	.attr("x2", b => b.xscale.range()[1])
-	.attr("y2", (b,i,j) => data[j].strain.zoomY )
+	.attr("y2", b => b.strain.zoomY )
+
+    zbs.select("text.blockLabel")
+        .attr("x", b => (b.xscale(b.start) + b.xscale(b.end))/2 )
+	.attr("y", b => b.strain.zoomY + 25);
 
     // features
     let feats = zbs.select('.features').selectAll(".feature")
@@ -668,6 +678,7 @@ function drawZoomView(data) {
     feats.exit().remove();
     let newFeats = feats.enter().append("rect")
         .attr("class", f => "feature" + (f.strand==="-" ? " minus" : " plus"))
+	.style("fill", f => cscale(getMungedType(f)))
 	.on("mouseover", function(f){highlight(f,this);});
 
     // draw the rectangles
@@ -676,11 +687,11 @@ function drawZoomView(data) {
 	return blkElt.__data__;
     }
     feats
-      .attr("x", function (f) { return fBlock(this).xscale(f.start) })
-      .attr("y", function (f) { return f.strain.zoomY - (f.strand === "-" ? 0 : featHeight) })
       .attr("width", function (f) { return fBlock(this).xscale(f.end)-fBlock(this).xscale(f.start)+1 })
       .attr("height", featHeight)
-      .style("fill", f => cscale(getMungedType(f)));
+      .attr("x", function (f) { return fBlock(this).xscale(f.start) })
+      .attr("y", function (f) { return f.strain.zoomY - (f.strand === "-" ? 0 : featHeight) })
+
     
     //
     applyFacets();
