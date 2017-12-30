@@ -13,12 +13,20 @@ line.chr {
 
 .featureDetails {
     font-size: 12px;
+    align-self: flex-start;
+    position: relative;
+    top: 35px;
+    width: 225px;
 }
 
 .brush .extent {
     fill-opacity : 0.3;
     stroke : none;
     shape-rendering: crispEdges;
+}
+
+.button {
+    cursor: pointer;
 }
 
 #genomeView {
@@ -127,7 +135,12 @@ label::after {
    fill-opacity: 0.3;
 }
 
-.fiducials.hidden .fiducial {
+.fiducials .featLabel {
+   font-size: 14px;
+}
+
+.fiducials.hidden .fiducial,
+.fiducials.hidden .featLabel {
    display: none;
 }
 

@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html>
 <head>
-<script src="http://d3js.org/d3.v3.min.js"></script>
-<meta charset="utf-8">
-<link type="text/css" rel="stylesheet" href="./style.css">
+    <meta charset="utf-8">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <script src="http://d3js.org/d3.v3.min.js"></script>
+    <link type="text/css" rel="stylesheet" href="./style.css">
 </head>
 <body>
 <h3>Genome Rearrangement Viewer</h3>
@@ -41,46 +42,50 @@
 		</div>
 		<div class="zoomBtns flexrow">
 		    <label>Zoom</label>
-		    <button id="zoomOut">Out</input>
-		    <button id="zoomIn">In</input>
+		    <i id="zoomOut" class="material-icons button">zoom_out</i>
+		    <i id="zoomIn" class="material-icons button">zoom_in</i>
 		</div>
 		<div class="panBtns flexrow">
 		    <label>Pan</label>
-		    <button id="panLeft">Left</input>
-		    <button id="panRight">Right</input>
+		    <i id="panLeft" class="material-icons button">chevron_left</i>
+		    <i id="panRight" class="material-icons button">chevron_right</i>
 		</div>
 	    </div>
-	    <svg></svg>
+	    <div class="flexrow">
+
+		<svg></svg>
+
+		<div class="featureDetails flexcolumn">
+		    <label>Feature details</label>
+		    <div class="mgpid flexrow">
+			<label>MGP id</label>
+			<span></span>
+		    </div>
+		    <div class="type flexrow">
+			<label>Type</label>
+			<span></span>
+		    </div>
+		    <div class="biotype flexrow">
+			<label>Biotype</label>
+			<span></span>
+		    </div>
+		    <div class="mgiid flexrow">
+			<label>MGI id</label>
+			<span></span>
+		    </div>
+		    <div class="symbol flexrow">
+			<label>Symbol</label>
+			<span></span>
+		    </div>
+		    <div class="coordinates flexrow">
+			<label>Coordinates</label>
+			<span></span>
+		    </div>
+		</div> <!-- end featureDetails -->
+	    </div>
 	</div>
     </div>
     <div class="rightcolumn flexcolumn">
-	<div class="featureDetails flexcolumn">
-	    <label>Feature details</label>
-	    <div class="mgpid flexrow">
-	        <label>MGP id</label>
-	        <span></span>
-	    </div>
-	    <div class="type flexrow">
-	        <label>Type</label>
-	        <span></span>
-	    </div>
-	    <div class="biotype flexrow">
-	        <label>Biotype</label>
-	        <span></span>
-	    </div>
-	    <div class="mgiid flexrow">
-	        <label>MGI id</label>
-	        <span></span>
-	    </div>
-	    <div class="symbol flexrow">
-	        <label>Symbol</label>
-	        <span></span>
-	    </div>
-	    <div class="coordinates flexrow">
-	        <label>Coordinates</label>
-	        <span></span>
-	    </div>
-	</div>
     </div>
 </div>
 <div class="footer">

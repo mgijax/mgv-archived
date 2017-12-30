@@ -427,26 +427,26 @@ function getBlockFiles(rStrain, cStrains) {
 //----------------------------------------------
 function drawGenomeView() {
 
-    let svg = svgs.genomeView;
+    let v = svgs.genomeView;
 
     let sdata = strainData[rsName];
 
     let xf = function(d){return bwidth+sdata.xscale(d.name);};
 
     // Chromosome backbones (lines)
-    let ccels = svg.svg.selectAll('line.chr')
+    let ccels = v.svg.selectAll('line.chr')
       .data(sdata.chromosomes, function(x){return x.name;});
     ccels.exit().transition().duration(dur)
-      .attr("y1", svg.height)
-      .attr("y2", svg.height)
+      .attr("y1", v.height)
+      .attr("y2", v.height)
       .remove();
     ccels.enter().append('line')
       .attr('class','chr')
       .attr('name', c => c.name)
       .attr("x1", xf)
-      .attr("y1", svg.height)
+      .attr("y1", v.height)
       .attr("x2", xf)
-      .attr("y2", svg.height)
+      .attr("y2", v.height)
       ;
     ccels.transition().duration(dur)
       .attr("x1", xf)
@@ -456,17 +456,17 @@ function drawGenomeView() {
 	;
 
     // Chromosome labels
-    labels = svg.svg.selectAll('.chrlabel')
+    labels = v.svg.selectAll('.chrlabel')
       .data(sdata.chromosomes, function(x){return x.name;});
     labels.exit().transition().duration(dur)
-      .attr('y', svg.height)
+      .attr('y', v.height)
       .remove();
     labels.enter().append('text')
       .attr('font-family','sans-serif')
       .attr('font-size', 10)
       .attr('class','chrlabel')
       .attr('x', xf)
-      .attr('y', svg.height);
+      .attr('y', v.height);
     labels
       .text(function(d){return d.name;})
       .transition().duration(dur)
@@ -474,7 +474,7 @@ function drawGenomeView() {
       .attr('y', -2) ;
 
     // Brushes
-    brushes = svg.svg.selectAll("g.brush")
+    brushes = v.svg.selectAll("g.brush")
         .data(sdata.chromosomes, function(x){return x.name;});
     brushes.exit().remove();
     brushes.enter().append('g')
@@ -489,6 +489,14 @@ function drawGenomeView() {
         .attr('transform', function(d){return 'translate('+sdata.xscale(d.name)+')';})
         .each(function(d){d3.select(this).call(d.brush);})
 	;
+    // Ref strain label
+    let rsLabel = v.svg.selectAll("text.strainLabel")
+        .data([rStrain]);
+    rsLabel.enter().append("text").attr("class","strainLabel");
+    rsLabel.text(s => s.label)
+        .attr("x", v.width/2)
+	.attr("y", v.height - 20);
+	
 }
 
 let featCache = {};    // global index from mgpid -> feature
@@ -499,13 +507,13 @@ function getFeatures(strain, ranges){
     return d3json(url).then(function(data) {
 	let s = data.forEach( (d,i) => {
 	    let r = ranges[i];
-	    r.features = processFeatures( d.features )
+	    r.features = processFeatures( d.features, strain )
 	});
 	return { strain, blocks:ranges };
     });
 }
 
-function processFeatures (feats) {
+function processFeatures (feats, strain) {
     return feats.map(d => {
 	mgpid = d[6];
 	if (featCache[mgpid])
@@ -520,6 +528,7 @@ function processFeatures (feats) {
 	  mgpid   : mgpid,
 	  mgiid   : d[7],
 	  symbol  : d[8],
+	  strain  : strain
 	};
 	featCache[mgpid] = r;
 	return r;
@@ -659,21 +668,16 @@ function drawZoomView(data) {
     feats.exit().remove();
     let newFeats = feats.enter().append("rect")
         .attr("class", f => "feature" + (f.strand==="-" ? " minus" : " plus"))
-	.on("mouseover", highlight);
+	.on("mouseover", function(f){highlight(f,this);});
 
     // draw the rectangles
     let fBlock = function (featElt) {
         let blkElt = featElt.parentNode.parentNode;
 	return blkElt.__data__;
     }
-    let fStrain = function (featElt) {
-        let blkElt = featElt.parentNode.parentNode;
-	let stripElt = blkElt.parentNode;
-	return stripElt.__data__.strain;
-    }
     feats
       .attr("x", function (f) { return fBlock(this).xscale(f.start) })
-      .attr("y", function (f) { return fStrain(this).zoomY - (f.strand === "-" ? 0 : featHeight) })
+      .attr("y", function (f) { return f.strain.zoomY - (f.strand === "-" ? 0 : featHeight) })
       .attr("width", function (f) { return fBlock(this).xscale(f.end)-fBlock(this).xscale(f.start)+1 })
       .attr("height", featHeight)
       .style("fill", f => cscale(getMungedType(f)));
@@ -710,7 +714,7 @@ function updateFeatureDetails (f) {
     fd.select('.coordinates span').text(`${f.strand}${f.chr}:${f.start}..${f.end}`)
 }
 
-function highlight(f) {
+function highlight(f, rect) {
     updateFeatureDetails(f);
     svgs.zoomView.svg.select("g.strips").selectAll(".feature")
         .classed("highlight", function(ff) {
@@ -721,7 +725,7 @@ function highlight(f) {
 		.attr("height", featHeight * (v ? 1.5 : 1));
 	    return v;
 	});
-    drawFiducials();
+    drawFiducials(f);
 }
 
 function unhighlight () {
@@ -731,17 +735,36 @@ function unhighlight () {
     hideFiducials();
 }
 
-function drawFiducials() {
-    let items = svgs.zoomView.svg.select("g.strips").selectAll(".feature.highlight")[0];
-    items.sort( (a,b) => parseFloat(a.getAttribute("y")) - parseFloat(b.getAttribute("y")) );
+function drawFiducials(f) {
     let v = svgs.zoomView.svg;
-    v.select("g.fiducials")
+
+    // get the "stack" of features that are highlighted
+    // make sure they're sorted by Y position
+    let items = v.select("g.strips").selectAll(".feature.highlight")[0];
+    items.sort( (a,b) => parseFloat(a.getAttribute("y")) - parseFloat(b.getAttribute("y")) );
+
+    // create all feducial marks in their own group 
+    let fGrp = v.select("g.fiducials")
         .classed("hidden", false);
+
+    if (f) {
+	let label = fGrp.selectAll('text.featLabel')
+	    .data([f]);
+	label.enter().append('text').attr('class','featLabel');
+	label
+	  .attr("x", 250)
+	  .attr("y", 20)
+	  .text(f => {
+	       let sym = f.symbol && f.symbol !== "." ? f.symbol : f.mgpid;
+	       return sym;
+	  })
+    }
+
+    // create a polygon between each successive pair of items
     let pairs = items.map((item, i) => [item,items[i+1]]);
     pairs.splice(pairs.length - 1, 1);
     //
-    let pgons = v.select("g.fiducials")
-        .selectAll("polygon")
+    let pgons = fGrp.selectAll("polygon")
 	.data(pairs)
 	;
     pgons.exit().remove();
