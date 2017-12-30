@@ -24,7 +24,7 @@ do :
     echo "${sn}	${slbl}" >> "${strainList}"
     count=$(expr $count + 1)
 done
-exit
+
 function download {
    strain=$1
    fname="${DDIR}/$2"
