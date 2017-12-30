@@ -1,295 +1,31 @@
 (function () {
  
-let svgs = {
-  genomeView : {
-    selector : "#genomeView svg",
-    margin : {top: 35, right: 10, bottom: 20, left: 10},
-    outerWidth : 800,
-    outerHeight : 250,
-    width : -1,
-    height : -1,
-    svg : null
-    },
-  zoomView : {
-    selector : "#zoomView svg",
-    margin : {top: 10, right: 10, bottom: 10, left: 10},
-    outerWidth : 800,
-    outerHeight : 100,
-    width : -1,
-    height : -1,
-    svg : null,
-    strains : [], // strains in zoom view, top-to-bottom order
-    stripHeight: 60 // height per strain in the zoom view
-    }
-}
-
-let allStrains = []; // list of all strain names
-let strainData = {}; // map from strain name -> strain data obj
-let rStrain = null; // thereference strain
-let cStrains = []; // comparison strains
-let rsName = null;      // reference strain name
-let csNames = [];     // list of comparison strain names
-let brushChr = null;  // chromosome with current brush
-
-let dur = 1500;         // anomation duration
-let cwidth = 20;        // chromosome width
-let featHeight = 10;	// height of a rectangle representing a feature
-let bwidth = cwidth/2;  // block width
-let zoomCoords = null;  // current zoom coordinates
-
-//
-// Promisifies a call to d3.tsv.
-// Args:
-//   url (string) The url of the tsv resource
-// Returns:
-//   a promise that resolves to the list of row objects
-function d3tsv(url) {
-    return new Promise(function(resolve, reject) {
-        d3.tsv(url, function(error, val){
-            error ? reject({ status: error.status, statusText: error.statusText}) : resolve(val);
-        })  
-    }); 
-}
-
-//
-// Promisifies a call to d3.json.
-// Args:
-//   url (string) The url of the json resource
-// Returns:
-//   a promise that resolves to the json object value, or rejects with an error
-function d3json(url) {
-    return new Promise(function(resolve, reject) {
-        d3.json(url, function(error, val){
-            error ? reject({ status: error.status, statusText: error.statusText}) : resolve(val);
-        })  
-    }); 
-}
-
 // ---------------------------------------------
-// Initialize the strain selection lists. 
-// Args:
-//  selector (string) CSS selector of the container element. 
-//  opts (list) List of option data objects. May be simple strings. May be more complex.
-//  value (function or null) Function to produce the option value for the option data obj.
-//       Defaults to the identity function (x=>x).
-//  title (function or null) Function to produce the option label for the option data obj.
-//       Defaults to the value function.
-//  multi (boolean) Specifies if the list support multiple selections. (default = false)
-function initOptList( selector, opts, value, text, multi ) {
-    let s = d3.select(selector);
-    s.property('multiple', multi || null) ;
-    let os = s.selectAll("option").data(opts);
-    let ident = d => d;
-    value = value || ident;
-    text = text || value;
-    os.enter().append("option") ;
-    os.exit().remove() ;
-    os.attr("value", value)
-      .text( text ) ;
-    return s;
+class Feature {
+  constructor (cfg) {
+      this.chr     = cfg.chr;
+      this.start   = cfg.start;
+      this.end     = cfg.end;
+      this.strand  = cfg.strand;
+      this.type    = cfg.type;
+      this.biotype = cfg.biotype;
+      this.mgpid   = cfg.mgpid;
+      this.mgiid   = cfg.mgiid;
+      this.symbol  = cfg.symbol;
+      this.strain  = cfg.strain;
+      if (this.mgiid === ".") this.mgiid = null;
+      if (this.symbol === ".") this.symbol = null;
+  }
 }
-
-//----------------------------------------------
-//
-function setup () {
-    //
-    setupSvgs();
-    //
-    d3.select("#refStrain").on("change", go);
-    d3.select("#compStrains").on("change", go);
-    //
-    drawColorKey();
-    //
-    d3.select("#mgiFacet").on("change", function(){setMgiFacet(this.value);});
-    //
-    d3.select("#zoomCoords").on("change", function () {
-        let coords = parseCoords(this.value);
-	if (! coords) {
-	    alert("Please enter a coordinate range formatted as 'chr:start..end'. For example, '5:10000000..50000000'.");
-	    this.value = "";
-	    return;
-	}
-	setZoomCoords(coords);
-    });
-    //
-    d3.select("#zoomOut").on("click", () => zoom(2));
-    d3.select("#zoomIn") .on("click", () => zoom(.5));
-    //
-    d3.select("#panLeft") .on("click", () => pan(+0.5));
-    d3.select("#panRight").on("click", () => pan(-0.5));
-    //
-    d3tsv("./data/strainList.tsv").then(function(data){
-        allStrains = data;
-        initOptList("#refStrain", allStrains, s=>s.strain, s=>s.label);
-        initOptList("#compStrains", allStrains, s=>s.strain, s=>s.label, true);
-        //
-        return Promise.all(allStrains.map(s => d3tsv(`./data/straindata/${s.strain}-chromosomes.tsv`)));
-    })
-    .then(function (data) {
-        processChromosomes(data);
-        go();
-    })
-    .catch(function(error) {
-        console.log("ERROR!", error)
-    });
-
+// ---------------------------------------------
+class Genome {
+  constructor () {
+  }
 }
-
-function formatCoords (chr, start, end) {
-    return `${chr}:${start}..${end}`
-}
-function parseCoords (coords) {
-    let re = /([^:]+):(\d+)\.\.(\d+)/;
-    let m = coords.match(re);
-    return m ? {chr:m[1], start:parseInt(m[2]), end:parseInt(m[3])} : null;
-}
-
-function setZoomCoords (coords) {
-    zoomCoords = coords;
-    d3.select("#zoomCoords")[0][0].value = formatCoords(coords.chr, coords.start, coords.end);
-    svgs.genomeView.svg.select("g.strips").select(`g.brush[name="${ coords.chr }"]`).each(function(chr){
-	chr.brush.extent([coords.start,coords.end]);
-	chr.brush(d3.select(this));
-    });
-    updateZoomView();
-}
-
-// Zooms in/out by factor. New zoom width is factor * the current zoom width.
-// Factor > 1 zooms out, 0 < factor < 1 zooms in.
-function zoom (factor) {
-    let z = zoomCoords;
-    if (!z) return;
-    let len = z.end - z.start + 1;
-    let newlen = Math.round(factor * len);
-    let x = (z.start + z.end)/2;
-    let newstart = Math.round(x - newlen/2);
-    setZoomCoords({ chr: z.chr, start: newstart, end: newstart + newlen - 1 });
-}
-
-// Pans the view left or right by factor. The distance moved is factor times the current zoom width.
-// Negative values pan left. Positive values pan right. (Note that panning moves the "camera". Panning to the
-// right makes the objects in the scene appear to move to the left, and vice versa.)
-//
-function pan (factor) {
-    let z = zoomCoords;
-    if (!z) return;
-    let d = Math.round(factor * (z.end - z.start + 1));
-    setZoomCoords({ chr: z.chr, start: z.start + d, end: z.end + d });
-}
-
-//
-function setupSvgs() {
-    for(let n in svgs){
-        let c = svgs[n];
-        c.width = c.outerWidth - c.margin.left - c.margin.right;
-        c.height = c.outerHeight - c.margin.top - c.margin.bottom;
-        c.svg = d3.select(c.selector)
-            .attr("width", c.outerWidth)
-            .attr("height", c.outerHeight)
-          .append("g")
-            .attr("transform", "translate(" + c.margin.left + "," + c.margin.top + ")")
-          .append("g");
-	
-	if (n === "zoomView") {
-	    c.svg.append("g")
-	      .attr("class","fiducials");
-	    c.svg.append("g")
-	      .attr("class","strips");
-	    d3.select(svgs[n].selector).on("click", unhighlight);
-        }
-    }
-}
-
-function processChromosomes (d) {
-    // d is a list of chromosome lists, one per strain
-    // Fill in the strainChrs map (strain -> chr list)
-    allStrains.forEach((s,i) => {
-        // nicely sort the chromosomes
-        let chrs = d[i];
-        let maxlen = 0;
-        chrs.forEach( c => {
-            // because I'd rather say "c.name" than "c.chromosome"
-            c.name = c.chromosome;
-            delete c.chromosome;
-	    //
-            c.scale = d3.scale.linear().domain([1, c.length]).range([0, svgs.genomeView.height]);
-            maxlen = Math.max(maxlen, c.length);
-        });
-        chrs.sort((a,b) => {
-            let aa = parseInt(a.name) - parseInt(b.name);
-            if (!isNaN(aa)) return aa;
-            return a.name < b.name ? -1 : a.name > b.name ? +1 : 0;
-        });
-        let xs = d3.scale.ordinal()
-               .domain(chrs.map(function(x){return x.name;}))
-               .rangePoints([0, svgs.genomeView.width],2);
-        let ys = d3.scale.linear().domain([1,maxlen]).range([0, svgs.genomeView.height]);
-        let cs = d3.scale.category20().domain(chrs.map(function(x){return x.name;}));
-
-	chrs.forEach(function(chr){
-	    var sc = d3.scale.linear().domain([1,chr.length]).range([0, ys(chr.length)]);
-            chr.brush = d3.svg.brush().y(sc)
-               .on("brushstart",brushstart)
-               .on("brushend",brushend);
-	  });
-        strainData[s.strain] = {
-	    name : s.strain,
-	    label: s.label,
-            chromosomes : chrs,
-            maxlen : maxlen,
-            xscale : xs,
-            yscale : ys,
-            cscale : cs,
-	    zoomY  : -1
-        };
-    });
-}
-
-
-function brushstart(chr){
-    clearBrushes(chr.brush);
-    d3.event.sourceEvent.stopPropagation();
-    brushChr = chr;
-}
-
-function brushend(chr){
-    if(chr.brush.empty()) {
-	brushChr = null;
-	return;
-    }
-    var xtnt = chr.brush.extent();
-    setZoomCoords({ chr:chr.name, start:Math.floor(xtnt[0]), end: Math.ceil(xtnt[1]) });
-}
-
-function clearBrushes(except){
-    d3.selectAll('.brush').each(function(chr){
-        if (chr.brush !== except) {
-            chr.brush.clear();
-            chr.brush(d3.select(this));
-        }
-    });
-}
-//----------------------------------------------
-//
-function go() {
-    // reference strain
-    let rs = d3.select("#refStrain");
-    rsName = rs[0][0].value
-    rStrain = strainData[rsName]
-    // comparison strains
-    let cs = d3.select("#compStrains");
-    // cs.select(`option[value="${rsName}"]`).property('selected', true);
-    let csos = cs[0][0].selectedOptions;
-    csNames = [];
-    cStrains = [];
-    for (let i = 0; i < csos.length; i++){
-	let csn = csos[i].value;
-        csNames.push(csn);
-	cStrains.push(strainData[csn]);
-    }
-    //
-    drawGenomeView();
-    if (brushChr) brushend(brushChr);
+// ---------------------------------------------
+class Blocks {
+  constructor () {
+  }
 }
 
 //----------------------------------------------
@@ -377,6 +113,324 @@ class BlockFile {
 	return blks;
     }
 }
+// ---------------------------------------------
+class SVGView {
+  constructor (id, width, height) {
+    this.id = id;
+    this.selector = `#${this.id} svg`;
+    this.margin = {top: 35, right: 10, bottom: 20, left: 10};
+    this.outerWidth = width;
+    this.outerHeight = height;
+    this.width = this.outerWidth - this.margin.left - this.margin.right;
+    this.height = this.outerHeight - this.margin.top - this.margin.bottom;
+    this.svg = d3.select(this.selector)
+            .attr("width", this.outerWidth)
+            .attr("height", this.outerHeight)
+          .append("g")
+            .attr("transform", `translate(${this.margin.left},${this.margin.top})`)
+          .append("g");
+  }
+}
+// ---------------------------------------------
+class GenomeView extends SVGView {
+    constructor (id, width, height) {
+        super(id, width, height);
+	this.brushChr = null;
+    }
+    setBrushCoords (coords) {
+	this.svg
+	  .select(`g.brush[name="${ coords.chr }"]`)
+	  .each(function(chr){
+	    chr.brush.extent([coords.start,coords.end]);
+	    chr.brush(d3.select(this));
+	});
+    }
+    //----------------------------------------------
+    brushstart (chr){
+	this.clearBrushes(chr.brush);
+	d3.event.sourceEvent.stopPropagation();
+	this.brushChr = chr;
+    }
+
+    //----------------------------------------------
+    brushend (){
+	if(!this.brushChr) return;
+	if(this.brushChr.brush.empty()) {
+	    this.brushChr = null;
+	    return;
+	}
+	var xtnt = this.brushChr.brush.extent();
+	mgv.zoomView.setCoords({ chr:this.brushChr.name, start:Math.floor(xtnt[0]), end: Math.ceil(xtnt[1]) });
+    }
+
+    //----------------------------------------------
+    clearBrushes (except){
+	this.svg.selectAll('.brush').each(function(chr){
+	    if (chr.brush !== except) {
+		chr.brush.clear();
+		chr.brush(d3.select(this));
+	    }
+	});
+    }
+    //----------------------------------------------
+    draw () {
+
+	let sdata = strainData[rsName];
+
+	let xf = function(d){return bwidth+sdata.xscale(d.name);};
+
+	// Chromosome backbones (lines)
+	let ccels = this.svg.selectAll('line.chr')
+	  .data(sdata.chromosomes, function(x){return x.name;});
+	ccels.exit().transition().duration(dur)
+	  .attr("y1", this.height)
+	  .attr("y2", this.height)
+	  .remove();
+	ccels.enter().append('line')
+	  .attr('class','chr')
+	  .attr('name', c => c.name)
+	  .attr("x1", xf)
+	  .attr("y1", this.height)
+	  .attr("x2", xf)
+	  .attr("y2", this.height)
+	  ;
+	ccels.transition().duration(dur)
+	  .attr("x1", xf)
+	  .attr("y1", 0)
+	  .attr("x2", xf)
+	  .attr("y2", function(d){return sdata.yscale(d.length);})
+	    ;
+
+	// Chromosome labels
+	let labels = this.svg.selectAll('.chrlabel')
+	  .data(sdata.chromosomes, function(x){return x.name;});
+	labels.exit().transition().duration(dur)
+	  .attr('y', this.height)
+	  .remove();
+	labels.enter().append('text')
+	  .attr('font-family','sans-serif')
+	  .attr('font-size', 10)
+	  .attr('class','chrlabel')
+	  .attr('x', xf)
+	  .attr('y', this.height);
+	labels
+	  .text(function(d){return d.name;})
+	  .transition().duration(dur)
+	  .attr('x', xf)
+	  .attr('y', -2) ;
+
+	// Brushes
+	let brushes = this.svg.selectAll("g.brush")
+	    .data(sdata.chromosomes, function(x){return x.name;});
+	brushes.exit().remove();
+	brushes.enter().append('g')
+	    .attr('class','brush')
+	    .attr('name',c=>c.name)
+	    .each(function(d){d3.select(this).call(d.brush);})
+	    .selectAll('rect')
+	     .attr('width',10)
+	     .attr('x', cwidth/4)
+	     ;
+	brushes
+	    .attr('transform', function(d){return 'translate('+sdata.xscale(d.name)+')';})
+	    .each(function(d){d3.select(this).call(d.brush);})
+	    ;
+	// Ref strain label
+	let rsLabel = this.svg.selectAll("text.strainLabel")
+	    .data([rStrain]);
+	rsLabel.enter().append("text").attr("class","strainLabel");
+	rsLabel.text(s => s.label)
+	    .attr("x", this.width/2)
+	    .attr("y", this.height - 20);
+	    
+	if (this.brushChr) this.brushend();
+    }
+
+}
+// ---------------------------------------------
+class ZoomView extends SVGView {
+    constructor (id, width, height, genomeView) {
+      super(id,width,height);
+      this.coords = null;
+      this.strains = []; // strains in zoom view, top-to-bottom order
+      this.stripHeight = 60; // height per strain in the zoom view
+      this.genomeView = genomeView;
+      this.svg.append("g")
+        .attr("class","fiducials");
+      this.svg.append("g")
+        .attr("class","strips");
+      d3.select(this.selector).on("click", unhighlight);
+    }
+    //----------------------------------------------
+    // Sets the coordinate range of the reference strain in the zoom view and
+    // redraws. The coordinates ranges of all comparison strains are adjusted accordingly.
+    // Args:
+    //     coords (object) An object of the form {chr, start, end}
+    setCoords (coords) {
+	this.coords = coords;
+	d3.select("#zoomCoords")[0][0].value = formatCoords(coords.chr, coords.start, coords.end);
+	this.genomeView.setBrushCoords(coords);
+	updateZoomView();
+    }
+
+    //----------------------------------------------
+    // Zooms in/out by factor. New zoom width is factor * the current zoom width.
+    // Factor > 1 zooms out, 0 < factor < 1 zooms in.
+    zoom (factor) {
+	if (!this.coords) return;
+	let len = this.coords.end - this.coords.start + 1;
+	let newlen = Math.round(factor * len);
+	let x = (this.coords.start + this.coords.end)/2;
+	let newstart = Math.round(x - newlen/2);
+	this.setCoords({ chr: this.coords.chr, start: newstart, end: newstart + newlen - 1 });
+    }
+
+    //----------------------------------------------
+    // Pans the view left or right by factor. The distance moved is factor times the current zoom width.
+    // Negative values pan left. Positive values pan right. (Note that panning moves the "camera". Panning to the
+    // right makes the objects in the scene appear to move to the left, and vice versa.)
+    //
+    pan (factor) {
+	if (!this.coords) return;
+	let d = Math.round(factor * (this.coords.end - this.coords.start + 1));
+	this.setCoords({ chr: this.coords.chr, start: this.coords.start + d, end: this.coords.end + d });
+    }
+
+}
+// ---------------------------------------------
+class MGVApp {
+    constructor () {
+	this.allStrains = []; // list of all strain names
+	//
+	this.genomeView = new GenomeView("genomeView", 800, 250);
+	this.zoomView = new ZoomView  ("zoomView",   800, 100, this.genomeView);
+	//
+	d3.select("#refStrain").on("change", go);
+	d3.select("#compStrains").on("change", go);
+	//
+	drawColorKey();
+	//
+	d3.select("#mgiFacet").on("change", function(){setMgiFacet(this.value);});
+	//
+	d3.select("#zoomCoords").on("change", function () {
+	    let coords = parseCoords(this.value);
+	    if (! coords) {
+		alert("Please enter a coordinate range formatted as 'chr:start..end'. For example, '5:10000000..50000000'.");
+		this.value = "";
+		return;
+	    }
+	    this.zoomView.setCoords(coords);
+	});
+	//
+	d3.select("#zoomOut").on("click", () => this.zoomView.zoom(2));
+	d3.select("#zoomIn") .on("click", () => this.zoomView.zoom(.5));
+	//
+	d3.select("#panLeft") .on("click", () => this.zoomView.pan(+0.5));
+	d3.select("#panRight").on("click", () => this.zoomView.pan(-0.5));
+	//
+	d3tsv("./data/strainList.tsv").then(function(data){
+	    this.allStrains = data;
+	    initOptList("#refStrain", this.allStrains, s=>s.strain, s=>s.label);
+	    initOptList("#compStrains", this.allStrains, s=>s.strain, s=>s.label, true);
+	    //
+	    return Promise.all(this.allStrains.map(s => d3tsv(`./data/straindata/${s.strain}-chromosomes.tsv`)));
+	}.bind(this))
+	.then(function (data) {
+	    processChromosomes(data);
+	    go();
+	})
+	.catch(function(error) {
+	    console.log("ERROR!", error)
+	});
+
+    }
+
+}
+
+// ---------------------------------------------
+let strainData = {}; // map from strain name -> strain data obj
+let rStrain = null; // thereference strain
+let cStrains = []; // comparison strains
+let rsName = null;      // reference strain name
+let csNames = [];     // list of comparison strain names
+
+let dur = 1500;         // anomation duration
+let cwidth = 20;        // chromosome width
+let featHeight = 10;	// height of a rectangle representing a feature
+let bwidth = cwidth/2;  // block width
+
+//
+//----------------------------------------------
+//----------------------------------------------
+function processChromosomes (d) {
+    // d is a list of chromosome lists, one per strain
+    // Fill in the strainChrs map (strain -> chr list)
+    mgv.allStrains.forEach((s,i) => {
+        // nicely sort the chromosomes
+        let chrs = d[i];
+        let maxlen = 0;
+        chrs.forEach( c => {
+            // because I'd rather say "c.name" than "c.chromosome"
+            c.name = c.chromosome;
+            delete c.chromosome;
+	    //
+            c.scale = d3.scale.linear().domain([1, c.length]).range([0, mgv.genomeView.height]);
+            maxlen = Math.max(maxlen, c.length);
+        });
+        chrs.sort((a,b) => {
+            let aa = parseInt(a.name) - parseInt(b.name);
+            if (!isNaN(aa)) return aa;
+            return a.name < b.name ? -1 : a.name > b.name ? +1 : 0;
+        });
+        let xs = d3.scale.ordinal()
+               .domain(chrs.map(function(x){return x.name;}))
+               .rangePoints([0, mgv.genomeView.width],2);
+        let ys = d3.scale.linear().domain([1,maxlen]).range([0, mgv.genomeView.height]);
+        let cs = d3.scale.category20().domain(chrs.map(function(x){return x.name;}));
+
+	chrs.forEach(function(chr){
+	    var sc = d3.scale.linear().domain([1,chr.length]).range([0, ys(chr.length)]);
+            chr.brush = d3.svg.brush().y(sc)
+               .on("brushstart", function(chr) { mgv.genomeView.brushstart(chr); })
+               .on("brushend", function () { mgv.genomeView.brushend(); });
+	  });
+        strainData[s.strain] = {
+	    name : s.strain,
+	    label: s.label,
+            chromosomes : chrs,
+            maxlen : maxlen,
+            xscale : xs,
+            yscale : ys,
+            cscale : cs,
+	    zoomY  : -1
+        };
+    });
+}
+
+
+//----------------------------------------------
+//
+function go() {
+    // reference strain
+    let rs = d3.select("#refStrain");
+    rsName = rs[0][0].value
+    rStrain = strainData[rsName]
+    // comparison strains
+    let cs = d3.select("#compStrains");
+    // cs.select(`option[value="${rsName}"]`).property('selected', true);
+    let csos = cs[0][0].selectedOptions;
+    csNames = [];
+    cStrains = [];
+    for (let i = 0; i < csos.length; i++){
+	let csn = csos[i].value;
+        csNames.push(csn);
+	cStrains.push(strainData[csn]);
+    }
+    //
+    mgv.genomeView.draw();
+}
+
+//----------------------------------------------
 let rcBlocks = {};
 function registerBlocks(url, aStrain, bStrain, blocks){
     let aname = aStrain.name;
@@ -387,6 +441,7 @@ function registerBlocks(url, aStrain, bStrain, blocks){
     rcBlocks[aname][bname] = blkFile;
     rcBlocks[bname][aname] = blkFile;
 }
+//----------------------------------------------
 function getBlockFile(aStrain, bStrain){
     // First, see if we already have this pair
     let aname = aStrain.name;
@@ -419,86 +474,13 @@ function getBlockFile(aStrain, bStrain){
       });
 }
 
+//----------------------------------------------
 function getBlockFiles(rStrain, cStrains) {
     let promises = cStrains.map(s => getBlockFile(rStrain, s));
     return Promise.all(promises)
 }
 
 //----------------------------------------------
-function drawGenomeView() {
-
-    let v = svgs.genomeView;
-
-    let sdata = strainData[rsName];
-
-    let xf = function(d){return bwidth+sdata.xscale(d.name);};
-
-    // Chromosome backbones (lines)
-    let ccels = v.svg.selectAll('line.chr')
-      .data(sdata.chromosomes, function(x){return x.name;});
-    ccels.exit().transition().duration(dur)
-      .attr("y1", v.height)
-      .attr("y2", v.height)
-      .remove();
-    ccels.enter().append('line')
-      .attr('class','chr')
-      .attr('name', c => c.name)
-      .attr("x1", xf)
-      .attr("y1", v.height)
-      .attr("x2", xf)
-      .attr("y2", v.height)
-      ;
-    ccels.transition().duration(dur)
-      .attr("x1", xf)
-      .attr("y1", 0)
-      .attr("x2", xf)
-      .attr("y2", function(d){return sdata.yscale(d.length);})
-	;
-
-    // Chromosome labels
-    labels = v.svg.selectAll('.chrlabel')
-      .data(sdata.chromosomes, function(x){return x.name;});
-    labels.exit().transition().duration(dur)
-      .attr('y', v.height)
-      .remove();
-    labels.enter().append('text')
-      .attr('font-family','sans-serif')
-      .attr('font-size', 10)
-      .attr('class','chrlabel')
-      .attr('x', xf)
-      .attr('y', v.height);
-    labels
-      .text(function(d){return d.name;})
-      .transition().duration(dur)
-      .attr('x', xf)
-      .attr('y', -2) ;
-
-    // Brushes
-    brushes = v.svg.selectAll("g.brush")
-        .data(sdata.chromosomes, function(x){return x.name;});
-    brushes.exit().remove();
-    brushes.enter().append('g')
-        .attr('class','brush')
-        .attr('name',c=>c.name)
-        .each(function(d){d3.select(this).call(d.brush);})
-	.selectAll('rect')
-	 .attr('width',10)
-	 .attr('x', cwidth/4)
-	 ;
-    brushes
-        .attr('transform', function(d){return 'translate('+sdata.xscale(d.name)+')';})
-        .each(function(d){d3.select(this).call(d.brush);})
-	;
-    // Ref strain label
-    let rsLabel = v.svg.selectAll("text.strainLabel")
-        .data([rStrain]);
-    rsLabel.enter().append("text").attr("class","strainLabel");
-    rsLabel.text(s => s.label)
-        .attr("x", v.width/2)
-	.attr("y", v.height - 20);
-	
-}
-
 let featCache = {};    // global index from mgpid -> feature
 function getFeatures(strain, ranges){
     let coordsArg = ranges.map(r => `${r.chr}:${r.start}..${r.end}`).join(',');
@@ -514,12 +496,13 @@ function getFeatures(strain, ranges){
     });
 }
 
+//----------------------------------------------
 function processFeatures (feats, strain) {
     return feats.map(d => {
 	mgpid = d[6];
 	if (featCache[mgpid])
 	    return featCache[mgpid];
-        let r = {
+        let f = new Feature({
 	  chr     : d[0],
 	  start   : parseInt(d[1]),
 	  end	  : parseInt(d[2]),
@@ -530,9 +513,9 @@ function processFeatures (feats, strain) {
 	  mgiid   : d[7],
 	  symbol  : d[8],
 	  strain  : strain
-	};
-	featCache[mgpid] = r;
-	return r;
+	});
+	featCache[mgpid] = f;
+	return f;
     });
 }
 
@@ -540,11 +523,12 @@ function processFeatures (feats, strain) {
 //----------------------------------------------
 function updateZoomView() {
 
-    if (!zoomCoords) return;
+    let zv = mgv.zoomView;
+    if (!zv.coords) return;
 
-    let chr = zoomCoords.chr;
-    let start = zoomCoords.start;
-    let end = zoomCoords.end;
+    let chr = zv.coords.chr;
+    let start = zv.coords.start;
+    let end = zv.coords.end;
 
     // make sure we've loaded the coordinate mapping data for these strains
     getBlockFiles(rStrain, cStrains).then(function(){
@@ -580,13 +564,14 @@ function updateZoomView() {
 
 }
 
+//----------------------------------------------
 function drawZoomView(data) {
     // data = [ zoomStrip_data ]
     // zoomStrip_data = { strain [ zoomBlock_data ] }
     // zoomBlock_data = { xscale, chr, start, end, fChr, fStart, fEnd, ori, [ feature_data ] }
     // feature_data = { mgpid, mgiid, symbol, chr, start, end, strand, type, biotype }
     //
-    let v = svgs.zoomView;
+    let v = mgv.zoomView;
 
     //
     let rBlock = data[0].blocks[0];
@@ -609,7 +594,7 @@ function drawZoomView(data) {
 
     // y-coords for each strain in the zoom view
     let dy = v.stripHeight;
-    d3.select(svgs.zoomView.selector)
+    d3.select(mgv.zoomView.selector)
         .attr("height", dy*(data.length+1));
     data.forEach( (d,i) => d.strain.zoomY = 45 + (i * dy) );
     //
@@ -699,6 +684,7 @@ function drawZoomView(data) {
     drawFiducials();
 };
 
+//----------------------------------------------
 let cscale = d3.scale.category10().domain([
         "protein_coding_gene",
 	"pseudogene",
@@ -708,6 +694,7 @@ let cscale = d3.scale.category10().domain([
 	"other_feature_type"
     ]);
 
+//----------------------------------------------
 function fText(f){
     return f.symbol === "." ?
 	    `${f.mgpid}\n${f.type}/${f.biotype}`
@@ -715,6 +702,7 @@ function fText(f){
 	    `${f.symbol}\n${f.mgiid}\n${f.mgpid}\n${f.type}/${f.biotype}` ;
 }
 
+//----------------------------------------------
 function updateFeatureDetails (f) {
     let fd = d3.select('.featureDetails');
     fd.select('.mgpid span').text(f.mgpid)
@@ -725,9 +713,10 @@ function updateFeatureDetails (f) {
     fd.select('.coordinates span').text(`${f.strand}${f.chr}:${f.start}..${f.end}`)
 }
 
+//----------------------------------------------
 function highlight(f, rect) {
     updateFeatureDetails(f);
-    svgs.zoomView.svg.select("g.strips").selectAll(".feature")
+    mgv.zoomView.svg.select("g.strips").selectAll(".feature")
         .classed("highlight", function(ff) {
 	    let v = (f.mgiid && f.mgiid !== "." && f.mgiid === ff.mgiid) || f === ff;
 	    return v;
@@ -739,15 +728,17 @@ function highlight(f, rect) {
     drawFiducials(f);
 }
 
+//----------------------------------------------
 function unhighlight () {
-    svgs.zoomView.svg.select("g.strips").selectAll(".feature.highlight")
+    mgv.zoomView.svg.select("g.strips").selectAll(".feature.highlight")
         .attr("transform", null)
 	.attr("height", featHeight);
     hideFiducials();
 }
 
+//----------------------------------------------
 function drawFiducials(f) {
-    let v = svgs.zoomView.svg;
+    let v = mgv.zoomView.svg;
 
     // get the "stack" of features that are highlighted
     // make sure they're sorted by Y position
@@ -798,12 +789,14 @@ function drawFiducials(f) {
 	return s;
     });
 }
+//----------------------------------------------
 function hideFiducials() {
-    let v = svgs.zoomView.svg;
+    let v = mgv.zoomView.svg;
     v.select("g.fiducials")
         .classed("hidden", true);
 }
 
+//----------------------------------------------
 function drawColorKey() {
     let colors = cscale.domain().map(lbl => {
         return { lbl:lbl, clr:cscale(lbl) };
@@ -841,16 +834,19 @@ let facets = {
   mgiIds: "",
 };
 
+//----------------------------------------------
 function setMgiFacet(v) {
     facets.mgiIds = v;
     applyFacets();
 }
 
+//----------------------------------------------
 function setFeatureTypeFacet(ftypes) {
     facets.featureTypes = ftypes;
     applyFacets();
 }
 
+//----------------------------------------------
 function applyFacets() {
     let show = null;
     let hide = "none";
@@ -864,11 +860,12 @@ function applyFacets() {
     function mgiFilter (f) {
 	return mgi === "yes" ? (f.mgiid && f.mgiid !== ".") : mgi === "no" ? (!f.mgiid || f.mgiid === ".") : true;
     };
-    svgs.zoomView.svg.select("g.strips").selectAll('rect.feature')
+    mgv.zoomView.svg.select("g.strips").selectAll('rect.feature')
         .style("display", f => (ftFilter(f) && mgiFilter(f)) ? show : hide);
 
 }
 
+//----------------------------------------------
 function getMungedType(f) {
     return f.type === "gene" ?
 	f.biotype === "protein_coding" ?
@@ -897,9 +894,99 @@ function getMungedType(f) {
 			"other_feature_type";
 }
 
+// =============================================
+//                    UTILS
+// =============================================
+
 // ---------------------------------------------
-//----------------------------------------------
-setup();
+// Initializes an option list.
+// Args:
+//   selector (string) CSS selector of the container element. 
+//   opts (list) List of option data objects. May be simple strings. May be more complex.
+//   value (function or null) Function to produce the option value for the option data obj.
+//       Defaults to the identity function (x=>x).
+//   title (function or null) Function to produce the option label for the option data obj.
+//       Defaults to the value function.
+//   multi (boolean) Specifies if the list support multiple selections. (default = false)
+// Returns:
+//   The option list in a D3 selection.
+function initOptList( selector, opts, value, text, multi ) {
+    let s = d3.select(selector);
+    s.property('multiple', multi || null) ;
+    let os = s.selectAll("option").data(opts);
+    let ident = d => d;
+    value = value || ident;
+    text = text || value;
+    os.enter().append("option") ;
+    os.exit().remove() ;
+    os.attr("value", value)
+      .text( text ) ;
+    return s;
+}
 
 //----------------------------------------------
+// Promisifies a call to d3.tsv.
+// Args:
+//   url (string) The url of the tsv resource
+// Returns:
+//   a promise that resolves to the list of row objects
+function d3tsv(url) {
+    return new Promise(function(resolve, reject) {
+        d3.tsv(url, function(error, val){
+            error ? reject({ status: error.status, statusText: error.statusText}) : resolve(val);
+        })  
+    }); 
+}
+
+//----------------------------------------------
+// Promisifies a call to d3.json.
+// Args:
+//   url (string) The url of the json resource
+// Returns:
+//   a promise that resolves to the json object value, or rejects with an error
+function d3json(url) {
+    return new Promise(function(resolve, reject) {
+        d3.json(url, function(error, val){
+            error ? reject({ status: error.status, statusText: error.statusText}) : resolve(val);
+        })  
+    }); 
+}
+
+//----------------------------------------------
+// Returns a deep copy of object o. 
+// Args:
+//   o  (object) Must be a JSON object (no curcular refs, no functions).
+// Returns:
+//   a deep copy of o
+function deepc(o) {
+    if (!o) return o;
+        return JSON.parse(JSON.stringify(o));
+}
+
+//----------------------------------------------
+// Formats a chromosome name, start and end position as a string.
+// Returns:
+//     string
+// Example:
+//     formatCoords("10", 10000000, 20000000) -> "10:10000000..20000000"
+function formatCoords (chr, start, end) {
+    return `${chr}:${start}..${end}`
+}
+//----------------------------------------------
+// Parses a string of the form "chr:start..end".
+// Returns:
+//   object contining the parsed fields.
+// Example:
+//   parseCoords("10:10000000..20000000") -> {chr:"10", start:10000000, end:20000000}
+function parseCoords (coords) {
+    let re = /([^:]+):(\d+)\.\.(\d+)/;
+    let m = coords.match(re);
+    return m ? {chr:m[1], start:parseInt(m[2]), end:parseInt(m[3])} : null;
+}
+
+// ---------------------------------------------
+// ---------------------------------------------
+let mgv = new MGVApp();
+
+// ---------------------------------------------
 })();
