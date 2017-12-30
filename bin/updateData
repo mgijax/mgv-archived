@@ -14,14 +14,17 @@ SDIR="${DIR}/data/straindata"
 mkdir -p ${DDIR}
 mkdir -p ${SDIR}
 
-# generate strain list file (a simple table of strain names)
+# generate strain list file (a simple table of strain names and labels)
 strainList="${DIR}/data/strainList.tsv"
-echo "strain" > "${strainList}"
+echo "strain	label" > "${strainList}"
+count=0
 for sn in "${ALL_STRAIN_NAMES[@]}"
 do : 
-    echo "${sn}" >> "${strainList}"
+    slbl="${ALL_STRAIN_LABELS[count]}"
+    echo "${sn}	${slbl}" >> "${strainList}"
+    count=$(expr $count + 1)
 done
-
+exit
 function download {
    strain=$1
    fname="${DDIR}/$2"

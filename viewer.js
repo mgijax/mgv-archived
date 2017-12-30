@@ -119,11 +119,11 @@ function setup () {
     d3.select("#panRight").on("click", () => pan(-0.5));
     //
     d3tsv("./data/strainList.tsv").then(function(data){
-        allStrains = data.map(s => s.strain);
-        initOptList("#refStrain", allStrains);
-        initOptList("#compStrains", allStrains, null, null, true);
+        allStrains = data;
+        initOptList("#refStrain", allStrains, s=>s.strain, s=>s.label);
+        initOptList("#compStrains", allStrains, s=>s.strain, s=>s.label, true);
         //
-        return Promise.all(allStrains.map(s => d3tsv(`./data/straindata/${s}-chromosomes.tsv`)));
+        return Promise.all(allStrains.map(s => d3tsv(`./data/straindata/${s.strain}-chromosomes.tsv`)));
     })
     .then(function (data) {
         processChromosomes(data);
@@ -190,10 +190,13 @@ function setupSvgs() {
             .attr("transform", "translate(" + c.margin.left + "," + c.margin.top + ")")
           .append("g");
 	
-	c.svg.append("g")
-	  .attr("class","strips");
-	c.svg.append("g")
-	  .attr("class","fiducials");
+	if (n === "zoomView") {
+	    c.svg.append("g")
+	      .attr("class","fiducials");
+	    c.svg.append("g")
+	      .attr("class","strips");
+	    d3.select(svgs[n].selector).on("click", unhighlight);
+        }
     }
 }
 
@@ -205,9 +208,10 @@ function processChromosomes (d) {
         let chrs = d[i];
         let maxlen = 0;
         chrs.forEach( c => {
-            // I'd rather say "c.name" than "c.chromosome"
+            // because I'd rather say "c.name" than "c.chromosome"
             c.name = c.chromosome;
             delete c.chromosome;
+	    //
             c.scale = d3.scale.linear().domain([1, c.length]).range([0, svgs.genomeView.height]);
             maxlen = Math.max(maxlen, c.length);
         });
@@ -228,8 +232,9 @@ function processChromosomes (d) {
                .on("brushstart",brushstart)
                .on("brushend",brushend);
 	  });
-        strainData[s] = {
-	    name : s,
+        strainData[s.strain] = {
+	    name : s.strain,
+	    label: s.label,
             chromosomes : chrs,
             maxlen : maxlen,
             xscale : xs,
@@ -605,7 +610,7 @@ function drawZoomView(data) {
 	.attr("y", d => d.strain.zoomY - 18)
 	.attr("font-family","sans-serif")
 	.attr("font-size", 10)
-        .text(d => d.strain.name);
+        .text(d => d.strain.label);
 
     // zoom blocks
     let zbs = zrs.selectAll(".zoomBlock")
@@ -719,8 +724,8 @@ function highlight(f) {
     drawFiducials();
 }
 
-function unhighlight (f) {
-    d3.select(this)
+function unhighlight () {
+    svgs.zoomView.svg.select("g.strips").selectAll(".feature.highlight")
         .attr("transform", null)
 	.attr("height", featHeight);
     hideFiducials();
@@ -754,7 +759,7 @@ function drawFiducials() {
 	let w2 = parseFloat(p[1].getAttribute("width"));
 	let h2 = parseFloat(p[1].getAttribute("height"));
 	//
-	let s = `${x1},${y1} ${x2},${y2} ${x2+w2},${y2} ${x1+w1},${y1}`
+	let s = `${x1},${y1+h1} ${x2},${y2} ${x2+w2},${y2} ${x1+w1},${y1+h1}`
 	//
 	return s;
     });

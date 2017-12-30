@@ -37,11 +37,16 @@ line.chr {
 }
 .zoomBlock > rect.block {
     stroke: none;
-    fill: #ddd;
+    fill: #fff;
+    fill-opacity: 0.3;
 }
 .zoomBlock.minus > rect.block {
-    fill: #aaa;
+    fill: #000;
 }
+.zoomBlock text {
+   font-size: 12px;
+}
+
 
 rect.feature {
     fill : #aaa;
@@ -116,14 +121,14 @@ label::after {
     padding: 6px;
 }
 
-.zoomBlock text {
-   font-size: 12px;
-}
-
 .fiducials .fiducial {
    stroke : none;
    fill: blue;
    fill-opacity: 0.3;
+}
+
+.fiducials.hidden .fiducial {
+   display: none;
 }
 
 .footer {
