@@ -4,7 +4,7 @@
 # Performs one of three related functions, depending on the action (-a) parameter:
 #
 # 1. create- Creates an index of the features in specified file. The feature file is a tab-delimied 
-# GFF-like (but simpler) file. See prepStrainFile.py. The generated index is also a tsv file,
+# GFF-like (but simpler) file. See prepGenomeFile.py. The generated index is also a tsv file,
 # and comprises a sequence of "blocks" where each block:
 #   i. covers a contiguous region of a single chromosome (has a chrom+start+end),
 #   ii. wholly contains some number of features.

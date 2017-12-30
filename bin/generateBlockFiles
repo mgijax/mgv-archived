@@ -12,7 +12,7 @@
 
 source config.sh
 
-datadir=${DIR}/data/straindata
+datadir=${DIR}/data/genomedata
 outdir=${DIR}/data/blockfiles
 
 mkdir -p ${outdir}
@@ -28,14 +28,14 @@ lim=$((${#arr[@]} - 1))
 #       for (j = i+1; j < length of list; j++)
 #           generate synteny blocks for file[i] and file[j]
 for i in `seq 0 ${lim}`; do
-    # extract the A strain name
+    # extract the A genome name
     a=${arr[$i]}
     afn=$(basename "${a}")
     afn="${afn%.*}"
     jstart=$(($i))
     if [ ${jstart} -le ${lim} ]; then
         for j in `seq ${jstart} ${lim}`; do
-            # extract the B strain name
+            # extract the B genome name
             b=${arr[$j]}
             bfn=$(basename "${b}")
             bfn="${bfn%.*}"

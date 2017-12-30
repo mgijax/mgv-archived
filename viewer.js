@@ -12,7 +12,7 @@ class Feature {
       this.mgpid   = cfg.mgpid;
       this.mgiid   = cfg.mgiid;
       this.symbol  = cfg.symbol;
-      this.strain  = cfg.strain;
+      this.genome  = cfg.genome;
       if (this.mgiid === ".") this.mgiid = null;
       if (this.symbol === ".") this.symbol = null;
   }
@@ -30,10 +30,10 @@ class Blocks {
 
 //----------------------------------------------
 class BlockFile {
-    constructor(url, aStrain, bStrain, blocks){
+    constructor(url, aGenome, bGenome, blocks){
         this.url = url;
-	this.aStrain = aStrain;
-	this.bStrain = bStrain;
+	this.aGenome = aGenome;
+	this.bGenome = bGenome;
 	this.blocks = blocks.map(b => this.processBlock(b))
 	this.currentSort = "a";
     }
@@ -66,15 +66,15 @@ class BlockFile {
 	this.blocks.sort(cmp);
 	this.currSort = newSort;
     }
-    // Given a strain (either the a or b strain) and a coordinate range,
-    // returns the equivalent coordinate range(s) in the other strain
-    translate (fromStrain, chr, start, end) {
-	// from = "a" or "b", depending on which strain is given.
+    // Given a genome (either the a or b genome) and a coordinate range,
+    // returns the equivalent coordinate range(s) in the other genome
+    translate (fromGenome, chr, start, end) {
+	// from = "a" or "b", depending on which genome is given.
 	// to = "b" or "a"
-        let from = (fromStrain === this.aStrain ? "a" : fromStrain === this.bStrain ? "b" : null);
-	if (!from) throw "Bad argument. Strain neither A nor B.";
+        let from = (fromGenome === this.aGenome ? "a" : fromGenome === this.bGenome ? "b" : null);
+	if (!from) throw "Bad argument. Genome neither A nor B.";
 	let to = (from === "a" ? "b" : "a");
-	// make sure the blocks are sorted by the from strain
+	// make sure the blocks are sorted by the from genome
 	this.setSort(from);
 	//
 	let fromC = from+"Chr";
@@ -86,7 +86,7 @@ class BlockFile {
 	let mapper = from+to+"Map";
 	// 
 	let blks = this.blocks
-	    // First filter for blocks that overlap the given coordinate range in the from strain
+	    // First filter for blocks that overlap the given coordinate range in the from genome
 	    .filter(blk => blk[fromC] === chr && blk[fromS] <= end && blk[fromE] >= start)
 	    // map each block. 
 	    .map(blk => {
@@ -101,7 +101,7 @@ class BlockFile {
 		    start: Math.min(s2,e2),
 		    end:   Math.max(s2,e2),
 		    ori:   blk.blockOri,
-		    // also return the fromStrain coordinates corresponding to this piece of the translation
+		    // also return the fromGenome coordinates corresponding to this piece of the translation
 		    fChr:   blk[fromC],
 		    fStart: s,
 		    fEnd:   e,
@@ -175,7 +175,7 @@ class GenomeView extends SVGView {
     //----------------------------------------------
     draw () {
 
-	let sdata = strainData[rsName];
+	let sdata = genomeData[rsName];
 
 	let xf = function(d){return bwidth+sdata.xscale(d.name);};
 
@@ -235,10 +235,10 @@ class GenomeView extends SVGView {
 	    .attr('transform', function(d){return 'translate('+sdata.xscale(d.name)+')';})
 	    .each(function(d){d3.select(this).call(d.brush);})
 	    ;
-	// Ref strain label
-	let rsLabel = this.svg.selectAll("text.strainLabel")
-	    .data([rStrain]);
-	rsLabel.enter().append("text").attr("class","strainLabel");
+	// Ref genome label
+	let rsLabel = this.svg.selectAll("text.genomeLabel")
+	    .data([rGenome]);
+	rsLabel.enter().append("text").attr("class","genomeLabel");
 	rsLabel.text(s => s.label)
 	    .attr("x", this.width/2)
 	    .attr("y", this.height - 20);
@@ -252,18 +252,18 @@ class ZoomView extends SVGView {
     constructor (id, width, height, genomeView) {
       super(id,width,height);
       this.coords = null;
-      this.strains = []; // strains in zoom view, top-to-bottom order
-      this.stripHeight = 60; // height per strain in the zoom view
+      this.genomes = []; // genomes in zoom view, top-to-bottom order
+      this.stripHeight = 60; // height per genome in the zoom view
       this.genomeView = genomeView;
       this.svg.append("g")
         .attr("class","fiducials");
       this.svg.append("g")
         .attr("class","strips");
-      d3.select(this.selector).on("click", unhighlight);
+      d3.select(this.selector).on("click", () => this.unhighlight());
     }
     //----------------------------------------------
-    // Sets the coordinate range of the reference strain in the zoom view and
-    // redraws. The coordinates ranges of all comparison strains are adjusted accordingly.
+    // Sets the coordinate range of the reference genome in the zoom view and
+    // redraws. The coordinates ranges of all comparison genomes are adjusted accordingly.
     // Args:
     //     coords (object) An object of the form {chr, start, end}
     setCoords (coords) {
@@ -296,17 +296,154 @@ class ZoomView extends SVGView {
 	this.setCoords({ chr: this.coords.chr, start: this.coords.start + d, end: this.coords.end + d });
     }
 
+    //----------------------------------------------
+    draw (data) {
+	// data = [ zoomStrip_data ]
+	// zoomStrip_data = { genome [ zoomBlock_data ] }
+	// zoomBlock_data = { xscale, chr, start, end, fChr, fStart, fEnd, ori, [ feature_data ] }
+	// feature_data = { mgpid, mgiid, symbol, chr, start, end, strand, type, biotype }
+	//
+	let rBlock = data[0].blocks[0];
+
+	// x-scale
+	this.xscale = d3.scale.linear()
+	    .domain([rBlock.start,rBlock.end])
+	    .range([0,this.width]);
+
+
+	// zoom strips (contain 0 or more zoom blocks)
+	let zrs = this.svg.select("g.strips")
+		  .selectAll("g.zoomStrip")
+		  .data(data, d => d.genome.name);
+	let newZrs = zrs.enter()
+	    .append("svg:g")
+		.attr("class", "zoomStrip")
+		.attr("name", d => d.genome.name);
+	zrs.exit().remove();
+
+	// y-coords for each genome in the zoom view
+	let dy = this.stripHeight;
+	d3.select(this.selector)
+	    .attr("height", dy*(data.length+1));
+	data.forEach( (d,i) => d.genome.zoomY = 45 + (i * dy) );
+	//
+	// genome labels
+	newZrs.append("text") ;
+	zrs.select("text")
+	    .attr("x", 0)
+	    .attr("y", d => d.genome.zoomY - 18)
+	    .attr("font-family","sans-serif")
+	    .attr("font-size", 10)
+	    .text(d => d.genome.label);
+
+	// zoom blocks
+	let zbs = zrs.selectAll(".zoomBlock")
+	    .data(d => d.blocks, d => d.blockId);
+	//
+	let newZbs = zbs.enter().append("g")
+	    .attr("class", b => "zoomBlock" + (b.ori==="+" ? " plus" : " minus"))
+	    .attr("name", d=>d.blockId);
+	// rectangle for the whole block
+	newZbs.append("rect").attr("class", "block");
+	// group to hold features
+	newZbs.append('g').attr('class','features');
+	// the axis line
+	newZbs.append("line").attr("class","axis") ;
+	// label
+	newZbs.append("text")
+	    .attr("class","blockLabel") 
+	    .text(b => b.chr);
+
+	//
+	zbs.exit().remove();
+
+	// To line each chunk up with the corresponding chunk in the reference genome,
+	// create the appropriate x scales.
+	zbs.each( b => {
+	    let x1 = this.xscale(b.fStart);
+	    let x2 = this.xscale(b.fEnd);
+	    b.xscale = d3.scale.linear().domain([b.start, b.end]).range([x1, x2]);
+	});
+	// draw the zoom block outline
+	zbs.select("rect.block")
+	  .attr("x", b => {
+	      return b.xscale(b.start)
+	  })
+	  .attr("y", (b,i,j) => {
+	      return data[j].genome.zoomY - 15;
+	  })
+	  .attr("width", b=>b.xscale(b.end)-b.xscale(b.start))
+	  .attr("height", 30);
+
+	// axis line
+	zbs.select("line")
+	    .attr("x1", b => b.xscale.range()[0])
+	    .attr("y1", b => b.genome.zoomY )
+	    .attr("x2", b => b.xscale.range()[1])
+	    .attr("y2", b => b.genome.zoomY )
+
+	zbs.select("text.blockLabel")
+	    .attr("x", b => (b.xscale(b.start) + b.xscale(b.end))/2 )
+	    .attr("y", b => b.genome.zoomY + 25);
+
+	// features
+	let feats = zbs.select('.features').selectAll(".feature")
+	    .data(d=>d.features, d=>d.mgpid);
+	feats.exit().remove();
+	let self = this;
+	let newFeats = feats.enter().append("rect")
+	    .attr("class", f => "feature" + (f.strand==="-" ? " minus" : " plus"))
+	    .style("fill", f => cscale(getMungedType(f)))
+	    .on("mouseover", function(f){ self.highlight(f,this);});
+
+	// draw the rectangles
+	let fBlock = function (featElt) {
+	    let blkElt = featElt.parentNode.parentNode;
+	    return blkElt.__data__;
+	}
+	feats
+	  .attr("width", function (f) { return fBlock(this).xscale(f.end)-fBlock(this).xscale(f.start)+1 })
+	  .attr("height", featHeight)
+	  .attr("x", function (f) { return fBlock(this).xscale(f.start) })
+	  .attr("y", function (f) { return f.genome.zoomY - (f.strand === "-" ? 0 : featHeight) })
+
+	
+	//
+	applyFacets();
+	//
+	drawFiducials();
+    };
+    //----------------------------------------------
+    highlight (f, rect) {
+	updateFeatureDetails(f);
+	this.svg.select("g.strips").selectAll(".feature")
+	    .classed("highlight", function(ff) {
+		let v = (f.mgiid && f.mgiid !== "." && f.mgiid === ff.mgiid) || f === ff;
+		return v;
+	    });
+	drawFiducials(f);
+    }
+
+    //----------------------------------------------
+    unhighlight () {
+	this.svg.select("g.strips").selectAll(".feature.highlight")
+	    .attr("transform", null)
+	    .attr("height", featHeight);
+	hideFiducials();
+    }
+
+
 }
 // ---------------------------------------------
 class MGVApp {
     constructor () {
-	this.allStrains = []; // list of all strain names
+	this.allGenomes = []; // list of all genome names
 	//
 	this.genomeView = new GenomeView("genomeView", 800, 250);
 	this.zoomView = new ZoomView  ("zoomView",   800, 100, this.genomeView);
 	//
-	d3.select("#refStrain").on("change", go);
-	d3.select("#compStrains").on("change", go);
+	d3.select("#refGenome").on("change", () => this.go());
+	d3.select("#compGenomes").on("change", () => this.go());
 	//
 	drawColorKey();
 	//
@@ -328,31 +465,51 @@ class MGVApp {
 	d3.select("#panLeft") .on("click", () => this.zoomView.pan(+0.5));
 	d3.select("#panRight").on("click", () => this.zoomView.pan(-0.5));
 	//
-	d3tsv("./data/strainList.tsv").then(function(data){
-	    this.allStrains = data;
-	    initOptList("#refStrain", this.allStrains, s=>s.strain, s=>s.label);
-	    initOptList("#compStrains", this.allStrains, s=>s.strain, s=>s.label, true);
+	d3tsv("./data/genomeList.tsv").then(function(data){
+	    this.allGenomes = data;
+	    initOptList("#refGenome", this.allGenomes, s=>s.name, s=>s.label);
+	    initOptList("#compGenomes", this.allGenomes, s=>s.name, s=>s.label, true);
 	    //
-	    return Promise.all(this.allStrains.map(s => d3tsv(`./data/straindata/${s.strain}-chromosomes.tsv`)));
+	    return Promise.all(this.allGenomes.map(s => d3tsv(`./data/genomedata/${s.name}-chromosomes.tsv`)));
 	}.bind(this))
 	.then(function (data) {
 	    processChromosomes(data);
-	    go();
-	})
+	    this.go();
+	}.bind(this))
 	.catch(function(error) {
 	    console.log("ERROR!", error)
 	});
 
     }
-
+    //----------------------------------------------
+    //
+    go () {
+	// reference genome
+	let rs = d3.select("#refGenome");
+	rsName = rs[0][0].value
+	rGenome = genomeData[rsName]
+	// comparison genomes
+	let cs = d3.select("#compGenomes");
+	// cs.select(`option[value="${rsName}"]`).property('selected', true);
+	let csos = cs[0][0].selectedOptions;
+	csNames = [];
+	cGenomes = [];
+	for (let i = 0; i < csos.length; i++){
+	    let csn = csos[i].value;
+	    csNames.push(csn);
+	    cGenomes.push(genomeData[csn]);
+	}
+	//
+	mgv.genomeView.draw();
+    }
 }
 
 // ---------------------------------------------
-let strainData = {}; // map from strain name -> strain data obj
-let rStrain = null; // thereference strain
-let cStrains = []; // comparison strains
-let rsName = null;      // reference strain name
-let csNames = [];     // list of comparison strain names
+let genomeData = {}; // map from genome name -> genome data obj
+let rGenome = null; // thereference genome
+let cGenomes = []; // comparison genomes
+let rsName = null;      // reference genome name
+let csNames = [];     // list of comparison genome names
 
 let dur = 1500;         // anomation duration
 let cwidth = 20;        // chromosome width
@@ -363,9 +520,9 @@ let bwidth = cwidth/2;  // block width
 //----------------------------------------------
 //----------------------------------------------
 function processChromosomes (d) {
-    // d is a list of chromosome lists, one per strain
-    // Fill in the strainChrs map (strain -> chr list)
-    mgv.allStrains.forEach((s,i) => {
+    // d is a list of chromosome lists, one per genome
+    // Fill in the genomeChrs map (genome -> chr list)
+    mgv.allGenomes.forEach((s,i) => {
         // nicely sort the chromosomes
         let chrs = d[i];
         let maxlen = 0;
@@ -394,8 +551,8 @@ function processChromosomes (d) {
                .on("brushstart", function(chr) { mgv.genomeView.brushstart(chr); })
                .on("brushend", function () { mgv.genomeView.brushend(); });
 	  });
-        strainData[s.strain] = {
-	    name : s.strain,
+        genomeData[s.name] = {
+	    name : s.name,
 	    label: s.label,
             chromosomes : chrs,
             maxlen : maxlen,
@@ -409,95 +566,73 @@ function processChromosomes (d) {
 
 
 //----------------------------------------------
-//
-function go() {
-    // reference strain
-    let rs = d3.select("#refStrain");
-    rsName = rs[0][0].value
-    rStrain = strainData[rsName]
-    // comparison strains
-    let cs = d3.select("#compStrains");
-    // cs.select(`option[value="${rsName}"]`).property('selected', true);
-    let csos = cs[0][0].selectedOptions;
-    csNames = [];
-    cStrains = [];
-    for (let i = 0; i < csos.length; i++){
-	let csn = csos[i].value;
-        csNames.push(csn);
-	cStrains.push(strainData[csn]);
-    }
-    //
-    mgv.genomeView.draw();
-}
-
-//----------------------------------------------
 let rcBlocks = {};
-function registerBlocks(url, aStrain, bStrain, blocks){
-    let aname = aStrain.name;
-    let bname = bStrain.name;
-    let blkFile = new BlockFile(url,aStrain,bStrain,blocks);
+function registerBlocks(url, aGenome, bGenome, blocks){
+    let aname = aGenome.name;
+    let bname = bGenome.name;
+    let blkFile = new BlockFile(url,aGenome,bGenome,blocks);
     if( ! rcBlocks[aname]) rcBlocks[aname] = {};
     if( ! rcBlocks[bname]) rcBlocks[bname] = {};
     rcBlocks[aname][bname] = blkFile;
     rcBlocks[bname][aname] = blkFile;
 }
 //----------------------------------------------
-function getBlockFile(aStrain, bStrain){
+function getBlockFile(aGenome, bGenome){
     // First, see if we already have this pair
-    let aname = aStrain.name;
-    let bname = bStrain.name;
+    let aname = aGenome.name;
+    let bname = bGenome.name;
     let bf = (rcBlocks[aname] || {})[bname];
     if (bf)
         return Promise.resolve(bf);
     
-    // For any given strain pair, only one of the following file
+    // For any given genome pair, only one of the following file
     // is generated...
-    let fn1 = `./data/blockfiles/${aStrain.name}-${bStrain.name}.tsv`
-    let fn2 = `./data/blockfiles/${bStrain.name}-${aStrain.name}.tsv`
+    let fn1 = `./data/blockfiles/${aGenome.name}-${bGenome.name}.tsv`
+    let fn2 = `./data/blockfiles/${bGenome.name}-${aGenome.name}.tsv`
     // ...so we'll try one, and if that's not it, the other.
     return d3tsv(fn1)
       .then(function(blocks){
 	  // yup, it was A-B
-	  registerBlocks(fn1, aStrain, bStrain, blocks);
+	  registerBlocks(fn1, aGenome, bGenome, blocks);
 	  return blocks
       })
       .catch(function(){
           return d3tsv(fn2)
 	      .then(function(blocks){
 		  // nope, it was B-A
-		  registerBlocks(fn2, bStrain, aStrain, blocks);
+		  registerBlocks(fn2, bGenome, aGenome, blocks);
 		  return blocks
 	      })
 	      .catch(function(e){
-	          throw `Cannot get block file for this strain pair: ${aStrain.name} ${bStrain.name}.\n(Error=${e})`;
+	          throw `Cannot get block file for this genome pair: ${aGenome.name} ${bGenome.name}.\n(Error=${e})`;
 	      });
       });
 }
 
 //----------------------------------------------
-function getBlockFiles(rStrain, cStrains) {
-    let promises = cStrains.map(s => getBlockFile(rStrain, s));
+function getBlockFiles(rGenome, cGenomes) {
+    let promises = cGenomes.map(s => getBlockFile(rGenome, s));
     return Promise.all(promises)
 }
 
 //----------------------------------------------
 let featCache = {};    // global index from mgpid -> feature
-function getFeatures(strain, ranges){
+function getFeatures(genome, ranges){
     let coordsArg = ranges.map(r => `${r.chr}:${r.start}..${r.end}`).join(',');
-    let dataString = `strain=${strain.name}&coords=${coordsArg}`;
+    let dataString = `genome=${genome.name}&coords=${coordsArg}`;
     let url = "./bin/getFeatures.cgi?" + dataString;
     return d3json(url).then(function(data) {
 	let s = data.forEach( (d,i) => {
 	    let r = ranges[i];
-	    r.features = processFeatures( d.features, strain );
-	    r.strain = strain;
+	    r.features = processFeatures( d.features, genome );
+	    r.genome = genome;
 	});
-	return { strain, blocks:ranges };
+	return { genome, blocks:ranges };
     });
 }
 
 //----------------------------------------------
-function processFeatures (feats, strain) {
+function processFeatures (feats, genome) {
     return feats.map(d => {
 	mgpid = d[6];
 	if (featCache[mgpid])
@@ -512,7 +647,7 @@ function processFeatures (feats, strain) {
 	  mgpid   : mgpid,
 	  mgiid   : d[7],
 	  symbol  : d[8],
-	  strain  : strain
+	  genome  : genome
 	});
 	featCache[mgpid] = f;
 	return f;
@@ -530,17 +665,17 @@ function updateZoomView() {
     let start = zv.coords.start;
     let end = zv.coords.end;
 
-    // make sure we've loaded the coordinate mapping data for these strains
-    getBlockFiles(rStrain, cStrains).then(function(){
+    // make sure we've loaded the coordinate mapping data for these genomes
+    getBlockFiles(rGenome, cGenomes).then(function(){
 	// OK, got the maps.
-	// Now issue requests for features. One request per strain, each request specifies one or more
+	// Now issue requests for features. One request per genome, each request specifies one or more
 	// coordinate ranges.
 	// Wait for all the data to become available, then draw.
 	//
 	let promises = [];
 
-	// First request is for the the reference strain. Get all the features in the range.
-	promises.push(getFeatures(rStrain, [{
+	// First request is for the the reference genome. Get all the features in the range.
+	promises.push(getFeatures(rGenome, [{
 	    chr    : chr,
 	    start  : start,
 	    end    : end,
@@ -549,140 +684,20 @@ function updateZoomView() {
 	    fEnd   : end,
 	    ori    : "+"
 	    }]));
-	// Add a request for each comparison strain, using translated coordinates. 
-	cStrains.forEach(cStrain => {
+	// Add a request for each comparison genome, using translated coordinates. 
+	cGenomes.forEach(cGenome => {
 	    // get the right block file
-	    let blkFile = (rcBlocks[rStrain.name] || {})[cStrain.name];
+	    let blkFile = (rcBlocks[rGenome.name] || {})[cGenome.name];
 	    if (!blkFile) throw "Internal error. No block file found in index."
 	    // translate!
-	    let ranges = blkFile.translate(rStrain, chr, start, end);
-	    promises.push(getFeatures(cStrain, ranges))
+	    let ranges = blkFile.translate(rGenome, chr, start, end);
+	    promises.push(getFeatures(cGenome, ranges))
 	});
 	// when everything is ready, call the draw function
-	Promise.all(promises).then( drawZoomView );
+	Promise.all(promises).then( data => mgv.zoomView.draw(data) );
     });
 
 }
-
-//----------------------------------------------
-function drawZoomView(data) {
-    // data = [ zoomStrip_data ]
-    // zoomStrip_data = { strain [ zoomBlock_data ] }
-    // zoomBlock_data = { xscale, chr, start, end, fChr, fStart, fEnd, ori, [ feature_data ] }
-    // feature_data = { mgpid, mgiid, symbol, chr, start, end, strand, type, biotype }
-    //
-    let v = mgv.zoomView;
-
-    //
-    let rBlock = data[0].blocks[0];
-
-    // x-scale
-    v.xscale = d3.scale.linear()
-        .domain([rBlock.start,rBlock.end])
-	.range([0,v.width]);
-
-
-    // zoom strips (contain 0 or more zoom blocks)
-    let zrs = v.svg.select("g.strips")
-              .selectAll("g.zoomStrip")
-              .data(data, d => d.strain.name);
-    let newZrs = zrs.enter()
-        .append("svg:g")
-            .attr("class", "zoomStrip")
-	    .attr("name", d => d.strain.name);
-    zrs.exit().remove();
-
-    // y-coords for each strain in the zoom view
-    let dy = v.stripHeight;
-    d3.select(mgv.zoomView.selector)
-        .attr("height", dy*(data.length+1));
-    data.forEach( (d,i) => d.strain.zoomY = 45 + (i * dy) );
-    //
-    // strain labels
-    newZrs.append("text") ;
-    zrs.select("text")
-	.attr("x", 0)
-	.attr("y", d => d.strain.zoomY - 18)
-	.attr("font-family","sans-serif")
-	.attr("font-size", 10)
-        .text(d => d.strain.label);
-
-    // zoom blocks
-    let zbs = zrs.selectAll(".zoomBlock")
-        .data(d => d.blocks, d => d.blockId);
-    //
-    let newZbs = zbs.enter().append("g")
-        .attr("class", b => "zoomBlock" + (b.ori==="+" ? " plus" : " minus"))
-	.attr("name", d=>d.blockId);
-    // rectangle for the whole block
-    newZbs.append("rect").attr("class", "block");
-    // group to hold features
-    newZbs.append('g').attr('class','features');
-    // the axis line
-    newZbs.append("line").attr("class","axis") ;
-    // label
-    newZbs.append("text")
-        .attr("class","blockLabel") 
-	.text(b => b.chr);
-
-    //
-    zbs.exit().remove();
-
-    // To line each chunk up with the corresponding chunk in the reference strain,
-    // create the appropriate x scales.
-    zbs.each( b => {
-	let x1 = v.xscale(b.fStart);
-	let x2 = v.xscale(b.fEnd);
-	b.xscale = d3.scale.linear().domain([b.start, b.end]).range([x1, x2]);
-    });
-    // draw the zoom block outline
-    zbs.select("rect.block")
-      .attr("x", b => {
-          return b.xscale(b.start)
-      })
-      .attr("y", (b,i,j) => {
-	  return data[j].strain.zoomY - 15;
-      })
-      .attr("width", b=>b.xscale(b.end)-b.xscale(b.start))
-      .attr("height", 30);
-
-    // axis line
-    zbs.select("line")
-	.attr("x1", b => b.xscale.range()[0])
-	.attr("y1", b => b.strain.zoomY )
-	.attr("x2", b => b.xscale.range()[1])
-	.attr("y2", b => b.strain.zoomY )
-
-    zbs.select("text.blockLabel")
-        .attr("x", b => (b.xscale(b.start) + b.xscale(b.end))/2 )
-	.attr("y", b => b.strain.zoomY + 25);
-
-    // features
-    let feats = zbs.select('.features').selectAll(".feature")
-        .data(d=>d.features, d=>d.mgpid);
-    feats.exit().remove();
-    let newFeats = feats.enter().append("rect")
-        .attr("class", f => "feature" + (f.strand==="-" ? " minus" : " plus"))
-	.style("fill", f => cscale(getMungedType(f)))
-	.on("mouseover", function(f){highlight(f,this);});
-
-    // draw the rectangles
-    let fBlock = function (featElt) {
-        let blkElt = featElt.parentNode.parentNode;
-	return blkElt.__data__;
-    }
-    feats
-      .attr("width", function (f) { return fBlock(this).xscale(f.end)-fBlock(this).xscale(f.start)+1 })
-      .attr("height", featHeight)
-      .attr("x", function (f) { return fBlock(this).xscale(f.start) })
-      .attr("y", function (f) { return f.strain.zoomY - (f.strand === "-" ? 0 : featHeight) })
-
-    
-    //
-    applyFacets();
-    //
-    drawFiducials();
-};
 
 //----------------------------------------------
 let cscale = d3.scale.category10().domain([
@@ -711,29 +726,6 @@ function updateFeatureDetails (f) {
     fd.select('.mgiid span').text(f.mgiid)
     fd.select('.symbol span').text(f.symbol)
     fd.select('.coordinates span').text(`${f.strand}${f.chr}:${f.start}..${f.end}`)
-}
-
-//----------------------------------------------
-function highlight(f, rect) {
-    updateFeatureDetails(f);
-    mgv.zoomView.svg.select("g.strips").selectAll(".feature")
-        .classed("highlight", function(ff) {
-	    let v = (f.mgiid && f.mgiid !== "." && f.mgiid === ff.mgiid) || f === ff;
-	    return v;
-	    d3.select(this)
-		.attr("transform", (v && ff.strand === "+") ?  `translate(0, ${-featHeight/2})` : null)
-		.attr("height", featHeight * (v ? 1.5 : 1));
-	    return v;
-	});
-    drawFiducials(f);
-}
-
-//----------------------------------------------
-function unhighlight () {
-    mgv.zoomView.svg.select("g.strips").selectAll(".feature.highlight")
-        .attr("transform", null)
-	.attr("height", featHeight);
-    hideFiducials();
 }
 
 //----------------------------------------------

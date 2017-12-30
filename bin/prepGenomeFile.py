@@ -1,6 +1,6 @@
 
 #
-# prepStrainFile.py
+# prepGenomeFile.py
 #
 #
 
@@ -28,7 +28,7 @@ class Prep:
             '-f',
             dest="gffFile",
             metavar='GFF file', 
-            help='Strain GFF3 input file. (Default=reads from stdin)')
+            help='Genome GFF3 input file. (Default=reads from stdin)')
 
         self.parser.add_argument(
             '-o',

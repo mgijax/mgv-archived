@@ -9,30 +9,32 @@ source config.sh
 
 BDIR="${DIR}/bin"
 DDIR="${DIR}/data/downloads"
-SDIR="${DIR}/data/straindata"
+SDIR="${DIR}/data/genomedata"
 
 mkdir -p ${DDIR}
 mkdir -p ${SDIR}
 
-# generate strain list file (a simple table of strain names and labels)
-strainList="${DIR}/data/strainList.tsv"
-echo "strain	label" > "${strainList}"
+# generate genome list file (a simple table of genome names and labels)
+genomeList="${DIR}/data/genomeList.tsv"
+echo "name	label" > "${genomeList}"
 count=0
-for sn in "${ALL_STRAIN_NAMES[@]}"
+for sn in "${ALL_GENOME_NAMES[@]}"
 do : 
-    slbl="${ALL_STRAIN_LABELS[count]}"
-    echo "${sn}	${slbl}" >> "${strainList}"
+    slbl="${ALL_GENOME_LABELS[count]}"
+    echo "${sn}	${slbl}" >> "${genomeList}"
     count=$(expr $count + 1)
 done
 
+exit
+
 function download {
-   strain=$1
+   genome=$1
    fname="${DDIR}/$2"
-   url="${BASEURL}/${strain}/$2"
-   featFile="${SDIR}/${strain}-features.tsv"
-   chrFile="${SDIR}/${strain}-chromosomes.tsv"
-   ixFile="${SDIR}/${strain}-index.tsv"
-   echo ${strain}
+   url="${BASEURL}/${genome}/$2"
+   featFile="${SDIR}/${genome}-features.tsv"
+   chrFile="${SDIR}/${genome}-chromosomes.tsv"
+   ixFile="${SDIR}/${genome}-index.tsv"
+   echo ${genome}
    echo "Downloading:" "${url}" to "${fname}"
    curl -R -z ${fname} -o ${fname} $url
    echo "Generating:" "${featFile}" "${chrFile}" "${ixFile}"
@@ -40,14 +42,14 @@ function download {
        | grep -v "^#" \
        | grep -v "Parent=" \
        | grep -v biological_region \
-       | python "${BDIR}/prepStrainFile.py" -o "${featFile}" -c "${chrFile}"
+       | python "${BDIR}/prepGenomeFile.py" -o "${featFile}" -c "${chrFile}"
    python "${BDIR}/indexFeatures.py" -f "${featFile}" -x "${ixFile}" -a create
 }
 
 
-for sn in "${ALL_STRAIN_NAMES[@]}"
+for sn in "${ALL_GENOME_NAMES[@]}"
 do : 
-    # For every strain name, there is an env var of that name containing the file name for that strain
+    # For every genome name, there is an env var of that name containing the file name for that genome
     # This gets the file name.
     eval fname=\$$sn
     # call the download function for this pair

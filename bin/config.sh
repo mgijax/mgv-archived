@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source ./strains.cfg
+source ./genomes.cfg
 
 export DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd ".." && pwd )"
 export ENSEMBLRELEASE=91
