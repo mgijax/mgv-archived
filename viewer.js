@@ -2,48 +2,63 @@
  
 // ---------------------------------------------
 class Feature {
-  constructor (cfg) {
-      this.chr     = cfg.chr;
-      this.start   = cfg.start;
-      this.end     = cfg.end;
-      this.strand  = cfg.strand;
-      this.type    = cfg.type;
-      this.biotype = cfg.biotype;
-      this.mgpid   = cfg.mgpid;
-      this.mgiid   = cfg.mgiid;
-      this.symbol  = cfg.symbol;
-      this.genome  = cfg.genome;
-      if (this.mgiid === ".") this.mgiid = null;
-      if (this.symbol === ".") this.symbol = null;
-  }
+    constructor (cfg) {
+        this.chr     = cfg.chr;
+        this.start   = cfg.start;
+        this.end     = cfg.end;
+        this.strand  = cfg.strand;
+        this.type    = cfg.type;
+        this.biotype = cfg.biotype;
+        this.mgpid   = cfg.mgpid;
+        this.mgiid   = cfg.mgiid;
+        this.symbol  = cfg.symbol;
+        this.genome  = cfg.genome;
+        if (this.mgiid === ".") this.mgiid = null;
+        if (this.symbol === ".") this.symbol = null;
+    }
+    //----------------------------------------------
+    getMungedType () {
+	return this.type === "gene" ?
+	    this.biotype === "protein_coding" ?
+		"protein_coding_gene"
+		:
+		this.biotype.indexOf("pseudogene") >= 0 ?
+		    "pseudogene"
+		    :
+		    this.biotype.indexOf("RNA") >= 0 ?
+			"ncRNA_gene"
+			:
+			"other_gene"
+	    :
+	    this.type === "pseudogene" ?
+		"pseudogene"
+		:
+		this.type.indexOf("gene_segment") >= 0 ?
+		    "gene_segment"
+		    :
+		    this.type.indexOf("RNA") >= 0 ?
+			"ncRNA_gene"
+			:
+			this.type.indexOf("gene") >= 0 ?
+			    "other_gene"
+			    :
+			    "other_feature_type";
+    }
 }
 // ---------------------------------------------
 class Genome {
   constructor (cfg) {
     this.name = cfg.name;
     this.label= cfg.label;
-    //this.chromosomes = chrs;
-    //this.maxlen = maxlen;
-    //this.xscale = xs;
-    //this.yscale = ys;
-    //this.cscale = cs;
-    //this.zoomY  = -1;
     this.chromosomes = [];
     this.maxlen = -1;
     this.xscale = null;
     this.yscale = null;
-    this.cscale = null;
     this.zoomY  = -1;
   }
 }
 // ---------------------------------------------
-class Block {
-  constructor () {
-  }
-}
-
-//----------------------------------------------
-class BlockFile {
+class BlockTranslator {
     constructor(url, aGenome, bGenome, blocks){
         this.url = url;
 	this.aGenome = aGenome;
@@ -127,6 +142,123 @@ class BlockFile {
 	return blks;
     }
 }
+
+//----------------------------------------------
+// BlockTranslator manager class
+//
+class BTManager {
+    constructor (app) {
+        this.app = app;
+	this.rcBlocks = {};
+    }
+
+    //----------------------------------------------
+    registerBlocks (url, aGenome, bGenome, blocks) {
+	let aname = aGenome.name;
+	let bname = bGenome.name;
+	let blkFile = new BlockTranslator(url,aGenome,bGenome,blocks);
+	if( ! this.rcBlocks[aname]) this.rcBlocks[aname] = {};
+	if( ! this.rcBlocks[bname]) this.rcBlocks[bname] = {};
+	this.rcBlocks[aname][bname] = blkFile;
+	this.rcBlocks[bname][aname] = blkFile;
+    }
+
+    //----------------------------------------------
+    getBlockFile (aGenome, bGenome) {
+	// First, see if we already have this pair
+	let aname = aGenome.name;
+	let bname = bGenome.name;
+	let bf = (this.rcBlocks[aname] || {})[bname];
+	if (bf)
+	    return Promise.resolve(bf);
+	
+	// For any given genome pair, only one of the following file
+	// is generated...
+	let fn1 = `./data/blockfiles/${aGenome.name}-${bGenome.name}.tsv`
+	let fn2 = `./data/blockfiles/${bGenome.name}-${aGenome.name}.tsv`
+	// ...so we'll try one, and if that's not it, the other.
+	let self = this;
+	return d3tsv(fn1)
+	  .then(function(blocks){
+	      // yup, it was A-B
+	      self.registerBlocks(fn1, aGenome, bGenome, blocks);
+	      return blocks
+	  })
+	  .catch(function(){
+	      return d3tsv(fn2)
+		  .then(function(blocks){
+		      // nope, it was B-A
+		      self.registerBlocks(fn2, bGenome, aGenome, blocks);
+		      return blocks
+		  })
+		  .catch(function(e){
+		      throw `Cannot get block file for this genome pair: ${aGenome.name} ${bGenome.name}.\n(Error=${e})`;
+		  });
+	  });
+    }
+
+    //----------------------------------------------
+    ready () {
+	let promises = this.app.cGenomes.map(cg => this.getBlockFile(this.app.rGenome, cg));
+	return Promise.all(promises)
+    }
+
+    //----------------------------------------------
+    translate (fromGenome, chr, start, end, toGenome) {
+	// get the right block file
+	let blkTrans = this.rcBlocks[fromGenome.name][toGenome.name];
+	if (!blkTrans) throw "Internal error. No block file found in index."
+	// translate!
+	let ranges = blkTrans.translate(fromGenome, chr, start, end);
+	return ranges;
+    }
+} // end class BTManager
+
+//----------------------------------------------
+class FeatureManager {
+    constructor () {
+        this.featCache = {};    // global index from mgpid -> feature
+    }
+
+    //----------------------------------------------
+    getFeatures (genome, ranges) {
+	let coordsArg = ranges.map(r => `${r.chr}:${r.start}..${r.end}`).join(',');
+	let dataString = `genome=${genome.name}&coords=${coordsArg}`;
+	let url = "./bin/getFeatures.cgi?" + dataString;
+	return d3json(url).then(function(data) {
+	    let s = data.forEach( (d,i) => {
+		let r = ranges[i];
+		r.features = this.processFeatures( d.features, genome );
+		r.genome = genome;
+	    });
+	    return { genome, blocks:ranges };
+	}.bind(this));
+    }
+
+    //----------------------------------------------
+    processFeatures (feats, genome) {
+	return feats.map(d => {
+	    let mgpid = d[6];
+	    if (this.featCache[mgpid])
+		return this.featCache[mgpid];
+	    let f = new Feature({
+	      chr     : d[0],
+	      start   : parseInt(d[1]),
+	      end	  : parseInt(d[2]),
+	      strand  : d[3],
+	      type    : d[4],
+	      biotype : d[5],
+	      mgpid   : mgpid,
+	      mgiid   : d[7],
+	      symbol  : d[8],
+	      genome  : genome
+	    });
+	    this.featCache[mgpid] = f;
+	    return f;
+	});
+    }
+} // end class Feature Manager
+
 // ---------------------------------------------
 class SVGView {
   constructor (id, width, height, app) {
@@ -145,7 +277,8 @@ class SVGView {
             .attr("transform", `translate(${this.margin.left},${this.margin.top})`)
           .append("g");
   }
-}
+} // end class SVGView
+
 // ---------------------------------------------
 class GenomeView extends SVGView {
     constructor (id, width, height, app) {
@@ -264,7 +397,8 @@ class GenomeView extends SVGView {
 	if (this.brushChr) this.brushend();
     }
 
-}
+} // end class GenomeView
+
 // ---------------------------------------------
 class ZoomView extends SVGView {
     constructor (id, width, height, app) {
@@ -280,6 +414,44 @@ class ZoomView extends SVGView {
       d3.select(this.selector).on("click", () => this.unhighlight());
     }
     //----------------------------------------------
+    update () {
+
+	if (!this.coords) return;
+
+	let chr = this.coords.chr;
+	let start = this.coords.start;
+	let end = this.coords.end;
+        let mgv = this.app;
+
+	mgv.translator.ready().then(function(){
+	    // Now issue requests for features. One request per genome, each request specifies one or more
+	    // coordinate ranges.
+	    // Wait for all the data to become available, then draw.
+	    //
+	    let promises = [];
+
+	    // First request is for the the reference genome. Get all the features in the range.
+	    promises.push(mgv.featureManager.getFeatures(mgv.rGenome, [{
+		chr    : chr,
+		start  : start,
+		end    : end,
+		fChr   : chr,
+		fStart : start,
+		fEnd   : end,
+		ori    : "+"
+		}]));
+	    // Add a request for each comparison genome, using translated coordinates. 
+	    mgv.cGenomes.forEach(cGenome => {
+		let ranges = mgv.translator.translate( mgv.rGenome, chr, start, end, cGenome );
+		promises.push(mgv.featureManager.getFeatures(cGenome, ranges))
+	    });
+	    // when everything is ready, call the draw function
+	    Promise.all(promises).then( data => mgv.zoomView.draw(data) );
+	});
+
+    }
+
+    //----------------------------------------------
     // Sets the coordinate range of the reference genome in the zoom view and
     // redraws. The coordinates ranges of all comparison genomes are adjusted accordingly.
     // Args:
@@ -288,7 +460,7 @@ class ZoomView extends SVGView {
 	this.coords = coords;
 	d3.select("#zoomCoords")[0][0].value = formatCoords(coords.chr, coords.start, coords.end);
 	this.app.genomeView.setBrushCoords(coords);
-	updateZoomView();
+	this.update();
     }
 
     //----------------------------------------------
@@ -413,7 +585,7 @@ class ZoomView extends SVGView {
 	feats.exit().remove();
 	let newFeats = feats.enter().append("rect")
 	    .attr("class", f => "feature" + (f.strand==="-" ? " minus" : " plus"))
-	    .style("fill", f => cscale(getMungedType(f)))
+	    .style("fill", f => self.app.cscale(f.getMungedType()))
 	    .on("mouseover", function(f){ self.highlight(f,this);});
 
 	// draw the rectangles
@@ -429,19 +601,20 @@ class ZoomView extends SVGView {
 
 	
 	//
-	applyFacets();
+	this.app.facetManager.applyAll();
+
 	//
-	drawFiducials();
+	this.drawFiducials();
     };
     //----------------------------------------------
     highlight (f, rect) {
-	updateFeatureDetails(f);
+	this.updateFeatureDetails(f);
 	this.svg.select("g.strips").selectAll(".feature")
 	    .classed("highlight", function(ff) {
 		let v = (f.mgiid && f.mgiid !== "." && f.mgiid === ff.mgiid) || f === ff;
 		return v;
 	    });
-	drawFiducials(f);
+	this.drawFiducials(f);
     }
 
     //----------------------------------------------
@@ -449,11 +622,121 @@ class ZoomView extends SVGView {
 	this.svg.select("g.strips").selectAll(".feature.highlight")
 	    .attr("transform", null)
 	    .attr("height", this.featHeight);
-	hideFiducials();
+	this.hideFiducials();
+    }
+    //----------------------------------------------
+    updateFeatureDetails (f) {
+	let fd = d3.select('.featureDetails');
+	fd.select('.mgpid span').text(f.mgpid)
+	fd.select('.type span').text(f.type)
+	fd.select('.biotype span').text(f.biotype)
+	fd.select('.mgiid span').text(f.mgiid)
+	fd.select('.symbol span').text(f.symbol)
+	fd.select('.coordinates span').text(`${f.strand}${f.chr}:${f.start}..${f.end}`)
+    }
+    //----------------------------------------------
+    drawFiducials (f) {
+	// get the "stack" of features that are highlighted
+	// make sure they're sorted by Y position
+	let items = this.svg.select("g.strips").selectAll(".feature.highlight")[0];
+	items.sort( (a,b) => parseFloat(a.getAttribute("y")) - parseFloat(b.getAttribute("y")) );
+
+	// put all feducial marks in their own group 
+	let fGrp = this.svg.select("g.fiducials")
+	    .classed("hidden", false);
+
+	if (f) {
+	    let label = fGrp.selectAll('text.featLabel')
+		.data([f]);
+	    label.enter().append('text').attr('class','featLabel');
+	    label
+	      .attr("x", 250)
+	      .attr("y", 20)
+	      .text(f => {
+		   let sym = f.symbol && f.symbol !== "." ? f.symbol : f.mgpid;
+		   return sym;
+	      })
+	}
+
+	// create a polygon between each successive pair of items
+	let pairs = items.map((item, i) => [item,items[i+1]]);
+	pairs.splice(pairs.length - 1, 1);
+	//
+	let pgons = fGrp.selectAll("polygon")
+	    .data(pairs)
+	    ;
+	pgons.exit().remove();
+	pgons.enter().append("polygon")
+	    .attr("class","fiducial")
+	    ;
+	pgons.attr("points", p => {
+	    let x1 = parseFloat(p[0].getAttribute("x"));
+	    let y1 = parseFloat(p[0].getAttribute("y"));
+	    let w1 = parseFloat(p[0].getAttribute("width"));
+	    let h1 = parseFloat(p[0].getAttribute("height"));
+	    //
+	    let x2 = parseFloat(p[1].getAttribute("x"));
+	    let y2 = parseFloat(p[1].getAttribute("y"));
+	    let w2 = parseFloat(p[1].getAttribute("width"));
+	    let h2 = parseFloat(p[1].getAttribute("height"));
+	    //
+	    let s = `${x1},${y1+h1} ${x2},${y2} ${x2+w2},${y2} ${x1+w1},${y1+h1}`
+	    //
+	    return s;
+	});
+    }
+    //----------------------------------------------
+    hideFiducials () {
+	this.svg.select("g.fiducials")
+	    .classed("hidden", true);
     }
 
 
-}
+} // end class ZoomView
+
+
+//----------------------------------------------
+class Facet {
+    constructor (name, manager) {
+	this.manager = manager;
+        this.name = name;
+	this.values = [];
+    }
+    setValues (values, quietly) {
+        this.values = values;
+	if (! quietly) this.manager.applyAll();
+    }
+    test (f) {
+        return !this.values || this.values.length === 0 || this.values.indexOf( xxx(f) ) >= 0;
+    }
+} // end class Facet
+
+//----------------------------------------------
+class FacetManager {
+    constructor (app) {
+	this.app = app;
+	this.facets = [];
+	this.name2facet = {}
+    }
+    addFacet (name, valueFcn) {
+	if (this.name2facet[name]) throw "Duplicate facet name. " + name;
+	let facet = new Facet(name, valueFcn, this);
+        this.facets.push( facet );
+	this.name2facet[name] = facet;
+	return facet
+    }
+    test (f) {
+        let vals = this.facets.map( facet => facet.test(f) );
+	return vals.reduce((accum, val) => accum && val, true);
+    }
+    applyAll () {
+	let show = null;
+	let hide = "none";
+	mgv.zoomView.svg.select("g.strips").selectAll('rect.feature')
+	    .style("display", f => this.test(f) ? show : hide);
+    }
+} // end class FacetManager
+
 // ---------------------------------------------
 class MGVApp {
     constructor () {
@@ -467,13 +750,33 @@ class MGVApp {
 	//
 	this.genomeView = new GenomeView("genomeView", 800, 250, this);
 	this.zoomView = new ZoomView  ("zoomView",   800, 100, this);
+	this.cscale = d3.scale.category10().domain([
+	    "protein_coding_gene",
+	    "pseudogene",
+	    "gene_segment",
+	    "ncRNA_gene",
+	    "other_gene",
+	    "other_feature_type"
+	]);
+	this.translator = new BTManager(this);
+	this.featureManager = new FeatureManager();
+
 	//
 	d3.select("#refGenome").on("change", () => this.go());
 	d3.select("#compGenomes").on("change", () => this.go());
+
+	// Facets
 	//
-	drawColorKey();
-	//
-	d3.select("#mgiFacet").on("change", function(){setMgiFacet(this.value);});
+	this.facetManager = new FacetManager(this);
+
+	let ftFacet  = this.facetManager.addFacet("FeatureType", f => f.getMungedType());
+	this.initFeatTypeControl(ftFacet);
+
+	let mgiFacet = this.facetManager.addFacet("HasMgiId",    f => f.mgiid && f.mgiid !== "." ? "yes" : "no" );
+	d3.select("#mgiFacet").on("change", function(){
+	    mgiFacet.setValues(this.value === "" ? [] : [this.value]);
+	});
+
 	//
 	d3.select("#zoomCoords").on("change", function () {
 	    let coords = parseCoords(this.value);
@@ -496,10 +799,12 @@ class MGVApp {
 	    initOptList("#refGenome",   this.allGenomes, g=>g.name, g=>g.label, false);
 	    initOptList("#compGenomes", this.allGenomes, g=>g.name, g=>g.label, true);
 	    //
-	    return Promise.all(this.allGenomes.map(g => d3tsv(`./data/genomedata/${g.name}-chromosomes.tsv`)));
+	    let cdps = this.allGenomes.map(g => d3tsv(`./data/genomedata/${g.name}-chromosomes.tsv`));
+	    //
+	    return Promise.all(cdps);
 	}.bind(this))
 	.then(function (data) {
-	    processChromosomes(data);
+	    this.processChromosomes(data);
 	    this.go();
 	}.bind(this))
 	.catch(function(error) {
@@ -507,6 +812,77 @@ class MGVApp {
 	});
 
     }
+    //----------------------------------------------
+    initFeatTypeControl (facet) {
+	let colors = this.cscale.domain().map(lbl => {
+	    return { lbl:lbl, clr:this.cscale(lbl) };
+	});
+	let ckes = d3.select(".colorKey")
+	    .selectAll('.colorKeyEntry')
+		.data(colors);
+	let ncs = ckes.enter().append("div")
+	    .attr("class", "colorKeyEntry flexrow");
+	ncs.append("div")
+	    .attr("class","swatch")
+	    .style("background-color", c => c.clr);
+	ncs.append("input")
+	    .attr("name", "featureType")
+	    .property("type", "checkbox")
+	    .property("value", c => c.lbl)
+	    .on("change", function () {
+		// get all the currently checked feature types
+		let fts = []
+		d3.selectAll('input[type="checkbox"][name="featureType"]')
+		    .each(function(d){
+			if (this.checked) fts.push(this.value);
+		    });
+		facet.setValues(fts);
+	    });
+	ncs.append("span")
+	    .text(c => c.lbl);
+    }
+
+    //----------------------------------------------
+    processChromosomes (d) {
+	// d is a list of chromosome lists, one per genome
+	// Fill in the genomeChrs map (genome -> chr list)
+	this.allGenomes.forEach((g,i) => {
+	    // nicely sort the chromosomes
+	    let chrs = d[i];
+	    let maxlen = 0;
+	    chrs.forEach( c => {
+		// because I'd rather say "c.name" than "c.chromosome"
+		c.name = c.chromosome;
+		delete c.chromosome;
+		//
+		c.scale = d3.scale.linear().domain([1, c.length]).range([0, this.genomeView.height]);
+		maxlen = Math.max(maxlen, c.length);
+	    });
+	    chrs.sort((a,b) => {
+		let aa = parseInt(a.name) - parseInt(b.name);
+		if (!isNaN(aa)) return aa;
+		return a.name < b.name ? -1 : a.name > b.name ? +1 : 0;
+	    });
+	    let xs = d3.scale.ordinal()
+		   .domain(chrs.map(function(x){return x.name;}))
+		   .rangePoints([0, this.genomeView.width],2);
+	    let ys = d3.scale.linear().domain([1,maxlen]).range([0, this.genomeView.height]);
+
+	    chrs.forEach(function(chr){
+		var sc = d3.scale.linear().domain([1,chr.length]).range([0, ys(chr.length)]);
+		chr.brush = d3.svg.brush().y(sc)
+		   .on("brushstart", chr => this.genomeView.brushstart(chr))
+		   .on("brushend", () => this.genomeView.brushend());
+	      }, this);
+	    g.chromosomes = chrs;
+	    g.maxlen = maxlen;
+	    g.xscale = xs;
+	    g.yscale = ys;
+	    g.zoomY  = -1;
+	    this.genomeData[g.name] = g;
+	});
+    }
+
     //----------------------------------------------
     //
     go () {
@@ -522,375 +898,13 @@ class MGVApp {
 	    this.cGenomes.push(this.genomeData[csn]);
 	}
 	//
-	mgv.genomeView.draw();
+	this.genomeView.draw();
     }
-}
+} // end class MGVApp
 
 //----------------------------------------------
+//---- END CLASS DEFS --------------------------
 //----------------------------------------------
-function processChromosomes (d) {
-    // d is a list of chromosome lists, one per genome
-    // Fill in the genomeChrs map (genome -> chr list)
-    mgv.allGenomes.forEach((g,i) => {
-        // nicely sort the chromosomes
-        let chrs = d[i];
-        let maxlen = 0;
-        chrs.forEach( c => {
-            // because I'd rather say "c.name" than "c.chromosome"
-            c.name = c.chromosome;
-            delete c.chromosome;
-	    //
-            c.scale = d3.scale.linear().domain([1, c.length]).range([0, mgv.genomeView.height]);
-            maxlen = Math.max(maxlen, c.length);
-        });
-        chrs.sort((a,b) => {
-            let aa = parseInt(a.name) - parseInt(b.name);
-            if (!isNaN(aa)) return aa;
-            return a.name < b.name ? -1 : a.name > b.name ? +1 : 0;
-        });
-        let xs = d3.scale.ordinal()
-               .domain(chrs.map(function(x){return x.name;}))
-               .rangePoints([0, mgv.genomeView.width],2);
-        let ys = d3.scale.linear().domain([1,maxlen]).range([0, mgv.genomeView.height]);
-        let cs = d3.scale.category20().domain(chrs.map(function(x){return x.name;}));
-
-	chrs.forEach(function(chr){
-	    var sc = d3.scale.linear().domain([1,chr.length]).range([0, ys(chr.length)]);
-            chr.brush = d3.svg.brush().y(sc)
-               .on("brushstart", function(chr) { mgv.genomeView.brushstart(chr); })
-               .on("brushend", function () { mgv.genomeView.brushend(); });
-	  });
-	g.chromosomes = chrs;
-	g.maxlen = maxlen;
-	g.xscale = xs;
-	g.yscale = ys;
-	g.cscale = cs;
-	g.zoomY  = -1;
-        mgv.genomeData[g.name] = g;
-    });
-}
-
-
-//----------------------------------------------
-let rcBlocks = {};
-function registerBlocks(url, aGenome, bGenome, blocks){
-    let aname = aGenome.name;
-    let bname = bGenome.name;
-    let blkFile = new BlockFile(url,aGenome,bGenome,blocks);
-    if( ! rcBlocks[aname]) rcBlocks[aname] = {};
-    if( ! rcBlocks[bname]) rcBlocks[bname] = {};
-    rcBlocks[aname][bname] = blkFile;
-    rcBlocks[bname][aname] = blkFile;
-}
-//----------------------------------------------
-function getBlockFile(aGenome, bGenome){
-    // First, see if we already have this pair
-    let aname = aGenome.name;
-    let bname = bGenome.name;
-    let bf = (rcBlocks[aname] || {})[bname];
-    if (bf)
-        return Promise.resolve(bf);
-    
-    // For any given genome pair, only one of the following file
-    // is generated...
-    let fn1 = `./data/blockfiles/${aGenome.name}-${bGenome.name}.tsv`
-    let fn2 = `./data/blockfiles/${bGenome.name}-${aGenome.name}.tsv`
-    // ...so we'll try one, and if that's not it, the other.
-    return d3tsv(fn1)
-      .then(function(blocks){
-	  // yup, it was A-B
-	  registerBlocks(fn1, aGenome, bGenome, blocks);
-	  return blocks
-      })
-      .catch(function(){
-          return d3tsv(fn2)
-	      .then(function(blocks){
-		  // nope, it was B-A
-		  registerBlocks(fn2, bGenome, aGenome, blocks);
-		  return blocks
-	      })
-	      .catch(function(e){
-	          throw `Cannot get block file for this genome pair: ${aGenome.name} ${bGenome.name}.\n(Error=${e})`;
-	      });
-      });
-}
-
-//----------------------------------------------
-function getBlockFiles(rGenome, cGenomes) {
-    let promises = cGenomes.map(s => getBlockFile(rGenome, s));
-    return Promise.all(promises)
-}
-
-//----------------------------------------------
-let featCache = {};    // global index from mgpid -> feature
-function getFeatures(genome, ranges){
-    let coordsArg = ranges.map(r => `${r.chr}:${r.start}..${r.end}`).join(',');
-    let dataString = `genome=${genome.name}&coords=${coordsArg}`;
-    let url = "./bin/getFeatures.cgi?" + dataString;
-    return d3json(url).then(function(data) {
-	let s = data.forEach( (d,i) => {
-	    let r = ranges[i];
-	    r.features = processFeatures( d.features, genome );
-	    r.genome = genome;
-	});
-	return { genome, blocks:ranges };
-    });
-}
-
-//----------------------------------------------
-function processFeatures (feats, genome) {
-    return feats.map(d => {
-	mgpid = d[6];
-	if (featCache[mgpid])
-	    return featCache[mgpid];
-        let f = new Feature({
-	  chr     : d[0],
-	  start   : parseInt(d[1]),
-	  end	  : parseInt(d[2]),
-	  strand  : d[3],
-	  type    : d[4],
-	  biotype : d[5],
-	  mgpid   : mgpid,
-	  mgiid   : d[7],
-	  symbol  : d[8],
-	  genome  : genome
-	});
-	featCache[mgpid] = f;
-	return f;
-    });
-}
-
-
-//----------------------------------------------
-function updateZoomView() {
-
-    let zv = mgv.zoomView;
-    if (!zv.coords) return;
-
-    let chr = zv.coords.chr;
-    let start = zv.coords.start;
-    let end = zv.coords.end;
-
-    // make sure we've loaded the coordinate mapping data for these genomes
-    getBlockFiles(mgv.rGenome, mgv.cGenomes).then(function(){
-	// OK, got the maps.
-	// Now issue requests for features. One request per genome, each request specifies one or more
-	// coordinate ranges.
-	// Wait for all the data to become available, then draw.
-	//
-	let promises = [];
-
-	// First request is for the the reference genome. Get all the features in the range.
-	promises.push(getFeatures(mgv.rGenome, [{
-	    chr    : chr,
-	    start  : start,
-	    end    : end,
-	    fChr   : chr,
-	    fStart : start,
-	    fEnd   : end,
-	    ori    : "+"
-	    }]));
-	// Add a request for each comparison genome, using translated coordinates. 
-	mgv.cGenomes.forEach(cGenome => {
-	    // get the right block file
-	    let blkFile = (rcBlocks[mgv.rGenome.name] || {})[cGenome.name];
-	    if (!blkFile) throw "Internal error. No block file found in index."
-	    // translate!
-	    let ranges = blkFile.translate(mgv.rGenome, chr, start, end);
-	    promises.push(getFeatures(cGenome, ranges))
-	});
-	// when everything is ready, call the draw function
-	Promise.all(promises).then( data => mgv.zoomView.draw(data) );
-    });
-
-}
-
-//----------------------------------------------
-let cscale = d3.scale.category10().domain([
-        "protein_coding_gene",
-	"pseudogene",
-	"gene_segment",
-	"ncRNA_gene",
-	"other_gene",
-	"other_feature_type"
-    ]);
-
-//----------------------------------------------
-function fText(f){
-    return f.symbol === "." ?
-	    `${f.mgpid}\n${f.type}/${f.biotype}`
-	    :
-	    `${f.symbol}\n${f.mgiid}\n${f.mgpid}\n${f.type}/${f.biotype}` ;
-}
-
-//----------------------------------------------
-function updateFeatureDetails (f) {
-    let fd = d3.select('.featureDetails');
-    fd.select('.mgpid span').text(f.mgpid)
-    fd.select('.type span').text(f.type)
-    fd.select('.biotype span').text(f.biotype)
-    fd.select('.mgiid span').text(f.mgiid)
-    fd.select('.symbol span').text(f.symbol)
-    fd.select('.coordinates span').text(`${f.strand}${f.chr}:${f.start}..${f.end}`)
-}
-
-//----------------------------------------------
-function drawFiducials(f) {
-    let v = mgv.zoomView.svg;
-
-    // get the "stack" of features that are highlighted
-    // make sure they're sorted by Y position
-    let items = v.select("g.strips").selectAll(".feature.highlight")[0];
-    items.sort( (a,b) => parseFloat(a.getAttribute("y")) - parseFloat(b.getAttribute("y")) );
-
-    // create all feducial marks in their own group 
-    let fGrp = v.select("g.fiducials")
-        .classed("hidden", false);
-
-    if (f) {
-	let label = fGrp.selectAll('text.featLabel')
-	    .data([f]);
-	label.enter().append('text').attr('class','featLabel');
-	label
-	  .attr("x", 250)
-	  .attr("y", 20)
-	  .text(f => {
-	       let sym = f.symbol && f.symbol !== "." ? f.symbol : f.mgpid;
-	       return sym;
-	  })
-    }
-
-    // create a polygon between each successive pair of items
-    let pairs = items.map((item, i) => [item,items[i+1]]);
-    pairs.splice(pairs.length - 1, 1);
-    //
-    let pgons = fGrp.selectAll("polygon")
-	.data(pairs)
-	;
-    pgons.exit().remove();
-    pgons.enter().append("polygon")
-        .attr("class","fiducial")
-	;
-    pgons.attr("points", p => {
-        let x1 = parseFloat(p[0].getAttribute("x"));
-        let y1 = parseFloat(p[0].getAttribute("y"));
-	let w1 = parseFloat(p[0].getAttribute("width"));
-	let h1 = parseFloat(p[0].getAttribute("height"));
-	//
-        let x2 = parseFloat(p[1].getAttribute("x"));
-        let y2 = parseFloat(p[1].getAttribute("y"));
-	let w2 = parseFloat(p[1].getAttribute("width"));
-	let h2 = parseFloat(p[1].getAttribute("height"));
-	//
-	let s = `${x1},${y1+h1} ${x2},${y2} ${x2+w2},${y2} ${x1+w1},${y1+h1}`
-	//
-	return s;
-    });
-}
-//----------------------------------------------
-function hideFiducials() {
-    let v = mgv.zoomView.svg;
-    v.select("g.fiducials")
-        .classed("hidden", true);
-}
-
-//----------------------------------------------
-function drawColorKey() {
-    let colors = cscale.domain().map(lbl => {
-        return { lbl:lbl, clr:cscale(lbl) };
-    });
-    let ckes = d3.select(".colorKey")
-        .selectAll('.colorKeyEntry')
-	    .data(colors);
-    let ncs = ckes.enter().append("div")
-        .attr("class", "colorKeyEntry flexrow");
-    ncs.append("div")
-        .attr("class","swatch")
-	.style("background-color", c => c.clr);
-    ncs.append("input")
-	.attr("name", "featureType")
-	.property("type", "checkbox")
-	.property("value", c => c.lbl)
-	.on("change", function () {
-	    // get all the currently checked feature types
-	    let fts = []
-	    d3.selectAll('input[type="checkbox"][name="featureType"]')
-		.each(function(d){
-		    if (this.checked) fts.push(this.value);
-		});
-	    setFeatureTypeFacet(fts);
-	});
-    ncs.append("span")
-	.text(c => c.lbl);
-}
-
-
-// ---------------------------------------------
-// ---------------------------------------------
-let facets = {
-  featureTypes: [],
-  mgiIds: "",
-};
-
-//----------------------------------------------
-function setMgiFacet(v) {
-    facets.mgiIds = v;
-    applyFacets();
-}
-
-//----------------------------------------------
-function setFeatureTypeFacet(ftypes) {
-    facets.featureTypes = ftypes;
-    applyFacets();
-}
-
-//----------------------------------------------
-function applyFacets() {
-    let show = null;
-    let hide = "none";
-    //
-    let fts = facets.featureTypes;
-    function ftFilter (f) {
-	return fts.length===0 || fts.indexOf(getMungedType(f)) >= 0 
-    };
-    //
-    let mgi = facets.mgiIds;
-    function mgiFilter (f) {
-	return mgi === "yes" ? (f.mgiid && f.mgiid !== ".") : mgi === "no" ? (!f.mgiid || f.mgiid === ".") : true;
-    };
-    mgv.zoomView.svg.select("g.strips").selectAll('rect.feature')
-        .style("display", f => (ftFilter(f) && mgiFilter(f)) ? show : hide);
-
-}
-
-//----------------------------------------------
-function getMungedType(f) {
-    return f.type === "gene" ?
-	f.biotype === "protein_coding" ?
-	    "protein_coding_gene"
-	    :
-	    f.biotype.indexOf("pseudogene") >= 0 ?
-		"pseudogene"
-		:
-		f.biotype.indexOf("RNA") >= 0 ?
-		    "ncRNA_gene"
-		    :
-		    "other_gene"
-	:
-	f.type === "pseudogene" ?
-	    "pseudogene"
-	    :
-	    f.type.indexOf("gene_segment") >= 0 ?
-		"gene_segment"
-		:
-		f.type.indexOf("RNA") >= 0 ?
-		    "ncRNA_gene"
-		    :
-		    f.type.indexOf("gene") >= 0 ?
-			"other_gene"
-			:
-			"other_feature_type";
-}
 
 // =============================================
 //                    UTILS
