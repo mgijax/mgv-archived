@@ -825,20 +825,17 @@ class MGVApp {
 	    .attr("class", "colorKeyEntry flexrow");
 	ncs.append("div")
 	    .attr("class","swatch")
-	    .style("background-color", c => c.clr);
-	ncs.append("input")
-	    .attr("name", "featureType")
-	    .property("type", "checkbox")
-	    .property("value", c => c.lbl)
-	    .on("change", function () {
-		// get all the currently checked feature types
-		let fts = []
-		d3.selectAll('input[type="checkbox"][name="featureType"]')
-		    .each(function(d){
-			if (this.checked) fts.push(this.value);
-		    });
+	    .attr("name", c => c.lbl)
+	    .style("background-color", c => c.clr)
+	    .on("click", function () {
+		let t = d3.select(this);
+	        t.classed("checked", ! t.classed("checked"));
+		let swatches = d3.selectAll(".swatch.checked")[0];
+		let fts = swatches.map(s=>s.getAttribute("name"))
 		facet.setValues(fts);
-	    });
+	    })
+	    .append("i")
+	        .attr("class","material-icons");
 	ncs.append("span")
 	    .text(c => c.lbl);
     }

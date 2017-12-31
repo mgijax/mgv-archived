@@ -73,6 +73,17 @@ rect.feature.highlight {
 .swatch {
     width: 20px;
     height: 20px;
+    cursor: pointer;
+}
+
+.swatch i.material-icons {
+    font-size: 18px;
+    font-weight: bold;
+    color: #fff;
+}
+
+.swatch.checked i.material-icons::before {
+    content: "check";
 }
 
 .spacer1 { flex-grow: 1; }
