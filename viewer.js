@@ -697,17 +697,18 @@ class ZoomView extends SVGView {
 
 //----------------------------------------------
 class Facet {
-    constructor (name, manager) {
+    constructor (name, manager, valueFcn) {
 	this.manager = manager;
         this.name = name;
 	this.values = [];
+	this.valueFcn = valueFcn;
     }
     setValues (values, quietly) {
         this.values = values;
 	if (! quietly) this.manager.applyAll();
     }
     test (f) {
-        return !this.values || this.values.length === 0 || this.values.indexOf( xxx(f) ) >= 0;
+        return !this.values || this.values.length === 0 || this.values.indexOf( this.valueFcn(f) ) >= 0;
     }
 } // end class Facet
 
@@ -720,7 +721,7 @@ class FacetManager {
     }
     addFacet (name, valueFcn) {
 	if (this.name2facet[name]) throw "Duplicate facet name. " + name;
-	let facet = new Facet(name, valueFcn, this);
+	let facet = new Facet(name, this, valueFcn);
         this.facets.push( facet );
 	this.name2facet[name] = facet;
 	return facet
