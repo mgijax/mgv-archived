@@ -19,11 +19,25 @@ class Feature {
 }
 // ---------------------------------------------
 class Genome {
-  constructor () {
+  constructor (cfg) {
+    this.name = cfg.name;
+    this.label= cfg.label;
+    //this.chromosomes = chrs;
+    //this.maxlen = maxlen;
+    //this.xscale = xs;
+    //this.yscale = ys;
+    //this.cscale = cs;
+    //this.zoomY  = -1;
+    this.chromosomes = [];
+    this.maxlen = -1;
+    this.xscale = null;
+    this.yscale = null;
+    this.cscale = null;
+    this.zoomY  = -1;
   }
 }
 // ---------------------------------------------
-class Blocks {
+class Block {
   constructor () {
   }
 }
@@ -115,8 +129,9 @@ class BlockFile {
 }
 // ---------------------------------------------
 class SVGView {
-  constructor (id, width, height) {
+  constructor (id, width, height, app) {
     this.id = id;
+    this.app = app;
     this.selector = `#${this.id} svg`;
     this.margin = {top: 35, right: 10, bottom: 20, left: 10};
     this.outerWidth = width;
@@ -133,9 +148,11 @@ class SVGView {
 }
 // ---------------------------------------------
 class GenomeView extends SVGView {
-    constructor (id, width, height) {
-        super(id, width, height);
-	this.brushChr = null;
+    constructor (id, width, height, app) {
+        super(id, width, height, app);
+	this.cwidth = 20;        // chromosome width
+	this.brushChr = null;	 // which chr has the current brush
+	this.bwidth = this.cwidth/2;  // block width
     }
     setBrushCoords (coords) {
 	this.svg
@@ -160,7 +177,7 @@ class GenomeView extends SVGView {
 	    return;
 	}
 	var xtnt = this.brushChr.brush.extent();
-	mgv.zoomView.setCoords({ chr:this.brushChr.name, start:Math.floor(xtnt[0]), end: Math.ceil(xtnt[1]) });
+	this.app.zoomView.setCoords({ chr:this.brushChr.name, start:Math.floor(xtnt[0]), end: Math.ceil(xtnt[1]) });
     }
 
     //----------------------------------------------
@@ -175,14 +192,15 @@ class GenomeView extends SVGView {
     //----------------------------------------------
     draw () {
 
-	let sdata = genomeData[rsName];
+	let sdata = this.app.rGenome;
 
-	let xf = function(d){return bwidth+sdata.xscale(d.name);};
+	let self = this;
+	let xf = function(d){return self.bwidth+sdata.xscale(d.name);};
 
 	// Chromosome backbones (lines)
 	let ccels = this.svg.selectAll('line.chr')
 	  .data(sdata.chromosomes, function(x){return x.name;});
-	ccels.exit().transition().duration(dur)
+	ccels.exit().transition().duration(this.app.dur)
 	  .attr("y1", this.height)
 	  .attr("y2", this.height)
 	  .remove();
@@ -194,7 +212,7 @@ class GenomeView extends SVGView {
 	  .attr("x2", xf)
 	  .attr("y2", this.height)
 	  ;
-	ccels.transition().duration(dur)
+	ccels.transition().duration(this.app.dur)
 	  .attr("x1", xf)
 	  .attr("y1", 0)
 	  .attr("x2", xf)
@@ -204,7 +222,7 @@ class GenomeView extends SVGView {
 	// Chromosome labels
 	let labels = this.svg.selectAll('.chrlabel')
 	  .data(sdata.chromosomes, function(x){return x.name;});
-	labels.exit().transition().duration(dur)
+	labels.exit().transition().duration(this.app.dur)
 	  .attr('y', this.height)
 	  .remove();
 	labels.enter().append('text')
@@ -215,7 +233,7 @@ class GenomeView extends SVGView {
 	  .attr('y', this.height);
 	labels
 	  .text(function(d){return d.name;})
-	  .transition().duration(dur)
+	  .transition().duration(this.app.dur)
 	  .attr('x', xf)
 	  .attr('y', -2) ;
 
@@ -229,7 +247,7 @@ class GenomeView extends SVGView {
 	    .each(function(d){d3.select(this).call(d.brush);})
 	    .selectAll('rect')
 	     .attr('width',10)
-	     .attr('x', cwidth/4)
+	     .attr('x', this.cwidth/4)
 	     ;
 	brushes
 	    .attr('transform', function(d){return 'translate('+sdata.xscale(d.name)+')';})
@@ -237,7 +255,7 @@ class GenomeView extends SVGView {
 	    ;
 	// Ref genome label
 	let rsLabel = this.svg.selectAll("text.genomeLabel")
-	    .data([rGenome]);
+	    .data([this.app.rGenome]);
 	rsLabel.enter().append("text").attr("class","genomeLabel");
 	rsLabel.text(s => s.label)
 	    .attr("x", this.width/2)
@@ -249,12 +267,12 @@ class GenomeView extends SVGView {
 }
 // ---------------------------------------------
 class ZoomView extends SVGView {
-    constructor (id, width, height, genomeView) {
-      super(id,width,height);
+    constructor (id, width, height, app) {
+      super(id,width,height, app);
+      this.featHeight = 10;	// height of a rectangle representing a feature
       this.coords = null;
       this.genomes = []; // genomes in zoom view, top-to-bottom order
       this.stripHeight = 60; // height per genome in the zoom view
-      this.genomeView = genomeView;
       this.svg.append("g")
         .attr("class","fiducials");
       this.svg.append("g")
@@ -269,7 +287,7 @@ class ZoomView extends SVGView {
     setCoords (coords) {
 	this.coords = coords;
 	d3.select("#zoomCoords")[0][0].value = formatCoords(coords.chr, coords.start, coords.end);
-	this.genomeView.setBrushCoords(coords);
+	this.app.genomeView.setBrushCoords(coords);
 	updateZoomView();
     }
 
@@ -298,6 +316,9 @@ class ZoomView extends SVGView {
 
     //----------------------------------------------
     draw (data) {
+
+	let self = this;
+
 	// data = [ zoomStrip_data ]
 	// zoomStrip_data = { genome [ zoomBlock_data ] }
 	// zoomBlock_data = { xscale, chr, start, end, fChr, fStart, fEnd, ori, [ feature_data ] }
@@ -390,7 +411,6 @@ class ZoomView extends SVGView {
 	let feats = zbs.select('.features').selectAll(".feature")
 	    .data(d=>d.features, d=>d.mgpid);
 	feats.exit().remove();
-	let self = this;
 	let newFeats = feats.enter().append("rect")
 	    .attr("class", f => "feature" + (f.strand==="-" ? " minus" : " plus"))
 	    .style("fill", f => cscale(getMungedType(f)))
@@ -403,9 +423,9 @@ class ZoomView extends SVGView {
 	}
 	feats
 	  .attr("width", function (f) { return fBlock(this).xscale(f.end)-fBlock(this).xscale(f.start)+1 })
-	  .attr("height", featHeight)
+	  .attr("height", this.featHeight)
 	  .attr("x", function (f) { return fBlock(this).xscale(f.start) })
-	  .attr("y", function (f) { return f.genome.zoomY - (f.strand === "-" ? 0 : featHeight) })
+	  .attr("y", function (f) { return f.genome.zoomY - (f.strand === "-" ? 0 : self.featHeight) })
 
 	
 	//
@@ -428,7 +448,7 @@ class ZoomView extends SVGView {
     unhighlight () {
 	this.svg.select("g.strips").selectAll(".feature.highlight")
 	    .attr("transform", null)
-	    .attr("height", featHeight);
+	    .attr("height", this.featHeight);
 	hideFiducials();
     }
 
@@ -437,10 +457,16 @@ class ZoomView extends SVGView {
 // ---------------------------------------------
 class MGVApp {
     constructor () {
+	//
+	this.genomeData = {}; // map from genome name -> genome data obj
+	this.rGenome = null; // thereference genome
+	this.cGenomes = []; // comparison genomes
+	this.dur = 1500;         // anomation duration
+	//
 	this.allGenomes = []; // list of all genome names
 	//
-	this.genomeView = new GenomeView("genomeView", 800, 250);
-	this.zoomView = new ZoomView  ("zoomView",   800, 100, this.genomeView);
+	this.genomeView = new GenomeView("genomeView", 800, 250, this);
+	this.zoomView = new ZoomView  ("zoomView",   800, 100, this);
 	//
 	d3.select("#refGenome").on("change", () => this.go());
 	d3.select("#compGenomes").on("change", () => this.go());
@@ -466,11 +492,11 @@ class MGVApp {
 	d3.select("#panRight").on("click", () => this.zoomView.pan(-0.5));
 	//
 	d3tsv("./data/genomeList.tsv").then(function(data){
-	    this.allGenomes = data;
-	    initOptList("#refGenome", this.allGenomes, s=>s.name, s=>s.label);
-	    initOptList("#compGenomes", this.allGenomes, s=>s.name, s=>s.label, true);
+	    this.allGenomes = data.map(g => new Genome(g));
+	    initOptList("#refGenome",   this.allGenomes, g=>g.name, g=>g.label, false);
+	    initOptList("#compGenomes", this.allGenomes, g=>g.name, g=>g.label, true);
 	    //
-	    return Promise.all(this.allGenomes.map(s => d3tsv(`./data/genomedata/${s.name}-chromosomes.tsv`)));
+	    return Promise.all(this.allGenomes.map(g => d3tsv(`./data/genomedata/${g.name}-chromosomes.tsv`)));
 	}.bind(this))
 	.then(function (data) {
 	    processChromosomes(data);
@@ -486,43 +512,26 @@ class MGVApp {
     go () {
 	// reference genome
 	let rs = d3.select("#refGenome");
-	rsName = rs[0][0].value
-	rGenome = genomeData[rsName]
+	this.rGenome = this.genomeData[rs[0][0].value];
 	// comparison genomes
 	let cs = d3.select("#compGenomes");
-	// cs.select(`option[value="${rsName}"]`).property('selected', true);
 	let csos = cs[0][0].selectedOptions;
-	csNames = [];
-	cGenomes = [];
+	this.cGenomes = [];
 	for (let i = 0; i < csos.length; i++){
 	    let csn = csos[i].value;
-	    csNames.push(csn);
-	    cGenomes.push(genomeData[csn]);
+	    this.cGenomes.push(this.genomeData[csn]);
 	}
 	//
 	mgv.genomeView.draw();
     }
 }
 
-// ---------------------------------------------
-let genomeData = {}; // map from genome name -> genome data obj
-let rGenome = null; // thereference genome
-let cGenomes = []; // comparison genomes
-let rsName = null;      // reference genome name
-let csNames = [];     // list of comparison genome names
-
-let dur = 1500;         // anomation duration
-let cwidth = 20;        // chromosome width
-let featHeight = 10;	// height of a rectangle representing a feature
-let bwidth = cwidth/2;  // block width
-
-//
 //----------------------------------------------
 //----------------------------------------------
 function processChromosomes (d) {
     // d is a list of chromosome lists, one per genome
     // Fill in the genomeChrs map (genome -> chr list)
-    mgv.allGenomes.forEach((s,i) => {
+    mgv.allGenomes.forEach((g,i) => {
         // nicely sort the chromosomes
         let chrs = d[i];
         let maxlen = 0;
@@ -551,16 +560,13 @@ function processChromosomes (d) {
                .on("brushstart", function(chr) { mgv.genomeView.brushstart(chr); })
                .on("brushend", function () { mgv.genomeView.brushend(); });
 	  });
-        genomeData[s.name] = {
-	    name : s.name,
-	    label: s.label,
-            chromosomes : chrs,
-            maxlen : maxlen,
-            xscale : xs,
-            yscale : ys,
-            cscale : cs,
-	    zoomY  : -1
-        };
+	g.chromosomes = chrs;
+	g.maxlen = maxlen;
+	g.xscale = xs;
+	g.yscale = ys;
+	g.cscale = cs;
+	g.zoomY  = -1;
+        mgv.genomeData[g.name] = g;
     });
 }
 
@@ -666,7 +672,7 @@ function updateZoomView() {
     let end = zv.coords.end;
 
     // make sure we've loaded the coordinate mapping data for these genomes
-    getBlockFiles(rGenome, cGenomes).then(function(){
+    getBlockFiles(mgv.rGenome, mgv.cGenomes).then(function(){
 	// OK, got the maps.
 	// Now issue requests for features. One request per genome, each request specifies one or more
 	// coordinate ranges.
@@ -675,7 +681,7 @@ function updateZoomView() {
 	let promises = [];
 
 	// First request is for the the reference genome. Get all the features in the range.
-	promises.push(getFeatures(rGenome, [{
+	promises.push(getFeatures(mgv.rGenome, [{
 	    chr    : chr,
 	    start  : start,
 	    end    : end,
@@ -685,12 +691,12 @@ function updateZoomView() {
 	    ori    : "+"
 	    }]));
 	// Add a request for each comparison genome, using translated coordinates. 
-	cGenomes.forEach(cGenome => {
+	mgv.cGenomes.forEach(cGenome => {
 	    // get the right block file
-	    let blkFile = (rcBlocks[rGenome.name] || {})[cGenome.name];
+	    let blkFile = (rcBlocks[mgv.rGenome.name] || {})[cGenome.name];
 	    if (!blkFile) throw "Internal error. No block file found in index."
 	    // translate!
-	    let ranges = blkFile.translate(rGenome, chr, start, end);
+	    let ranges = blkFile.translate(mgv.rGenome, chr, start, end);
 	    promises.push(getFeatures(cGenome, ranges))
 	});
 	// when everything is ready, call the draw function
