@@ -13,8 +13,8 @@ form   = cgi.FieldStorage()
 genome = form['genome'].value
 coords = form['coords'].value
 '''
-genome = "mus_caroli"
-coords = "7:2000000..4000000,8:4000000..6000000,X:64000000..68000000"
+genome = "mus_musculus_dba2j"
+coords = "4:65219973..91282907"
 '''
 
 # find the data directory
@@ -29,18 +29,19 @@ ix = readIndexFile(xf)
 print "Content-type: application/json"
 print
 
-allFeats = []
+answer = []
+allBlocks = {}
 for c in coords.split(","):
     chr, rest = c.split(":")
-    s,e = rest.split("..")
+    s,e   = rest.split("..")
     start = int(s)
-    end = int(e)
-    feats = lookup(ff, ix, chr, start, end)
-    blk = {
-      "chr" : chr,
-      "start" : start,
-      "end" : end,
-      "features" : feats
-    }
-    allFeats.append(blk)
-print json.dumps(allFeats)
+    end   = int(e)
+    blocks= lookup(ff, ix, chr, start, end)
+    for b in blocks:
+        if not b["id"] in allBlocks:
+	    allBlocks[b["id"]] = b
+	    answer.append(b)
+#
+print json.dumps(answer)
+
+

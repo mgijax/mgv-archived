@@ -6,7 +6,7 @@
 # 1. create- Creates an index of the features in specified file. The feature file is a tab-delimied 
 # GFF-like (but simpler) file. See prepGenomeFile.py. The generated index is also a tsv file,
 # and comprises a sequence of "blocks" where each block:
-#   i. covers a contiguous region of a single chromosome (has a chrom+start+end),
+#   i. covers a contiguous region of a single chromosome (has a chr+start+end),
 #   ii. wholly contains some number of features.
 #   iii. points to a contiguous block of characters in the feature file (has start/end byte offsets)
 #
@@ -30,22 +30,22 @@ import json
 class Block:
     MAXBLKSIZE = 5000000
     blockCount = 0
-    def __init__(self, si, ei, c, start, end):
+    def __init__(self, si, ei, c, start, end, count=1):
         # offsets into file spanning range of lines for these features
         self.startIndex = si    # position in file of first byte of first list
         self.endIndex = ei      # position in file of last byte ("\n") of last line
         # 
-        self.chrom = c          # the chromosome
+        self.chr = c          # the chromosome
         self.start = start
         self.end = end
-        self.count = 1          # number of features in this block
+        self.count = count      # number of features in this block
 
     def size (self):
         return self.end - self.start + 1
 
     def extend(self, other):
         #
-        if self.chrom != other.chrom:
+        if self.chr != other.chr:
             canExtend = False
         elif other.start <= self.end:
             canExtend = True
@@ -64,8 +64,17 @@ class Block:
         #
         return True
 
+    def jsonObj (self) :
+        return {
+	    "id"	: "%s:%d..%d"%(self.chr, self.start, self.end),
+	    "chr"	: self.chr,
+	    "start"	: self.start,
+	    "end"	: self.end,
+	    "count"     : self.count
+	}
+
     def tuple(self):
-        return (self.startIndex,self.endIndex,self.chrom,self.start,self.end,self.count)
+        return (self.startIndex,self.endIndex,self.chr,self.start,self.end,self.count)
 
     def rowString(self):
         return '\t'.join([str(x) for x in self.tuple()])
@@ -73,12 +82,24 @@ class Block:
     def __str__(self):
         return "index[%d,%d] coords[%s:%d-%d] count[%d]"%self.tuple()
 
+# Builds an index file over a GFF file. (The GFF file MUST be sorted
+# by chromosome + start position!) The index divides the GFF file into
+# a sequence of "blocks". The coordinates of a block are from the start
+# coordinate of its first feature to the end coordinate of its last.
+# The index tries to make each block approx 5 MB in size. An important
+# requirement is that every feature in a block must be wholly contained 
+# within its boundaries. In other words, the end coord of the last
+# feature in a block must the max end coord of any feature in that block.
+# UPDATE: close the gaps between blocks. These gaps contain no features,
+# but we want those regions "covered" by blocks. In fact, what we really
+# want (to put it more simply) is that the blocks partition the chromosome.
 #
 def buildIndex(fin, fout):
     allBlocks = []
     currBlk = None
     index = 0
     #
+    lastEnd = 0
     for i,line in enumerate(fin):
         lineLen = len(line)
         index += lineLen
@@ -88,16 +109,19 @@ def buildIndex(fin, fout):
         blk = Block(index-lineLen, index-1, fields[0], int(fields[1]), int(fields[2]))
         if currBlk:
             if not currBlk.extend(blk):
+		currBlk.start = lastEnd + 1
                 fout.write(currBlk.rowString()+'\n')
+		lastEnd = currBlk.end
                 currBlk = blk
         else:
             currBlk = blk
     if currBlk:
+	currBlk.start = lastEnd + 1
         fout.write(currBlk.rowString()+'\n')
 
 #
 def readIndexFile(xf) :
-    ix = {}
+    ix = {} # chr -> list of Blocks
     for ixLine in xf:
         toks = ixLine[:-1].split('\t')
         s = int(toks[0])
@@ -106,8 +130,7 @@ def readIndexFile(xf) :
         cs = int(toks[3])
         ce = int(toks[4])
         n = int(toks[5])
-        blk = Block(s, e, c, cs, ce)
-        blk.count = n
+        blk = Block(s, e, c, cs, ce, n)
         # sanity check
         if blk.end != ce:
             raise RuntimeError("End coordinates disagree.")
@@ -129,31 +152,43 @@ def validate(ff, ix) :
                 print ".",
     print
 
+# Returns all features in all the index blocks touched by the 
+# specified coordinate range. From caller's perspective, the requested
+# range is effectively enlarged to the index block boundary ends,
+# and all of those features are returned. The caller can filter the
+# returned list for features in the requested range.
+# Args:
+#    ff (open file) the gff file 
+#    ix (index) the index for ff (as returned by readIndexFile())
+#    chr (string) chromosome
+#    start (integer) start coordinate
+#    end (integer) end coordinate. End must be >= start.
+# Returns:
+#    List of index blocks overlapped by the given range. Each block contains
+#    all the features in that block that overlap the range. 
+#    Each block is an object:
+#	{ chr (string), start (int), end (int), features (list of features) }
+#    
 def lookup(ff, ix, chr, start, end):
-    answer = []
+    # get all the index blocks for the given chromosome
     cblocks = ix.get(chr,None)
     if not cblocks:
         raise RuntimeError("No such chromosome: " + chr)
+    # filter for blocks that overlap the start,end range.
+    cblocks = filter(lambda b : b.start <= end and b.end >= start, cblocks)
     #
-    for i,b in enumerate(cblocks):
-        if start <= b.end and end >= b.start: break
-    else:
-        return []
-    #
-    while i < len(cblocks):
-        b = cblocks[i]
+    # each block ...
+    answer = []
+    for b in cblocks:
+	# read the features
         ff.seek(b.startIndex)
         s = ff.read(b.endIndex-b.startIndex+1)
-        lines = s[:-1].split('\n')
-        for l in lines:
-            toks = l.split('\t')
-            ls = int(toks[1])
-            le = int(toks[2])
-            if le >= start and ls <= end:
-                answer.append(toks)
-            elif ls > end:
-                return answer
-        i += 1
+	feats = map(lambda l: l.split("\t"), s[:-1].split("\n"))
+	# add block to answer
+	b2 = b.jsonObj()
+	b2["features"] = feats
+	#
+	answer.append(b2)
     #
     return answer
 
@@ -229,7 +264,7 @@ def main():
         xf = open(args.indexFile, 'r')
 	ix = readIndexFile(xf)
         ans = lookup(ff, ix, m.group(1), int(m.group(2)), int(m.group(3)))
-        print json.dumps(ans)
+        print json.dumps(ans, indent=2)
     elif args.action == "validate":
         print "Validating index..."
         if not args.indexFile:
