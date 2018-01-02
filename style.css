@@ -140,6 +140,18 @@ label::after {
     padding: 6px;
 }
 
+#zoomView g.axis path {
+    stroke: black;
+    stroke-width: 1px;
+    fill: none;
+}
+#zoomView g.axis text {
+   font-size: 10px;
+}
+#zoomView g.brush rect {
+   height: 10px;
+}
+
 .fiducials .fiducial {
    stroke : none;
    fill: blue;
@@ -148,6 +160,7 @@ label::after {
 
 .fiducials .featLabel {
    font-size: 14px;
+   text-anchor: middle;
 }
 
 .fiducials.hidden .fiducial,

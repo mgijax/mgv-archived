@@ -600,8 +600,14 @@ class ZoomView extends SVGView {
     }
 
     //----------------------------------------------
+    zoomBrushed () {
+      let ext = this.brushFunc.extent();
+      let start = Math.ceil(ext[0]);
+      let end = Math.floor(ext[1]);
+      this.setCoords({chr: this.coords.chr, start, end});
+    }
+    //----------------------------------------------
     draw (data) {
-
 	let self = this;
 
 	// data = [ zoomStrip_data ]
@@ -615,7 +621,26 @@ class ZoomView extends SVGView {
 	this.xscale = d3.scale.linear()
 	    .domain([rBlock.start,rBlock.end])
 	    .range([0,this.width]);
+	this.axisFunc = d3.svg.axis()
+	    .scale(this.xscale)
+	    .orient("top")
+	    .tickFormat(d3.format("1.3s"))
+	    ;
+	this.brushFunc = d3.svg.brush()
+	    .x(this.xscale)
+	    .on("brushstart", ()=> console.log("zoom brush start"))
+	    .on("brushend", () => this.zoomBrushed())
+	    ;
 
+	let axis = this.svg.selectAll("g.axis")
+	    .data([this]);
+	axis.enter().append("g").attr("class","axis");
+	axis.call(this.axisFunc);
+
+	let brush = this.svg.selectAll("g.brush")
+	    .data([this]);
+	brush.enter().append("g").attr("class","brush");
+	brush.call(this.brushFunc);
 
 	// zoom strips (contain 0 or more zoom blocks)
 	let zrs = this.svg.select("g.strips")
@@ -659,7 +684,6 @@ class ZoomView extends SVGView {
 	newZbs.append("text")
 	    .attr("class","blockLabel") 
 	    .text(b => b.chr);
-
 	//
 	zbs.exit().remove();
 
@@ -682,11 +706,12 @@ class ZoomView extends SVGView {
 	  .attr("height", 30);
 
 	// axis line
-	zbs.select("line")
+	zbs.select("line.axis")
 	    .attr("x1", b => b.xscale.range()[0])
-	    .attr("y1", b => b.genome.zoomY )
+	    .attr("y1", b => b.genome.zoomY)
 	    .attr("x2", b => b.xscale.range()[1])
-	    .attr("y2", b => b.genome.zoomY )
+	    .attr("y2", b => b.genome.zoomY)
+	    ;
 
 	zbs.select("text.blockLabel")
 	    .attr("x", b => (b.xscale(b.start) + b.xscale(b.end))/2 )
@@ -763,7 +788,7 @@ class ZoomView extends SVGView {
 		.data([f]);
 	    label.enter().append('text').attr('class','featLabel');
 	    label
-	      .attr("x", 250)
+	      .attr("x", this.width / 2)
 	      .attr("y", 20)
 	      .text(f => {
 		   let sym = f.symbol && f.symbol !== "." ? f.symbol : f.mgpid;
