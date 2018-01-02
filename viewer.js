@@ -45,6 +45,148 @@ class Feature {
 			    "other_feature_type";
     }
 }
+//----------------------------------------------
+class FeatureManager {
+    constructor () {
+        this.featCache = {};     // index from mgpid -> feature
+	this.cache = {};         // {genome.name -> {chr.name -> list of blocks}}
+    }
+ 
+    //----------------------------------------------
+    processFeatures (feats, genome) {
+	return feats.map(d => {
+	    let mgpid = d[6];
+	    if (this.featCache[mgpid])
+		return this.featCache[mgpid];
+	    let f = new Feature({
+	      chr     : d[0],
+	      start   : parseInt(d[1]),
+	      end	  : parseInt(d[2]),
+	      strand  : d[3],
+	      type    : d[4],
+	      biotype : d[5],
+	      mgpid   : mgpid,
+	      mgiid   : d[7],
+	      symbol  : d[8],
+	      genome  : genome
+	    });
+	    this.featCache[mgpid] = f;
+	    return f;
+	});
+    }
+
+    //----------------------------------------------
+    // Registers an index block for the given genome. An index block
+    // is a contiguous chunk of featues from the GFF file for that genome.
+    // Registering the same block multiple times is ok - successive times
+    // have no effect.
+    // Side effects:
+    //   Adds the block to the cache
+    //   Replaces each raw feature in the block with a Feature object.
+    //   Registers new Features in a lookup.
+    // Args:
+    //   genome (object) The genome the block is for,
+    //   blk (object) An index block, which has a chr, start, end,
+    //   	and a list of "raw" feature objects.
+    // Returns:
+    //   nothing
+    //
+    _registerBlock (genome, blk) {
+        let gc = this.cache[genome.name] = (this.cache[genome.name] || {});
+	let cc = gc[blk.chr] = (gc[blk.chr] || []);
+	if (cc.filter(b => b.id === blk.id).length === 0) {
+	    blk.features = this.processFeatures( blk.features, genome );
+	    blk.genome = genome;
+	    cc.push(blk);
+	    cc.sort( (a,b) => a.start - b.start );
+	}
+	else
+	    console.log("Skipped block. Already seen.", genome.name, blk.id);
+    }
+
+    //----------------------------------------------
+    // Returns the remainder of the given range after
+    // subtracting the already-ensured ranges.
+    // 
+    _subtractRange(genome, range){
+	let gc = this.cache[genome.name];
+	if (!gc) throw "No such genome: " + genome.name;
+	let gBlks = gc[range.chr] || [];
+	let ans = [];
+	let rng = range;
+	gBlks.forEach( b => {
+	    let sub = rng ? subtract( rng, b ) : [];
+	    if (sub.length === 0)
+	        rng = null;
+	    if (sub.length === 1)
+	        rng = sub[0];
+	    else if (sub.length === 2){
+	        ans.push(sub[0]);
+		rng = sub[1];
+	    }
+	})
+	rng && ans.push(rng);
+	ans.sort( (a,b) => a.start - b.start );
+	return ans;
+    }
+    //----------------------------------------------
+    // Calls subtractRange for each range in the list and returns
+    // the accumulated results.
+    //
+    _subtractRanges(genome, ranges) {
+	let gc = this.cache[genome.name];
+	if (!gc) return ranges;
+	let newranges = [];
+	ranges.forEach(r => {
+	    newranges = newranges.concat(this._subtractRange(genome, r));
+	}, this)
+	return newranges;
+    }
+
+    //----------------------------------------------
+    _ensureFeatures (genome, ranges) {
+	let newranges = this._subtractRanges(genome, ranges);
+	if (newranges.length === 0) 
+	    return Promise.resolve();
+	let coordsArg = newranges.map(r => `${r.chr}:${r.start}..${r.end}`).join(',');
+	let dataString = `genome=${genome.name}&coords=${coordsArg}`;
+	let url = "./bin/getFeatures.cgi?" + dataString;
+	let self = this;
+	console.log("Requesting:", genome.name, newranges);
+	return d3json(url).then(function(blocks){
+	    console.log("Transferred:", genome.name, blocks);
+	    blocks.forEach( b => self._registerBlock(genome, b) );
+	});
+    }
+
+    //----------------------------------------------
+    _getCachedFeatures (genome, range) {
+        let gc = this.cache[genome.name] ;
+	if (!gc) return [];
+	let cBlocks = gc[range.chr];
+	if (!cBlocks) return [];
+	let feats = cBlocks
+	    .filter(cb => overlaps(cb, range))
+	    .map( cb => cb.features.filter( f => overlaps( f, range) ) )
+	    .reduce( (acc, val) => acc.concat(val), []);
+        return feats;	
+    }
+
+    //----------------------------------------------
+    // This is what the user calls. Returns (a promise for) the features in 
+    // the specified ranges of the specified genome.
+    getFeatures (genome, ranges) {
+	return this._ensureFeatures(genome, ranges).then(function() {
+            ranges.forEach( r => {
+	        r.features = this._getCachedFeatures(genome, r) 
+		r.genome = genome;
+	    });
+	    return { genome, blocks:ranges };
+	}.bind(this));
+    }
+
+} // end class Feature Manager
+
 // ---------------------------------------------
 class Genome {
   constructor (cfg) {
@@ -123,8 +265,8 @@ class BlockTranslator {
 		let s = Math.max(start, blk[fromS]);
 		let e = Math.min(end, blk[fromE]);
 		// coord range on the to side.
-		let s2 = Math.round(blk[mapper](s));
-		let e2 = Math.round(blk[mapper](e));
+		let s2 = Math.ceil(blk[mapper](s));
+		let e2 = Math.floor(blk[mapper](e));
 	        return {
 		    chr:   blk[toC],
 		    start: Math.min(s2,e2),
@@ -213,51 +355,6 @@ class BTManager {
 	return ranges;
     }
 } // end class BTManager
-
-//----------------------------------------------
-class FeatureManager {
-    constructor () {
-        this.featCache = {};    // global index from mgpid -> feature
-    }
-
-    //----------------------------------------------
-    getFeatures (genome, ranges) {
-	let coordsArg = ranges.map(r => `${r.chr}:${r.start}..${r.end}`).join(',');
-	let dataString = `genome=${genome.name}&coords=${coordsArg}`;
-	let url = "./bin/getFeatures.cgi?" + dataString;
-	return d3json(url).then(function(data) {
-	    let s = data.forEach( (d,i) => {
-		let r = ranges[i];
-		r.features = this.processFeatures( d.features, genome );
-		r.genome = genome;
-	    });
-	    return { genome, blocks:ranges };
-	}.bind(this));
-    }
-
-    //----------------------------------------------
-    processFeatures (feats, genome) {
-	return feats.map(d => {
-	    let mgpid = d[6];
-	    if (this.featCache[mgpid])
-		return this.featCache[mgpid];
-	    let f = new Feature({
-	      chr     : d[0],
-	      start   : parseInt(d[1]),
-	      end	  : parseInt(d[2]),
-	      strand  : d[3],
-	      type    : d[4],
-	      biotype : d[5],
-	      mgpid   : mgpid,
-	      mgiid   : d[7],
-	      symbol  : d[8],
-	      genome  : genome
-	    });
-	    this.featCache[mgpid] = f;
-	    return f;
-	});
-    }
-} // end class Feature Manager
 
 // ---------------------------------------------
 class SVGView {
@@ -779,6 +876,7 @@ class MGVApp {
 	});
 
 	//
+	let self = this;
 	d3.select("#zoomCoords").on("change", function () {
 	    let coords = parseCoords(this.value);
 	    if (! coords) {
@@ -786,7 +884,7 @@ class MGVApp {
 		this.value = "";
 		return;
 	    }
-	    this.zoomView.setCoords(coords);
+	    self.zoomView.setCoords(coords);
 	});
 	//
 	d3.select("#zoomOut").on("click", () => this.zoomView.zoom(2));
@@ -980,8 +1078,32 @@ function deepc(o) {
 // Example:
 //     formatCoords("10", 10000000, 20000000) -> "10:10000000..20000000"
 function formatCoords (chr, start, end) {
+    if (arguments.length === 1) {
+	let c = chr;
+	chr = c.chr;
+	start = c.start;
+	end = c.end;
+    }
     return `${chr}:${start}..${end}`
 }
+//----------------------------------------------
+// Returns true iff the two ranges overlap by at least 1.
+// Each range must have a chr, start, and end.
+//
+function overlaps (a, b) {
+    return a.chr === b.chr && a.start <= b.end && a.end >= b.start;
+}
+//----------------------------------------------
+// Given two ranges, a and b, returns a - b.
+// The result is a list of 0, 1 or 2 new ranges, depending on a and b.
+function subtract(a, b) {
+    if (a.chr !== b.chr) return [ a ];
+    let abLeft = { chr:a.chr, start:a.start,                  end:Math.min(a.end, b.start-1) };
+    let abRight= { chr:a.chr, start:Math.max(a.start, b.end+1), end:a.end };
+    let ans = [ abLeft, abRight ].filter( r => r.start <= r.end );
+    return ans;
+}
+
 //----------------------------------------------
 // Parses a string of the form "chr:start..end".
 // Returns:
