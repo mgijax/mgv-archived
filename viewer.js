@@ -330,6 +330,7 @@ class BTManager {
 	      return d3tsv(fn2)
 		  .then(function(blocks){
 		      // nope, it was B-A
+		      console.log(`INFO: ${fn1} was not found. Trying ${fn2}.`);
 		      self.registerBlocks(fn2, bGenome, aGenome, blocks);
 		      return blocks
 		  })
@@ -859,9 +860,6 @@ class MGVApp {
 	this.translator = new BTManager(this);
 	this.featureManager = new FeatureManager();
 
-	//
-	d3.select("#refGenome").on("change", () => this.go());
-	d3.select("#compGenomes").on("change", () => this.go());
 
 	// Facets
 	//
@@ -897,6 +895,9 @@ class MGVApp {
 	    this.allGenomes = data.map(g => new Genome(g));
 	    initOptList("#refGenome",   this.allGenomes, g=>g.name, g=>g.label, false);
 	    initOptList("#compGenomes", this.allGenomes, g=>g.name, g=>g.label, true);
+	    //
+	    d3.select("#refGenome").on("change", () => this.go());
+	    d3.select("#compGenomes").on("change", () => this.go());
 	    //
 	    let cdps = this.allGenomes.map(g => d3tsv(`./data/genomedata/${g.name}-chromosomes.tsv`));
 	    //
@@ -991,7 +992,9 @@ class MGVApp {
 	this.cGenomes = [];
 	for (let i = 0; i < csos.length; i++){
 	    let csn = csos[i].value;
-	    this.cGenomes.push(this.genomeData[csn]);
+	    let cg = this.genomeData[csn];
+	    if (cg !== this.rGenome)
+	        this.cGenomes.push(cg);
 	}
 	//
 	this.genomeView.draw();
