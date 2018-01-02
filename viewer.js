@@ -1,6 +1,19 @@
 (function () {
  
 // ---------------------------------------------
+class Genome {
+  constructor (cfg) {
+    this.name = cfg.name;
+    this.label= cfg.label;
+    this.chromosomes = [];
+    this.maxlen = -1;
+    this.xscale = null;
+    this.yscale = null;
+    this.zoomY  = -1;
+  }
+}
+
+// ---------------------------------------------
 class Feature {
     constructor (cfg) {
         this.chr     = cfg.chr;
@@ -187,18 +200,6 @@ class FeatureManager {
 
 } // end class Feature Manager
 
-// ---------------------------------------------
-class Genome {
-  constructor (cfg) {
-    this.name = cfg.name;
-    this.label= cfg.label;
-    this.chromosomes = [];
-    this.maxlen = -1;
-    this.xscale = null;
-    this.yscale = null;
-    this.zoomY  = -1;
-  }
-}
 // ---------------------------------------------
 class BlockTranslator {
     constructor(url, aGenome, bGenome, blocks){
@@ -502,9 +503,8 @@ class ZoomView extends SVGView {
     constructor (id, width, height, app) {
       super(id,width,height, app);
       this.featHeight = 10;	// height of a rectangle representing a feature
-      this.coords = null;
-      this.genomes = []; // genomes in zoom view, top-to-bottom order
-      this.stripHeight = 60; // height per genome in the zoom view
+      this.stripHeight = 60;    // height per genome in the zoom view
+      this.coords = null;	// curr zoom view coords { chr, start, end }
       this.svg.append("g")
         .attr("class","fiducials");
       this.svg.append("g")
@@ -513,14 +513,14 @@ class ZoomView extends SVGView {
     }
     //----------------------------------------------
     update () {
-
+	//
 	if (!this.coords) return;
-
+	//
 	let chr = this.coords.chr;
 	let start = this.coords.start;
 	let end = this.coords.end;
         let mgv = this.app;
-
+	//
 	mgv.translator.ready().then(function(){
 	    // Now issue requests for features. One request per genome, each request specifies one or more
 	    // coordinate ranges.
@@ -555,7 +555,10 @@ class ZoomView extends SVGView {
     // Args:
     //     coords (object) An object of the form {chr, start, end}
     setCoords (coords) {
+	let chromosome = this.app.rGenome.chromosomes.filter(c => c.name === coords.chr)[0];
 	this.coords = coords;
+	this.coords.start = Math.max(1, this.coords.start)
+	this.coords.end   = Math.min(chromosome.length, this.coords.end)
 	d3.select("#zoomCoords")[0][0].value = formatCoords(coords.chr, coords.start, coords.end);
 	this.app.genomeView.setBrushCoords(coords);
 	this.update();
@@ -580,8 +583,20 @@ class ZoomView extends SVGView {
     //
     pan (factor) {
 	if (!this.coords) return;
-	let d = Math.round(factor * (this.coords.end - this.coords.start + 1));
-	this.setCoords({ chr: this.coords.chr, start: this.coords.start + d, end: this.coords.end + d });
+	let width = this.coords.end - this.coords.start + 1;
+	let d = Math.round(factor * width);
+	let ns;
+	let ne;
+	if (d < 0) {
+	    ns = Math.max(1, this.coords.start+d);
+	    ne = ns + width - 1;
+	}
+	else if (d > 0) {
+	    let chromosome = this.app.rGenome.chromosomes.filter(c => c.name === this.coords.chr)[0];
+	    ne = Math.min(chromosome.length, this.coords.end+d)
+	    ns = ne - width + 1;
+	}
+	this.setCoords({ chr: this.coords.chr, start: ns, end: ne });
     }
 
     //----------------------------------------------
@@ -948,6 +963,8 @@ class MGVApp {
 	    let chrs = d[i];
 	    let maxlen = 0;
 	    chrs.forEach( c => {
+		//
+		c.length = parseInt(c.length)
 		// because I'd rather say "c.name" than "c.chromosome"
 		c.name = c.chromosome;
 		delete c.chromosome;
