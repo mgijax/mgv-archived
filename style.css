@@ -19,6 +19,9 @@ line.chr {
     width: 225px;
 }
 
+#zoomView .brush rect {
+   height: 10px;
+}
 .brush .extent {
     fill-opacity : 0.3;
     stroke : none;
@@ -147,9 +150,6 @@ label::after {
 }
 #zoomView g.axis text {
    font-size: 10px;
-}
-#zoomView g.brush rect {
-   height: 10px;
 }
 
 .fiducials .fiducial {

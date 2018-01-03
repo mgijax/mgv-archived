@@ -607,7 +607,60 @@ class ZoomView extends SVGView {
       this.setCoords({chr: this.coords.chr, start, end});
     }
     //----------------------------------------------
+    bbGetRefCoords () {
+      let rg = this.app.rGenome;
+      let blk = this.brushing;
+      let ext = blk.brush.extent();
+      let r = { chr: blk.chr, start: ext[0], end: ext[1], blockId:blk.blockId };
+      let tr = this.app.translator;
+      if( blk.genome !== rg ) {
+         // user is brushing a comp genomes so first translate
+	 // coordinates to ref genome
+	 let rs = this.app.translator.translate(blk.genome, r.chr, r.start, r.end, rg);
+	 if (rs.length === 0) return;
+	 if (rs.length > 1) throw "Internal error."
+	 r = rs[0];
+      }
+      return r;
+    }
+    bbStart (blk,bElt) {
+      console.log("bbStart", blk);
+      this.brushing = blk;
+    }
+    bbBrush () {
+      let rg = this.app.rGenome;
+      let tr = this.app.translator;
+      let blk = this.brushing;
+      let r = this.bbGetRefCoords();
+      let gs = [rg].concat(this.app.cGenomes)
+      gs.forEach( g => {
+          let rs = (g === rg) ? [r] : tr.translate(rg, r.chr, r.start, r.end, g);
+	  rs.forEach( rr => {
+	      let bb = this.svg.select(`.zoomBlock[name="${rr.blockId}"] .brush`)
+	      bb.each( function(b) {
+	          b.brush.extent([rr.start, rr.end]);
+		  d3.select(this).call(b.brush);
+	      });
+	  });
+      });
+    }
+    bbEnd () {
+      let r = this.bbGetRefCoords();
+      this.brushing = null;
+      this.setCoords(r);
+    }
+
+    //----------------------------------------------
+    // Draws the zoom view panel with the given data.
+    // Data is structured as follows:
+    //  - data is a list of items, one per strip to be displayed. Item[0] is data for the ref genome.
+    //    Items[1+] are data for the comparison genome.
+    //    - each strip item is an object containing a genome and a list of blocks. Item[0] always has 
+    //      a single block.
+    //      - each block is an object containing a chromosome, start, end, orientation, etc, and a list of features.
+    //        - each feature has chr,start,end,strand,type,biotype,mgpid
     draw (data) {
+	// 
 	let self = this;
 
 	// data = [ zoomStrip_data ]
@@ -617,32 +670,39 @@ class ZoomView extends SVGView {
 	//
 	let rBlock = data[0].blocks[0];
 
-	// x-scale
+	// x-scale and x-axis based on the ref genome data.
 	this.xscale = d3.scale.linear()
 	    .domain([rBlock.start,rBlock.end])
 	    .range([0,this.width]);
+	// x-axis.
 	this.axisFunc = d3.svg.axis()
 	    .scale(this.xscale)
 	    .orient("top")
 	    .tickFormat(d3.format("1.3s"))
 	    ;
-	this.brushFunc = d3.svg.brush()
-	    .x(this.xscale)
-	    .on("brushstart", ()=> console.log("zoom brush start"))
-	    .on("brushend", () => this.zoomBrushed())
-	    ;
+	// brush for the axis
+	if (!this.brushFunc) {
+	    this.brushFunc = d3.svg.brush()
+	        .on("brushend", () => this.zoomBrushed());
+	}
+	this.brushFunc.x(this.xscale) ;
+	this.brushFunc.clear();
 
+	// axis container
 	let axis = this.svg.selectAll("g.axis")
 	    .data([this]);
 	axis.enter().append("g").attr("class","axis");
+	// inject the axis elts
 	axis.call(this.axisFunc);
 
-	let brush = this.svg.selectAll("g.brush")
+	// brush container
+	let brush = this.svg.selectAll("g.brush.top")
 	    .data([this]);
-	brush.enter().append("g").attr("class","brush");
+	brush.enter().append("g").attr("class","brush top");
+	// inject the brush elts
 	brush.call(this.brushFunc);
 
-	// zoom strips (contain 0 or more zoom blocks)
+	// strips, one per genome
 	let zrs = this.svg.select("g.strips")
 		  .selectAll("g.zoomStrip")
 		  .data(data, d => d.genome.name);
@@ -652,11 +712,12 @@ class ZoomView extends SVGView {
 		.attr("name", d => d.genome.name);
 	zrs.exit().remove();
 
-	// y-coords for each genome in the zoom view
-	let dy = this.stripHeight;
+	// reset the svg size based on number of strips
 	d3.select(this.selector)
-	    .attr("height", dy*(data.length+1));
-	data.forEach( (d,i) => d.genome.zoomY = 45 + (i * dy) );
+	    .attr("height", Math.max(250, this.stripHeight*(data.length+1)));
+
+	// y-coords for each genome in the zoom view
+	data.forEach( (d,i) => d.genome.zoomY = 45 + (i * this.stripHeight) );
 	//
 	// genome labels
 	newZrs.append("text") ;
@@ -682,10 +743,16 @@ class ZoomView extends SVGView {
 	newZbs.append("line").attr("class","axis") ;
 	// label
 	newZbs.append("text")
-	    .attr("class","blockLabel") 
-	    .text(b => b.chr);
+	    .attr("class","blockLabel") ;
+	// brush
+	newZbs.append("g").attr("class","brush");
+
 	//
 	zbs.exit().remove();
+
+	//
+	zbs.select("text.blockLabel")
+	    .text( b => b.chr);
 
 	// To line each chunk up with the corresponding chunk in the reference genome,
 	// create the appropriate x scales.
@@ -713,6 +780,20 @@ class ZoomView extends SVGView {
 	    .attr("y2", b => b.genome.zoomY)
 	    ;
 
+	// brush
+	zbs.select(".brush").each(function(b) {
+	    if (!b.brush) {
+	        b.brush = d3.svg.brush()
+		    .on("brushstart", function(){ self.bbStart( b, this ); })
+		    .on("brush",      function(){ self.bbBrush( b, this ); })
+		    .on("brushend",   function(){ self.bbEnd( b, this ); })
+	    }
+	    b.brush.x(b.xscale).clear();
+	    d3.select(this).call(b.brush);
+	})
+	.attr("transform", b => `translate(0,${b.genome.zoomY + this.featHeight + 6})`);
+
+	// chromosome label 
 	zbs.select("text.blockLabel")
 	    .attr("x", b => (b.xscale(b.start) + b.xscale(b.end))/2 )
 	    .attr("y", b => b.genome.zoomY + 25);
@@ -771,6 +852,7 @@ class ZoomView extends SVGView {
 	fd.select('.mgiid span').text(f.mgiid)
 	fd.select('.symbol span').text(f.symbol)
 	fd.select('.coordinates span').text(`${f.strand}${f.chr}:${f.start}..${f.end}`)
+	fd.select('.length span').text(`${f.end - f.start + 1}`)
     }
     //----------------------------------------------
     drawFiducials (f) {
@@ -888,7 +970,7 @@ class MGVApp {
 	this.allGenomes = []; // list of all genome names
 	//
 	this.genomeView = new GenomeView("genomeView", 800, 250, this);
-	this.zoomView = new ZoomView  ("zoomView",   800, 100, this);
+	this.zoomView = new ZoomView  ("zoomView",   800, 250, this);
 	this.cscale = d3.scale.category10().domain([
 	    "protein_coding_gene",
 	    "pseudogene",
