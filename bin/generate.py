@@ -6,11 +6,13 @@ Given two sets of features, one from genome A and one from genome B,
 and a file of a/b feature pairs defining corrospondence between features in A and B,
 generates synteny blocks between genome A and genome B via interpolation.
 
-Inputs: 3 files
-    1. A file of features from genome A. We'll call this "A".
-    2. A file of features from genome B. We'll call this "B".
+Inputs: 2 files, plus optional 3rd:
+    1. A file of features from genome A. We'll call this "A". Required.
+    2. A file of features from genome B. We'll call this "B". Required.
     3. A 2-column, tab delimited file of A/B ID pairs, which defines 
        the correspondence between A and B features. We'll call this "AB".
+       This file is optional. If not given, then features from A and B are
+       considered equivalent if they have the same ID attribute.
 
 Outputs a tab-delimited file of inferred synteny blocks.
 Each row corresponds to one block, and has the following fields:
@@ -86,7 +88,8 @@ class SyntenyBlockGenerator:
         self.aid2feat = self.prepGff(self.A, self.a2b)
         self.bid2feat = self.prepGff(self.B, self.b2a)
         self.join()
-        if self.args.debug: self.writePairs()
+        if self.args.debug:
+	    self.writePairs()
         self.generateBlocks()
         self.writeBlocks()
 
@@ -417,16 +420,16 @@ class SyntenyBlockGenerator:
               "blockCount",
               "blockOri",
               "blockRatio",
-              "aChr",
-              "bChr",
-              "aLength",
-              "bLength",
-              "aStart",
-              "bStart",
-              "aEnd",
-              "bEnd",
               "aIndex",
+              "aChr",
+              "aStart",
+              "aEnd",
+              "aLength",
               "bIndex",
+              "bChr",
+              "bStart",
+              "bEnd",
+              "bLength",
             ]
         sys.stdout.write( '\t'.join(map(lambda x:str(x),b)) + '\n' )
         for block in self.blocks:
@@ -439,16 +442,16 @@ class SyntenyBlockGenerator:
               blkcount,
               (ori==1 and "+" or "-"),
               "%1.2f"%blkRatio,
-              fields['a']['chr'],
-              fields['b']['chr'],
-              fields['a']['end']-fields['a']['start']+1,
-              fields['b']['end']-fields['b']['start']+1,
-              fields['a']['start'],
-              fields['b']['start'],
-              fields['a']['end'],
-              fields['b']['end'],
               fields['a']['index'],
+              fields['a']['chr'],
+              fields['a']['start'],
+              fields['a']['end'],
+              fields['a']['end']-fields['a']['start']+1,
               fields['b']['index'] - (blkcount-1 if ori == 1 else 0),
+              fields['b']['chr'],
+              fields['b']['start'],
+              fields['b']['end'],
+              fields['b']['end']-fields['b']['start']+1,
             ]
             sys.stdout.write( '\t'.join(map(lambda x:str(x),r)) + '\n' )
 
