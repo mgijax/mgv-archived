@@ -27,7 +27,6 @@ line.chr {
     stroke : none;
     shape-rendering: crispEdges;
 }
-
 .button {
     cursor: pointer;
 }
@@ -37,6 +36,14 @@ line.chr {
     background-color: #ccc;
     border: thin solid black;
 }
+#genomeView > svg {
+    height: 250px;
+    transition: height 0.5s;
+}
+#genomeView > svg:hover {
+    height: 250px;
+}
+
 #zoomView {
     display: inline-block;
     background-color: #ccc;
