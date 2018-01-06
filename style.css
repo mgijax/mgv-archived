@@ -134,7 +134,6 @@ label {
 }
 
 label::after {
-    content: ":";
 }
 
 .leftcolumn {
@@ -165,9 +164,16 @@ label::after {
    fill-opacity: 0.3;
 }
 
+.fiducials .current .fiducial {
+   fill: yellow;
+}
+
 .fiducials .featLabel {
-   font-size: 14px;
+   font-size: 10px;
    text-anchor: middle;
+}
+
+.fiducials .current .featLabel {
 }
 
 .fiducials.hidden .fiducial,
