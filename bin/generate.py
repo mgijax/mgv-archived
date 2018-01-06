@@ -50,6 +50,7 @@ Implementation outline:
 import argparse
 import sys
 import gff3
+import math
 
 class SyntenyBlockGenerator:
 
@@ -91,6 +92,7 @@ class SyntenyBlockGenerator:
         if self.args.debug:
 	    self.writePairs()
         self.generateBlocks()
+	self.closeGaps()
         self.writeBlocks()
 
     def initArgParser (self):
@@ -404,6 +406,33 @@ class SyntenyBlockGenerator:
                 self.blocks.append(currBlock)
             currPair['block'] = currBlock[0]
 
+    def sortBlocksBy (self, which) :
+	self.blocks.sort( cmp = lambda x,y : x[3][which]['index'] - y[3][which]['index'] )
+
+    def closeGapsBy (self, which) :
+	#
+	self.sortBlocksBy(which)
+	#
+	pblk = None # previous block
+	for cblk in self.blocks:
+	    if pblk:
+		cblkid, cblkori, cblkcount, cblkfields, cblkids = cblk
+		pblkid, pblkori, pblkcount, pblkfields, pblkids = pblk
+		if pblkfields[which]['chr'] != cblkfields[which]['chr']:
+		    # starting new chromosome
+		    pblk = None
+		    continue
+		# distance between previous and current
+		delta = (cblkfields[which]['start'] - pblkfields[which]['end'] - 1) / 2.0
+		pblkfields[which]['end'] += int(math.floor(delta))
+		cblkfields[which]['start'] -= int(math.ceil(delta))
+	    #
+	    pblk = cblk
+
+    def closeGaps (self):
+        self.closeGapsBy('b')
+        self.closeGapsBy('a')
+
     def writePairs (self) :
         for p in self.pairs:
             a = p['a']
@@ -442,11 +471,13 @@ class SyntenyBlockGenerator:
               blkcount,
               (ori==1 and "+" or "-"),
               "%1.2f"%blkRatio,
+	      #
               fields['a']['index'],
               fields['a']['chr'],
               fields['a']['start'],
               fields['a']['end'],
               fields['a']['end']-fields['a']['start']+1,
+	      #
               fields['b']['index'] - (blkcount-1 if ori == 1 else 0),
               fields['b']['chr'],
               fields['b']['start'],
