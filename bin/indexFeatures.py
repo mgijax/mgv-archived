@@ -96,27 +96,25 @@ class Block:
 #
 def buildIndex(fin, fout):
     allBlocks = []
-    currBlk = None
     index = 0
     #
-    lastEnd = 0
+    currBlk = None
     for i,line in enumerate(fin):
         lineLen = len(line)
         index += lineLen
-        if i == 0: continue
+        if i == 0: continue # skip header line
         fields = line[:-1].split('\t')
         start = int(fields[1])
         blk = Block(index-lineLen, index-1, fields[0], int(fields[1]), int(fields[2]))
         if currBlk:
             if not currBlk.extend(blk):
-		currBlk.start = lastEnd + 1
+		if currBlk.chr == blk.chr:
+		    currBlk.end = blk.start - 1
                 fout.write(currBlk.rowString()+'\n')
-		lastEnd = currBlk.end
                 currBlk = blk
         else:
             currBlk = blk
     if currBlk:
-	currBlk.start = lastEnd + 1
         fout.write(currBlk.rowString()+'\n')
 
 #
