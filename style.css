@@ -165,7 +165,7 @@ label::after {
 }
 
 .fiducials .current .fiducial {
-   fill: yellow;
+   fill: red;
 }
 
 .fiducials .featLabel {
