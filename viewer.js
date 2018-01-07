@@ -542,11 +542,14 @@ class ZoomView extends SVGView {
       this.stripHeight = 60;    // height per genome in the zoom view
       //
       this.coords = null;	// curr zoom view coords { chr, start, end }
+      this.history = [];	// so user can go back
       this.hiFeats = [];	// list of IDs of Features we're highlighting. May be mgpid  or mgiId
       this.svg.append("g")
         .attr("class","fiducials");
       this.svg.append("g")
         .attr("class","strips");
+      // so user can go back
+      this.undoMgr = new UndoManager(25);
     }
     //----------------------------------------------
     update () {
@@ -594,20 +597,40 @@ class ZoomView extends SVGView {
     // redraws. The coordinates ranges of all comparison genomes are adjusted accordingly.
     // Args:
     //     coords (object) An object of the form {chr, start, end}
-    setCoords (coords) {
+    //     undoing (boolean) Optional, default=false. If true, corrdinates are being set 
+    //         during an undo/redo operarion (so don't register the action with the UndoManager).
+    setCoords (coords, undoing) {
 	let chromosome = this.app.rGenome.chromosomes.filter(c => c.name === coords.chr)[0];
 	let c;
 	if (!chromosome || (coords.end - coords.start + 1) < 100){
 	    c = this.coords; // invalid range. Keep the current coordinates.
 	}
 	else {
-	    c = this.coords = coords; // valid range. Change the coords.
+	    // valid range. Change the coords.
+	    c = this.coords = coords;
+	    if (!undoing)
+	        this.undoMgr.add(coords);
 	}
 	c.start = Math.max(1, Math.floor(c.start))
 	c.end   = Math.min(chromosome.length, Math.floor(c.end))
 	d3.select("#zoomCoords")[0][0].value = formatCoords(c.chr, c.start, c.end);
 	this.app.genomeView.setBrushCoords(c);
 	this.update();
+    }
+
+    //----------------------------------------------
+    goBack () {
+        if (this.undoMgr.canUndo) {
+	    this.setCoords(this.undoMgr.undo(), true);
+	}
+    }
+    goForward () {
+        if (this.undoMgr.canRedo) {
+	    this.setCoords(this.undoMgr.redo(), true);
+	}
+    }
+    clearCoordHistory () {
+        this.undoMgr.clear();
     }
 
     //----------------------------------------------
@@ -759,6 +782,10 @@ class ZoomView extends SVGView {
 	this.xscale = d3.scale.linear()
 	    .domain([rBlock.start,rBlock.end])
 	    .range([0,this.width]);
+	//
+	// pixels per base
+	let ppb = this.width / (rBlock.end - rBlock.start + 1);
+
 	// x-axis.
 	this.axisFunc = d3.svg.axis()
 	    .scale(this.xscale)
@@ -822,17 +849,25 @@ class ZoomView extends SVGView {
 	//
 	zbs.exit().remove();
 
-	//
-	zbs.select("text.blockLabel")
-	    .text( b => b.chr);
-
 	// To line each chunk up with the corresponding chunk in the reference genome,
 	// create the appropriate x scales.
-	zbs.each( b => {
-	    let x1 = this.xscale(b.fStart);
-	    let x2 = this.xscale(b.fEnd);
+	let offset = []; // offset of start  position of next block, by strip index (0===ref)
+	zbs.each( (b,i,j) => { // b=block, i=index within strip, j=strip index
+	    // This one scales each comp block to be the same width as its ref range.
+	    // let x1 = this.xscale(b.fStart);
+	    // let x2 = this.xscale(b.fEnd);
+	    //
+	    // This one lets each comp block be its 'actual' width
+	    let x1 = i === 0 ? this.xscale(b.fStart) : offset[j];
+	    let x2 = x1 + ppb * (b.end - b.start + 1)
 	    b.xscale = d3.scale.linear().domain([b.start, b.end]).range([x1, x2]);
+	    offset[j] = x2;
 	});
+
+	//
+	zbs.select("text.blockLabel")
+	    .text( b => b.chr );
+
 	// draw the zoom block outline
 	zbs.select("rect.block")
 	  .attr("x", b => {
@@ -1139,12 +1174,15 @@ class MGVApp {
 	d3.select("#panLeft") .on("click", () => this.zoomView.pan(-0.35));
 	d3.select("#panRight").on("click", () => this.zoomView.pan(+0.35));
 	//
+	d3.select("#goBack") .on("click", () => this.zoomView.goBack());
+	d3.select("#goForward").on("click", () => this.zoomView.goForward());
+	//
 	d3tsv("./data/genomeList.tsv").then(function(data){
 	    this.allGenomes = data.map(g => new Genome(g));
 	    initOptList("#refGenome",   this.allGenomes, g=>g.name, g=>g.label, false);
 	    initOptList("#compGenomes", this.allGenomes, g=>g.name, g=>g.label, true);
 	    //
-	    d3.select("#refGenome").on("change", () => this.go());
+	    d3.select("#refGenome").on("change", () => { this.zoomView.clearCoordHistory(); this.go() });
 	    d3.select("#compGenomes").on("change", () => this.go());
 	    //
 	    let cdps = this.allGenomes.map(g => d3tsv(`./data/genomedata/${g.name}-chromosomes.tsv`));
@@ -1231,7 +1269,6 @@ class MGVApp {
 	    this.genomeData[g.name] = g;
 	});
     }
-
     //----------------------------------------------
     //
     go () {
@@ -1252,6 +1289,51 @@ class MGVApp {
 	this.genomeView.draw();
     }
 } // end class MGVApp
+
+// ---------------------------------------------
+// UndoManager maintains a history stack of states (arbitrary objects).
+//
+class UndoManager {
+    constructor(limit) {
+        this.clear();
+    }
+    clear () {
+        this.history = [];
+        this.pointer = -1;
+    }
+    get currentState () {
+        if (this.pointer < 0)
+            throw "No current state.";
+        return this.history[this.pointer];
+    }
+    get hasState () {
+        return this.pointer >= 0;
+    }
+    get canUndo () {
+        return this.pointer > 0;
+    }
+    get canRedo () {
+        return this.hasState && this.pointer < this.history.length-1;
+    }
+    add (s) {
+        //console.log("ADD");
+        this.pointer += 1;
+        this.history[this.pointer] = s;
+        this.history.splice(this.pointer+1);
+    }
+    undo () {
+        //console.log("UNDO");
+        if (! this.canUndo) throw "No undo."
+        this.pointer -= 1;
+        return this.history[this.pointer];
+    }
+    redo () {
+        //console.log("REDO");
+        if (! this.canRedo) throw "No redo."
+        this.pointer += 1;
+        return this.history[this.pointer];
+    }
+} // end class UndoManager
 
 //----------------------------------------------
 //---- END CLASS DEFS --------------------------
