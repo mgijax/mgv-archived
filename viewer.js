@@ -67,32 +67,38 @@ class Feature {
     }
 }
 //----------------------------------------------
-// Provides caller a get-features-in-range interface.
+// Provides a get-features-in-range interface.
 // Requests features from the server and registers them in a cache.
 // Interacts with the back end to load features; tries not to request
 // the same region twice.
 //
 class FeatureManager {
-    constructor () {
+    constructor (app) {
+        this.app = app;
         this.featCache = {};     // index from mgpid -> feature
 	this.cache = {};         // {genome.name -> {chr.name -> list of blocks}}
+
+	this.mineFeatureCache = {}; // auxiliary info pulled from MouseMine 
     }
  
     //----------------------------------------------
     // Processes the "raw" features returned by the server.
     // Turns them into Feature objects and registers them.
+    // If the same raw feature is registered multiple times,
+    // successive times reuse the Feature object created the first time.
     //
     processFeatures (feats, genome) {
 	return feats.map(d => {
 	    // get the ID field
 	    let mgpid = d[6];
+	    // If we've already got this one in the cache, return it.
 	    if (this.featCache[mgpid])
 		return this.featCache[mgpid];
-	    //
+	    // Create a new Feature
 	    let f = new Feature({
 	      chr     : d[0],
 	      start   : parseInt(d[1]),
-	      end	  : parseInt(d[2]),
+	      end     : parseInt(d[2]),
 	      strand  : d[3],
 	      type    : d[4],
 	      biotype : d[5],
@@ -101,8 +107,9 @@ class FeatureManager {
 	      symbol  : d[8],
 	      genome  : genome
 	    });
-	    //
+	    // Register it.
 	    this.featCache[mgpid] = f;
+	    // here y'go.
 	    return f;
 	});
     }
@@ -229,6 +236,62 @@ class FeatureManager {
     }
 
 } // end class Feature Manager
+
+// ---------------------------------------------
+class AuxDataManager {
+    constructor (app) {
+	this.app = app;
+        this.cache = {};
+    }
+
+    //----------------------------------------------
+    merge (newdata, fields) {
+	let mgiix = fields.indexOf('mgiid');
+	if (mgiix < 0) throw "No mgiid field in field name list."
+        return newdata.map(d => {
+	    let mgiid = d[mgiix];
+	    let f ;
+	    if (this.cache[mgiid])
+		f = this.cache[mgiid];
+	    else
+		f = this.cache[mgiid] = { mgiid };
+	    fields.forEach( (fn,i) => f[fn] = d[i] );
+	    return f;
+	})
+    }
+
+    //----------------------------------------------
+    getAuxData (q, fields) {
+	let url = "http://www.mousemine.org/mousemine/service/query/results?format=json&query=" + encodeURIComponent(q) ;
+	return d3json(url).then( data => {
+	    return this.merge(data.results, fields);
+	});
+    }
+
+    //----------------------------------------------
+    // do a LOOKUP query for SequenceFeatures from MouseMine
+    featuresById (qryString) {
+	let q = `<query name="" model="genomic" view="SequenceFeature.primaryIdentifier SequenceFeature.symbol SequenceFeature.name SequenceFeature.chromosomeLocation.locatedOn.primaryIdentifier SequenceFeature.chromosomeLocation.start SequenceFeature.chromosomeLocation.end SequenceFeature.chromosomeLocation.strand" longDescription="" constraintLogic="A and B">
+	    <constraint path="SequenceFeature" code="A" op="LOOKUP" value="${qryString}"/>
+	    <constraint path="SequenceFeature.organism.taxonId" code="B" op="=" value="10090"/>
+	    </query>`;
+	return this.getAuxData(q, ['mgiid','symbol','name','chr','start','end','strand']);
+    }
+    //----------------------------------------------
+    featuresByOntologyTerm (qryString,termType) {
+        let q = `<query name="" model="genomic" view="SequenceFeature.primaryIdentifier SequenceFeature.symbol SequenceFeature.ontologyAnnotations.ontologyTerm.identifier SequenceFeature.ontologyAnnotations.ontologyTerm.name SequenceFeature.chromosomeLocation.locatedOn.primaryIdentifier SequenceFeature.chromosomeLocation.start SequenceFeature.chromosomeLocation.end SequenceFeature.chromosomeLocation.strand" longDescription="" sortOrder="SequenceFeature.symbol asc">
+	  <constraint path="SequenceFeature.ontologyAnnotations.ontologyTerm" type="${termType}"/>
+	  <constraint path="SequenceFeature.ontologyAnnotations.ontologyTerm.parents" type="${termType}"/>
+	  <constraint path="SequenceFeature.ontologyAnnotations.ontologyTerm.parents" op="LOOKUP" value="${qryString}"/>
+	  </query>`
+	return this.getAuxData(q, ['mgiid','symbol','termid','term','chr','start','end','strand']);
+    }
+    //----------------------------------------------
+    featuresByFunction  (qryString) { return this.featuresByOntologyTerm(qryString, "GOTerm"); }
+    featuresByPhenotype (qryString) { return this.featuresByOntologyTerm(qryString, "MPTerm"); }
+    featuresByDisease   (qryString) { return this.featuresByOntologyTerm(qryString, "DOTerm"); }
+    //----------------------------------------------
+}
 
 // ---------------------------------------------
 class BlockTranslator {
@@ -453,16 +516,16 @@ class GenomeView extends SVGView {
 	});
     }
     //----------------------------------------------
-    draw () {
+    draw (fdata) {
 
-	let sdata = this.app.rGenome;
+	let gdata = this.app.rGenome;
 
 	let self = this;
-	let xf = function(d){return self.bwidth+sdata.xscale(d.name);};
+	let xf = function(d){return self.bwidth+gdata.xscale(d.name);};
 
 	// Chromosome backbones (lines)
 	let ccels = this.svg.selectAll('line.chr')
-	  .data(sdata.chromosomes, function(x){return x.name;});
+	  .data(gdata.chromosomes, function(x){return x.name;});
 	ccels.exit().transition().duration(this.app.dur)
 	  .attr("y1", this.height)
 	  .attr("y2", this.height)
@@ -479,12 +542,12 @@ class GenomeView extends SVGView {
 	  .attr("x1", xf)
 	  .attr("y1", 0)
 	  .attr("x2", xf)
-	  .attr("y2", function(d){return sdata.yscale(d.length);})
+	  .attr("y2", function(d){return gdata.yscale(d.length);})
 	    ;
 
 	// Chromosome labels
 	let labels = this.svg.selectAll('.chrlabel')
-	  .data(sdata.chromosomes, function(x){return x.name;});
+	  .data(gdata.chromosomes, function(x){return x.name;});
 	labels.exit().transition().duration(this.app.dur)
 	  .attr('y', this.height)
 	  .remove();
@@ -502,7 +565,7 @@ class GenomeView extends SVGView {
 
 	// Brushes
 	let brushes = this.svg.selectAll("g.brush")
-	    .data(sdata.chromosomes, function(x){return x.name;});
+	    .data(gdata.chromosomes, function(x){return x.name;});
 	brushes.exit().remove();
 	brushes.enter().append('g')
 	    .attr('class','brush')
@@ -513,7 +576,7 @@ class GenomeView extends SVGView {
 	     .attr('x', this.cwidth/4)
 	     ;
 	brushes
-	    .attr('transform', function(d){return 'translate('+sdata.xscale(d.name)+')';})
+	    .attr('transform', function(d){return 'translate('+gdata.xscale(d.name)+')';})
 	    .each(function(d){d3.select(this).call(d.brush);})
 	    ;
 	// Ref genome label
@@ -524,7 +587,29 @@ class GenomeView extends SVGView {
 	    .attr("x", this.width/2)
 	    .attr("y", this.height - 20);
 	    
+	//
+	this.drawTicks(fdata);
+
+	// 
 	if (this.brushChr) this.brushend();
+    }
+
+    // ---------------------------------------------
+    drawTicks (fdata) {
+	let gdata = this.app.rGenome;
+	// feature tick marks
+	let tickLength = 10;
+        let feats = this.svg.selectAll("line.feature")
+	    .data(fdata||[], d => d.mgiid);
+	let nfs = feats.enter()
+	    .append("line")
+	    .attr("class","feature");
+	feats.attr("x1", d => gdata.xscale(d.chr) + (d.strand === "-1" ? 0 : tickLength))
+	feats.attr("y1", d => gdata.yscale(d.start))
+	feats.attr("x2", d => gdata.xscale(d.chr)+ (d.strand === "-1" ? 0 : tickLength) + tickLength)
+	feats.attr("y2", d => gdata.yscale(d.start))
+	//
+	feats.exit().remove()
     }
 
 } // end class GenomeView
@@ -543,7 +628,7 @@ class ZoomView extends SVGView {
       //
       this.coords = null;	// curr zoom view coords { chr, start, end }
       this.history = [];	// so user can go back
-      this.hiFeats = [];	// list of IDs of Features we're highlighting. May be mgpid  or mgiId
+      this.hiFeats = {};	// IDs of Features we're highlighting. May be mgpid  or mgiId
       this.svg.append("g")
         .attr("class","fiducials");
       this.svg.append("g")
@@ -922,13 +1007,10 @@ class ZoomView extends SVGView {
 	    .on("click", function(f){
 		d3.event.stopPropagation();
 	        let id = f.mgiid || f.mgpid;
-		let i = self.hiFeats.indexOf(id);
-		if (i === -1) {
-		    self.hiFeats.push(id);
-		}
-		else {
-		    self.hiFeats.splice(i,1);
-		}
+		if (self.hiFeats[id])
+		    delete self.hiFeats[id]
+		else
+		    self.hiFeats[id] = id;
 		self.highlight();
 	    });
 
@@ -946,7 +1028,8 @@ class ZoomView extends SVGView {
 	//
 	this.app.facetManager.applyAll();
 
-	//
+	// We need to let the view render before doing the highlighting, since it depends on
+	// the positions of rectangles in the scene.
 	window.setTimeout(this.highlight.bind(this), 50);
     };
     //----------------------------------------------
@@ -961,24 +1044,37 @@ class ZoomView extends SVGView {
     //        will include the feature corresponding to this rect along with those in the highlight list.
     //
     highlight (rect) {
+	let self = this;
 	let f = rect ? rect.__data__ : null;
-	let hiFeats = this.hiFeats.concat( f ? f.id : [] );
+	let hiFeats = Object.assign({}, this.hiFeats);
+	if (f) hiFeats[f.id] = f.id;
 	let stacks = {}; // fid -> [ rects ] 
         let feats = this.svg.selectAll(".feature")
+	  // filter rect.features for those in the highlight list
 	  .filter(function(ff){
-	      let mgi = hiFeats.indexOf(ff.mgiid) >=0;
-	      let mgp = hiFeats.indexOf(ff.mgpid) >=0;
+	      // highlight ff if either id is in the list AND it's not been hidden
+	      let mgi = hiFeats[ff.mgiid];
+	      let mgp = hiFeats[ff.mgpid];
 	      let showing = d3.select(this).style("display") !== "none";
-	      return showing && (mgi || mgp);
-	  })
-	  .each(function(ff){
-	      let k = ff.id;
-	      if (!stacks[k]) stacks[k] = []
-	      stacks[k].push(this)
-	  })
-	  ;
+	      let hl = showing && (mgi || mgp);
+	      if (hl) {
+		  // for each highlighted feature, add its rectangle to the list
+		  let k = ff.id;
+		  if (!stacks[k]) stacks[k] = []
+		  stacks[k].push(this)
+	      }
+	      let dh = hl ? self.blockHeight/2 - self.featHeight : 0;
+              let dy = ff.strand === "+" ? (dh ? -self.featHeight-dh : -self.featHeight) : 0;
+	      d3.select(this)
+		  .classed("highlight", hl)
+	          .attr("height", self.featHeight + dh)
+		  .attr("y", ff.genome.zoomY + dy)
+	      return hl;
+	  });
+	// build data array for drawing fiducials
 	let data = [];
 	for (let k in stacks) {
+	    // for each highlighted feature, sort the rectangles in its list by Y-coordinate
 	    let rects = stacks[k];
 	    rects.sort( (a,b) => parseFloat(a.getAttribute("y")) - parseFloat(b.getAttribute("y")) );
 	    // want a polygon between each successive pair of items
@@ -1023,7 +1119,7 @@ class ZoomView extends SVGView {
 	//
 	ffGrps.attr("class",d => "featureMarks " + (d.cls || ""))
 
-	//
+	// Draw feature labels. Each label is drawn once, above the first rectangle in its list.
 	let labels = ffGrps.selectAll('text.featLabel')
 	    .data(d => [{ fid: d.fid, rect: d.rects[0][0] }]);
 	    // .data(d => d.rects.map( function (r) { return { fid: d.fid, rect: r[0] } }));
@@ -1142,7 +1238,8 @@ class MGVApp {
 	    "other_feature_type"
 	]);
 	this.translator = new BTManager(this);
-	this.featureManager = new FeatureManager();
+	this.featureManager = new FeatureManager(this);
+	this.auxDataManager = new AuxDataManager(this);
 
 	// Facets
 	//
@@ -1176,6 +1273,21 @@ class MGVApp {
 	//
 	d3.select("#goBack") .on("click", () => this.zoomView.goBack());
 	d3.select("#goForward").on("click", () => this.zoomView.goForward());
+	// ------------------------------
+	// ------------------------------
+	let pfs = function(ffun, s) {
+	    self.auxDataManager[ffun](s)
+	      .then(feats => {
+		  feats.forEach(f => self.zoomView.hiFeats[f.mgiid] = f.mgiid);
+	          self.genomeView.drawTicks(feats);
+	      });
+	};
+	d3.select("#lookup")   .on("change", function () { pfs("featuresById",        this.value) });
+	d3.select("#function") .on("change", function () { pfs("featuresByFunction",  this.value) });
+	d3.select("#phenotype").on("change", function () { pfs("featuresByPhenotype", this.value) });
+	d3.select("#disease")  .on("change", function () { pfs("featuresByDisease",   this.value) });
+	// ------------------------------
+	// ------------------------------
 	//
 	d3tsv("./data/genomeList.tsv").then(function(data){
 	    this.allGenomes = data.map(g => new Genome(g));
@@ -1185,8 +1297,8 @@ class MGVApp {
 	    d3.select("#refGenome").on("change", () => { this.zoomView.clearCoordHistory(); this.go() });
 	    d3.select("#compGenomes").on("change", () => this.go());
 	    //
+	    // chromosome data promises
 	    let cdps = this.allGenomes.map(g => d3tsv(`./data/genomedata/${g.name}-chromosomes.tsv`));
-	    //
 	    return Promise.all(cdps);
 	}.bind(this))
 	.then(function (data) {
@@ -1451,6 +1563,12 @@ function parseCoords (coords) {
     let re = /([^:]+):(\d+)\.\.(\d+)/;
     let m = coords.match(re);
     return m ? {chr:m[1], start:parseInt(m[2]), end:parseInt(m[3])} : null;
+}
+
+//----------------------------------------------
+// Creates a list of key,value pairs from the obj.
+function obj2list (o) {
+    return Object.keys(o).map(k => [k, o[k]])    
 }
 
 // ---------------------------------------------
