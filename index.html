@@ -11,24 +11,31 @@
 <h3>Multi Genome Viewer</h3>
 <div class="flexrow" style="align-items: flex-start;">
     <div class="leftcolumn flexcolumn">
-	<div class="refGenome flexcolumn">
+	<div class="refGenome flexcolumn collapsible">
 	    <label>Reference genome</label>
 	    <select id="refGenome"></select>
 	</div>
-	<div class="compGenomes flexcolumn">
+	<div class="compGenomes flexcolumn collapsible">
 	    <label>Comparison genomes</label>
 	    <select id="compGenomes" size="20"></select>
 	</div>
-	<div class="colorKey flexcolumn">
+	<div class="colorKey flexcolumn collapsible">
 	    <label>Feature types</label>
 	</div>
-	<div class="mgiFacet flexcolumn">
+	<div class="mgiFacet flexcolumn collapsible">
 	    <label>Has MGI ID?</label>
-	    <select id="mgiFacet">
-	        <option value="">don't care</option>
-	        <option value="yes">yes</option>
-	        <option value="no">no</option>
-	    </select>
+	    <div class="flexrow">
+		<input type="radio" name="mgiFacet" value="yes" />
+		<label>Yes</label>
+	    </div>
+	    <div class="flexrow">
+		<input type="radio" name="mgiFacet" value="no" />
+		<label>No</label>
+	    </div>
+	    <div class="flexrow">
+		<input type="radio" name="mgiFacet" value="" checked />
+		<label>Don't care</label>
+	    </div>
 	</div>
     </div>
     <div class="middlecolumn flexcolumn">

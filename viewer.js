@@ -589,9 +589,6 @@ class GenomeView extends SVGView {
 	    
 	//
 	this.drawTicks(fdata);
-
-	// 
-	if (this.brushChr) this.brushend();
     }
 
     // ---------------------------------------------
@@ -685,6 +682,8 @@ class ZoomView extends SVGView {
     //     undoing (boolean) Optional, default=false. If true, corrdinates are being set 
     //         during an undo/redo operarion (so don't register the action with the UndoManager).
     setCoords (coords, undoing) {
+	if (typeof(coords) === "string") 
+	    coords = parseCoords(coords);
 	let chromosome = this.app.rGenome.chromosomes.filter(c => c.name === coords.chr)[0];
 	let c;
 	if (!chromosome || (coords.end - coords.start + 1) < 100){
@@ -693,6 +692,7 @@ class ZoomView extends SVGView {
 	else {
 	    // valid range. Change the coords.
 	    c = this.coords = coords;
+	    this.app.callback();
 	    if (!undoing)
 	        this.undoMgr.add(coords);
 	}
@@ -1216,9 +1216,12 @@ class FacetManager {
 
 // ---------------------------------------------
 class MGVApp {
-    constructor () {
+    constructor (cfg, callback) {
 	//
+	console.log("MGVApp. cfg=", cfg);
 	let self = this;
+	//
+	this.callback = callback;
 	//
 	this.genomeData = {}; // map from genome name -> genome data obj
 	this.rGenome = null; // thereference genome
@@ -1249,21 +1252,24 @@ class MGVApp {
 	this.initFeatTypeControl(ftFacet);
 
 	let mgiFacet = this.facetManager.addFacet("HasMgiId",    f => f.mgiid  ? "yes" : "no" );
-	d3.select("#mgiFacet").on("change", function(){
+	d3.selectAll('input[name="mgiFacet"]').on("change", function(){
 	    mgiFacet.setValues(this.value === "" ? [] : [this.value]);
 	    self.zoomView.highlight();
 	});
 
 	//
-	d3.select("#zoomCoords").on("change", function () {
-	    let coords = parseCoords(this.value);
-	    if (! coords) {
-		alert("Please enter a coordinate range formatted as 'chr:start..end'. For example, '5:10000000..50000000'.");
-		this.value = "";
-		return;
-	    }
-	    self.zoomView.setCoords(coords);
-	});
+	let startingCoords = formatCoords(cfg);
+	d3.select("#zoomCoords")
+	    .call(zcs => zcs[0][0].value = startingCoords || "1:10000000..20000000")
+	    .on("change", function () {
+		let coords = parseCoords(this.value);
+		if (! coords) {
+		    alert("Please enter a coordinate range formatted as 'chr:start..end'. For example, '5:10000000..50000000'.");
+		    this.value = "";
+		    return;
+		}
+		self.zoomView.setCoords(coords);
+	    });
 	//
 	d3.select("#zoomOut").on("click", () => this.zoomView.zoom(2));
 	d3.select("#zoomIn") .on("click", () => this.zoomView.zoom(.5));
@@ -1291,8 +1297,8 @@ class MGVApp {
 	//
 	d3tsv("./data/genomeList.tsv").then(function(data){
 	    this.allGenomes = data.map(g => new Genome(g));
-	    initOptList("#refGenome",   this.allGenomes, g=>g.name, g=>g.label, false);
-	    initOptList("#compGenomes", this.allGenomes, g=>g.name, g=>g.label, true);
+	    initOptList("#refGenome",   this.allGenomes, g=>g.name, g=>g.label, false, g => g.label === cfg.ref);
+	    initOptList("#compGenomes", this.allGenomes, g=>g.name, g=>g.label, true, g => cfg.comps.has(g.label));
 	    //
 	    d3.select("#refGenome").on("change", () => { this.zoomView.clearCoordHistory(); this.go() });
 	    d3.select("#compGenomes").on("change", () => this.go());
@@ -1305,9 +1311,11 @@ class MGVApp {
 	    this.processChromosomes(data);
 	    this.go();
 	}.bind(this))
+	/*
 	.catch(function(error) {
 	    console.log("ERROR!", error)
 	});
+	*/
 
     }
     //----------------------------------------------
@@ -1382,6 +1390,15 @@ class MGVApp {
 	});
     }
     //----------------------------------------------
+    currentParameters () {
+        let ref = `ref=${this.rGenome.label}`;
+        let comp = `comp=${this.cGenomes.map(g => g.label).join("+")}`;
+        let c = this.zoomView.coords;
+	let coords = `chr=${c.chr}&start=${c.start}&end=${c.end}`;
+	return `${ref}&${comp}&${coords}`;
+    }
+
+    //----------------------------------------------
     //
     go () {
 	// reference genome
@@ -1399,6 +1416,10 @@ class MGVApp {
 	}
 	//
 	this.genomeView.draw();
+	//
+	let coords = parseCoords(d3.select("#zoomCoords")[0][0].value)
+	coords && this.zoomView.setCoords(coords);
+
     }
 } // end class MGVApp
 
@@ -1458,25 +1479,28 @@ class UndoManager {
 // ---------------------------------------------
 // Initializes an option list.
 // Args:
-//   selector (string) CSS selector of the container element. 
+//   selector (string) CSS selector of the container <select> element.
 //   opts (list) List of option data objects. May be simple strings. May be more complex.
 //   value (function or null) Function to produce the option value for the option data obj.
 //       Defaults to the identity function (x=>x).
 //   title (function or null) Function to produce the option label for the option data obj.
 //       Defaults to the value function.
 //   multi (boolean) Specifies if the list support multiple selections. (default = false)
+//   selected (function or null) Function to determine if a given option is selectd. (default function returns false)
 // Returns:
 //   The option list in a D3 selection.
-function initOptList( selector, opts, value, text, multi ) {
+function initOptList( selector, opts, value, text, multi, selected ) {
     let s = d3.select(selector);
     s.property('multiple', multi || null) ;
     let os = s.selectAll("option").data(opts);
     let ident = d => d;
     value = value || ident;
     text = text || value;
+    selected = selected || (x => false);
     os.enter().append("option") ;
     os.exit().remove() ;
     os.attr("value", value)
+      .property("selected", o => selected(o) || null)
       .text( text ) ;
     return s;
 }
@@ -1521,7 +1545,25 @@ function deepc(o) {
 }
 
 //----------------------------------------------
+// Parses a string of the form "chr:start..end".
+// Returns:
+//   object contining the parsed fields.
+// Example:
+//   parseCoords("10:10000000..20000000") -> {chr:"10", start:10000000, end:20000000}
+function parseCoords (coords) {
+    let re = /([^:]+):(\d+)\.\.(\d+)/;
+    let m = coords.match(re);
+    return m ? {chr:m[1], start:parseInt(m[2]), end:parseInt(m[3])} : null;
+}
+
+//----------------------------------------------
 // Formats a chromosome name, start and end position as a string.
+// Args (form 1):
+//   coords (object) Of the form {chr:string, start:int, end:int}
+// Args (form 2):
+//   chr string
+//   start int
+//   end int
 // Returns:
 //     string
 // Example:
@@ -1554,18 +1596,6 @@ function subtract(a, b) {
 }
 
 //----------------------------------------------
-// Parses a string of the form "chr:start..end".
-// Returns:
-//   object contining the parsed fields.
-// Example:
-//   parseCoords("10:10000000..20000000") -> {chr:"10", start:10000000, end:20000000}
-function parseCoords (coords) {
-    let re = /([^:]+):(\d+)\.\.(\d+)/;
-    let m = coords.match(re);
-    return m ? {chr:m[1], start:parseInt(m[2]), end:parseInt(m[3])} : null;
-}
-
-//----------------------------------------------
 // Creates a list of key,value pairs from the obj.
 function obj2list (o) {
     return Object.keys(o).map(k => [k, o[k]])    
@@ -1573,7 +1603,34 @@ function obj2list (o) {
 
 // ---------------------------------------------
 // ---------------------------------------------
-let mgv = new MGVApp();
+function pqstring (qstring) {
+    // FIXME: URLSearchParams API is not supported in all browsers. OK for development
+    // but need a fallback eventually.
+    let prms = new URLSearchParams(qstring);
+    let comps = new Set();
+    let comps0 = prms.getAll("comp");
+    comps0.forEach(c0 => {
+        c0.split(/[, ]+/).forEach(c => comps.add(c));
+    });
+    let cfg = {
+	ref: prms.get("ref") || "C57BL/6J",
+	comps: comps,
+	chr: prms.get("chr") || "1",
+	start: parseInt(prms.get("start") || "1"),
+	end: parseInt(prms.get("end") || "20000000")
+    };
+    if (cfg.start > cfg.end) {
+        let x = cfg.start; cfg.start = cfg.end; cfg.end = x;
+    }
+    return cfg;
+}
+let qstring = window.location.hash.substring(1);
+
+function setHash () {
+    window.location.hash = mgv.currentParameters();
+}
+
+let mgv = new MGVApp(pqstring(qstring), setHash );
 
 // ---------------------------------------------
 })();

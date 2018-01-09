@@ -3,6 +3,42 @@ body {
     font-family: sans-serif;
 }
 
+.spacer1 { flex-grow: 1; }
+.spacer2 { flex-grow: 2; }
+.spacer3 { flex-grow: 3; }
+.spacer5 { flex-grow: 5; }
+.spacer8 { flex-grow: 8; }
+.spacer13 { flex-grow: 13; }
+
+.flexrow {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: nowrap;
+}
+
+.flexrow > * {
+    margin: 2px;
+}
+
+.flexcolumn {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+}
+
+.flexcolumn > * {
+    margin: 2px;
+}
+
+.flexcolumn.collapsible > * {
+}
+.flexcolumn.collapsible > label:first-child {
+}
+.flexcolumn.collapsible:hover > * {
+}
+
+
 line.chr {
     stroke: black;
 }
@@ -99,34 +135,6 @@ rect.feature.highlight {
     content: "check";
 }
 
-.spacer1 { flex-grow: 1; }
-.spacer2 { flex-grow: 2; }
-.spacer3 { flex-grow: 3; }
-.spacer5 { flex-grow: 5; }
-.spacer8 { flex-grow: 8; }
-.spacer13 { flex-grow: 13; }
-
-.flexrow {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    flex-wrap: nowrap;
-}
-
-.flexrow > * {
-    margin: 2px;
-}
-
-.flexcolumn {
-    display: flex;
-    flex-direction: column;
-    flex-wrap: nowrap;
-}
-
-.flexcolumn > * {
-    margin: 2px;
-}
-
 label {
     font-weight: bold;
     font-size: 16px;
@@ -134,9 +142,6 @@ label {
 
 .featureDetails div label {
     font-size: 12px;
-}
-
-label::after {
 }
 
 .leftcolumn {
