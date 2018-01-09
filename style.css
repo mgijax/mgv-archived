@@ -1,6 +1,7 @@
 body {
     background-color: #eee;
     font-family: sans-serif;
+    font-size: 12px;
 }
 
 .spacer1 { flex-grow: 1; }

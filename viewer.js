@@ -1257,6 +1257,15 @@ class MGVApp {
 	    self.zoomView.highlight();
 	});
 
+	let hiFacet = this.facetManager.addFacet("IsHi", f => {
+	    let ishi = this.zoomView.hiFeats[f.mgiid] || this.zoomView.hiFeats[f.mgpid];
+	    return ishi ? "yes" : "no";
+	});
+	d3.selectAll('input[name="hiFacet"]').on("change", function(){
+	    hiFacet.setValues(this.value === "" ? [] : [this.value]);
+	    self.zoomView.highlight();
+	});
+
 	//
 	let startingCoords = formatCoords(cfg);
 	d3.select("#zoomCoords")
