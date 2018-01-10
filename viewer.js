@@ -282,7 +282,8 @@ class AuxDataManager {
         let q = `<query name="" model="genomic" view="SequenceFeature.primaryIdentifier SequenceFeature.symbol SequenceFeature.ontologyAnnotations.ontologyTerm.identifier SequenceFeature.ontologyAnnotations.ontologyTerm.name SequenceFeature.chromosomeLocation.locatedOn.primaryIdentifier SequenceFeature.chromosomeLocation.start SequenceFeature.chromosomeLocation.end SequenceFeature.chromosomeLocation.strand" longDescription="" sortOrder="SequenceFeature.symbol asc">
 	  <constraint path="SequenceFeature.ontologyAnnotations.ontologyTerm" type="${termType}"/>
 	  <constraint path="SequenceFeature.ontologyAnnotations.ontologyTerm.parents" type="${termType}"/>
-	  <constraint path="SequenceFeature.ontologyAnnotations.ontologyTerm.parents" op="LOOKUP" value="${qryString}"/>
+	  <constraint path="SequenceFeature.ontologyAnnotations.ontologyTerm.parents" code="A" op="LOOKUP" value="${qryString}"/>
+	  <constraint path="SequenceFeature.organism.taxonId" code="B" op="=" value="10090"/>
 	  </query>`
 	return this.getAuxData(q, ['mgiid','symbol','termid','term','chr','start','end','strand']);
     }
@@ -929,6 +930,7 @@ class ZoomView extends SVGView {
 		else
 		    self.hiFeats[id] = id;
 		self.highlight();
+		self.app.callback();
 	    });
 
 	// draw the rectangles
@@ -1209,6 +1211,8 @@ class MGVApp {
 	//
 	d3.select("#panLeft") .on("click", () => this.pan(-0.35));
 	d3.select("#panRight").on("click", () => this.pan(+0.35));
+	// Initial highlighted set 
+	(cfg.highlight || []).forEach(h => this.zoomView.hiFeats[h]=h);
 	// ------------------------------
 	// ------------------------------
 	let pfs = function(ffun, s) {
@@ -1263,7 +1267,8 @@ class MGVApp {
         let ref = `ref=${c.ref}`;
         let comps = `comps=${c.comps.join("+")}`;
 	let coords = `chr=${c.chr}&start=${c.start}&end=${c.end}`;
-	return `${ref}&${comps}&${coords}`;
+	let hls = `highlight=${c.highlight.join("+")}`;
+	return `${ref}&${comps}&${coords}&${hls}`;
     }
     //----------------------------------------------
     // Returns the current context as an object.
@@ -1275,7 +1280,8 @@ class MGVApp {
 	    comps: this.cGenomes.map(g => g.label),
 	    chr: c.chr,
 	    start: c.start,
-	    end: c.end
+	    end: c.end,
+	    highlight: Object.keys(this.zoomView.hiFeats)
 	}
     }
 
@@ -1315,6 +1321,14 @@ class MGVApp {
 	else
 	    coords = this.coords;
 
+	// highlighted features
+	let hls = cfg.highlight;
+	if (hls) {
+	    this.zoomView.hiFeats = hls.reduce((a,v) => { a[v]=v; return a; }, {});
+	    changed = true;
+	}
+	
+	//
 	if (changed) {
 	    this.genomeView.setBrushCoords(coords);
 	    this.zoomView.update(coords)
@@ -1581,17 +1595,26 @@ function pqstring (qstring) {
     // FIXME: URLSearchParams API is not supported in all browsers. OK for development
     // but need a fallback eventually.
     let prms = new URLSearchParams(qstring);
+    //
     let comps = new Set();
     let comps0 = prms.getAll("comps");
     comps0.forEach(c0 => {
-        c0.split(/[, ]+/).forEach(c => comps.add(c));
+        c0.split(/[, ]+/).forEach(c => c && comps.add(c));
     });
+    //
+    let hls = new Set();
+    let hls0 = prms.getAll("highlight");
+    hls0.forEach(h0 => {
+        h0.split(/[, ]+/).forEach(h => h && hls.add(h));
+    });
+    //
     let cfg = {
 	ref: prms.get("ref") || "C57BL/6J",
 	comps: Array.from(comps),
 	chr: prms.get("chr") || "1",
 	start: parseInt(prms.get("start") || "1"),
-	end: parseInt(prms.get("end") || "20000000")
+	end: parseInt(prms.get("end") || "20000000"),
+	highlight: Array.from(hls)
     };
     if (cfg.start > cfg.end) {
         let x = cfg.start; cfg.start = cfg.end; cfg.end = x;
