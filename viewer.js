@@ -503,7 +503,8 @@ class GenomeView extends SVGView {
 	    return;
 	}
 	var xtnt = this.brushChr.brush.extent();
-	this.app.zoomView.setCoords({ chr:this.brushChr.name, start:Math.floor(xtnt[0]), end: Math.floor(xtnt[1]) });
+	let coords = { chr:this.brushChr.name, start:Math.floor(xtnt[0]), end: Math.floor(xtnt[1]) };
+	this.app.setContext(coords);
     }
 
     //----------------------------------------------
@@ -631,18 +632,13 @@ class ZoomView extends SVGView {
       this.svg.append("g")
         .attr("class","strips");
       // so user can go back
-      this.undoMgr = new UndoManager(25);
     }
     //----------------------------------------------
-    update () {
+    update (coords) {
+	let c = this.coords = coords;
+	d3.select("#zoomCoords")[0][0].value = formatCoords(c.chr, c.start, c.end);
 	//
-	if (!this.coords) return;
-	//
-	let chr = this.coords.chr;
-	let start = this.coords.start;
-	let end = this.coords.end;
         let mgv = this.app;
-	//
 	mgv.translator.ready().then(function(){
 	    // Now issue requests for features. One request per genome, each request specifies one or more
 	    // coordinate ranges.
@@ -654,103 +650,24 @@ class ZoomView extends SVGView {
 	    promises.push(mgv.featureManager.getFeatures(mgv.rGenome, [{
 		// Need to simulate the results from calling the translator. 
 		// 
-		chr    : chr,
-		start  : start,
-		end    : end,
-		fChr   : chr,
-		fStart : start,
-		fEnd   : end,
+		chr    : c.chr,
+		start  : c.start,
+		end    : c.end,
+		fChr   : c.chr,
+		fStart : c.start,
+		fEnd   : c.end,
 		ori    : "+",
 		blockId: mgv.rGenome.name
 		}]));
 	    // Add a request for each comparison genome, using translated coordinates. 
 	    mgv.cGenomes.forEach(cGenome => {
-		let ranges = mgv.translator.translate( mgv.rGenome, chr, start, end, cGenome );
+		let ranges = mgv.translator.translate( mgv.rGenome, c.chr, c.start, c.end, cGenome );
 		promises.push(mgv.featureManager.getFeatures(cGenome, ranges))
 	    });
 	    // when everything is ready, call the draw function
 	    Promise.all(promises).then( data => mgv.zoomView.draw(data) );
 	});
 
-    }
-
-    //----------------------------------------------
-    // Sets the coordinate range of the reference genome in the zoom view and
-    // redraws. The coordinates ranges of all comparison genomes are adjusted accordingly.
-    // Args:
-    //     coords (object) An object of the form {chr, start, end}
-    //     undoing (boolean) Optional, default=false. If true, corrdinates are being set 
-    //         during an undo/redo operarion (so don't register the action with the UndoManager).
-    setCoords (coords, undoing) {
-	if (typeof(coords) === "string") 
-	    coords = parseCoords(coords);
-	let chromosome = this.app.rGenome.chromosomes.filter(c => c.name === coords.chr)[0];
-	let c;
-	if (!chromosome || (coords.end - coords.start + 1) < 100){
-	    c = this.coords; // invalid range. Keep the current coordinates.
-	}
-	else {
-	    // valid range. Change the coords.
-	    c = this.coords = coords;
-	    this.app.callback();
-	    if (!undoing)
-	        this.undoMgr.add(coords);
-	}
-	c.start = Math.max(1, Math.floor(c.start))
-	c.end   = Math.min(chromosome.length, Math.floor(c.end))
-	d3.select("#zoomCoords")[0][0].value = formatCoords(c.chr, c.start, c.end);
-	this.app.genomeView.setBrushCoords(c);
-	this.update();
-    }
-
-    //----------------------------------------------
-    goBack () {
-        if (this.undoMgr.canUndo) {
-	    this.setCoords(this.undoMgr.undo(), true);
-	}
-    }
-    goForward () {
-        if (this.undoMgr.canRedo) {
-	    this.setCoords(this.undoMgr.redo(), true);
-	}
-    }
-    clearCoordHistory () {
-        this.undoMgr.clear();
-    }
-
-    //----------------------------------------------
-    // Zooms in/out by factor. New zoom width is factor * the current zoom width.
-    // Factor > 1 zooms out, 0 < factor < 1 zooms in.
-    zoom (factor) {
-	if (!this.coords) return;
-	let len = this.coords.end - this.coords.start + 1;
-	let newlen = Math.round(factor * len);
-	let x = (this.coords.start + this.coords.end)/2;
-	let newstart = Math.round(x - newlen/2);
-	this.setCoords({ chr: this.coords.chr, start: newstart, end: newstart + newlen - 1 });
-    }
-
-    //----------------------------------------------
-    // Pans the view left or right by factor. The distance moved is factor times the current zoom width.
-    // Negative values pan left. Positive values pan right. (Note that panning moves the "camera". Panning to the
-    // right makes the objects in the scene appear to move to the left, and vice versa.)
-    //
-    pan (factor) {
-	if (!this.coords) return;
-	let width = this.coords.end - this.coords.start + 1;
-	let d = Math.round(factor * width);
-	let ns;
-	let ne;
-	if (d < 0) {
-	    ns = Math.max(1, this.coords.start+d);
-	    ne = ns + width - 1;
-	}
-	else if (d > 0) {
-	    let chromosome = this.app.rGenome.chromosomes.filter(c => c.name === this.coords.chr)[0];
-	    ne = Math.min(chromosome.length, this.coords.end+d)
-	    ns = ne - width + 1;
-	}
-	this.setCoords({ chr: this.coords.chr, start: ns, end: ne });
     }
 
     //----------------------------------------------
@@ -840,7 +757,7 @@ class ZoomView extends SVGView {
 	  r.start = this.coords.start - ds;
 	  r.end = r.start + newWidth - 1;
       }
-      this.setCoords(r);
+      this.app.setContext(r);
     }
 
     //----------------------------------------------
@@ -1223,10 +1140,14 @@ class MGVApp {
 	//
 	this.callback = callback;
 	//
-	this.genomeData = {}; // map from genome name -> genome data obj
+	this.name2genome = {}; // map from genome name -> genome data obj
+	this.label2genome = {}; // map from genome label -> genome data obj
+	//
 	this.rGenome = null; // thereference genome
 	this.cGenomes = []; // comparison genomes
-	this.dur = 1500;         // anomation duration
+	this.coords = { chr:"1", start:1, end:10000000 }; // current coordinates
+	//
+	this.dur = 250;         // anomation duration
 	//
 	this.allGenomes = []; // list of all genome names
 	//
@@ -1248,15 +1169,18 @@ class MGVApp {
 	//
 	this.facetManager = new FacetManager(this);
 
+	// Feature-type facet
 	let ftFacet  = this.facetManager.addFacet("FeatureType", f => f.getMungedType());
 	this.initFeatTypeControl(ftFacet);
 
+	// Has-MGI-id facet
 	let mgiFacet = this.facetManager.addFacet("HasMgiId",    f => f.mgiid  ? "yes" : "no" );
 	d3.selectAll('input[name="mgiFacet"]').on("change", function(){
 	    mgiFacet.setValues(this.value === "" ? [] : [this.value]);
 	    self.zoomView.highlight();
 	});
 
+	// Is-highlighted facet
 	let hiFacet = this.facetManager.addFacet("IsHi", f => {
 	    let ishi = this.zoomView.hiFeats[f.mgiid] || this.zoomView.hiFeats[f.mgpid];
 	    return ishi ? "yes" : "no";
@@ -1266,7 +1190,7 @@ class MGVApp {
 	    self.zoomView.highlight();
 	});
 
-	//
+	// Initial coordinates
 	let startingCoords = formatCoords(cfg);
 	d3.select("#zoomCoords")
 	    .call(zcs => zcs[0][0].value = startingCoords || "1:10000000..20000000")
@@ -1277,17 +1201,14 @@ class MGVApp {
 		    this.value = "";
 		    return;
 		}
-		self.zoomView.setCoords(coords);
+		self.setContext(coords);
 	    });
 	//
-	d3.select("#zoomOut").on("click", () => this.zoomView.zoom(2));
-	d3.select("#zoomIn") .on("click", () => this.zoomView.zoom(.5));
+	d3.select("#zoomOut").on("click", () => this.zoom(2));
+	d3.select("#zoomIn") .on("click", () => this.zoom(.5));
 	//
-	d3.select("#panLeft") .on("click", () => this.zoomView.pan(-0.35));
-	d3.select("#panRight").on("click", () => this.zoomView.pan(+0.35));
-	//
-	d3.select("#goBack") .on("click", () => this.zoomView.goBack());
-	d3.select("#goForward").on("click", () => this.zoomView.goForward());
+	d3.select("#panLeft") .on("click", () => this.pan(-0.35));
+	d3.select("#panRight").on("click", () => this.pan(+0.35));
 	// ------------------------------
 	// ------------------------------
 	let pfs = function(ffun, s) {
@@ -1305,28 +1226,149 @@ class MGVApp {
 	// ------------------------------
 	//
 	d3tsv("./data/genomeList.tsv").then(function(data){
-	    this.allGenomes = data.map(g => new Genome(g));
+	    this.allGenomes   = data.map(g => new Genome(g));
+	    this.name2genome  = this.allGenomes.reduce((acc,g) => { acc[g.name] = g; return acc; }, {});
+	    this.label2genome = this.allGenomes.reduce((acc,g) => { acc[g.label] = g; return acc; }, {});
+
 	    initOptList("#refGenome",   this.allGenomes, g=>g.name, g=>g.label, false, g => g.label === cfg.ref);
-	    initOptList("#compGenomes", this.allGenomes, g=>g.name, g=>g.label, true, g => cfg.comps.has(g.label));
+	    initOptList("#compGenomes", this.allGenomes, g=>g.name, g=>g.label, true, g => cfg.comps.indexOf(g.label) >= 0);
 	    //
-	    d3.select("#refGenome").on("change", () => { this.zoomView.clearCoordHistory(); this.go() });
+	    d3.select("#refGenome").on("change", () => this.go());
 	    d3.select("#compGenomes").on("change", () => this.go());
 	    //
-	    // chromosome data promises
+	    // Preload all the chromosome files for all the genomes
 	    let cdps = this.allGenomes.map(g => d3tsv(`./data/genomedata/${g.name}-chromosomes.tsv`));
 	    return Promise.all(cdps);
 	}.bind(this))
 	.then(function (data) {
 	    this.processChromosomes(data);
 	    this.go();
-	}.bind(this))
-	/*
-	.catch(function(error) {
-	    console.log("ERROR!", error)
-	});
-	*/
-
+	}.bind(this));
     }
+    //----------------------------------------------
+    go () {
+	let ref = d3.select("#refGenome")[0][0].value;
+	let comps = [];
+	for(let x of d3.select("#compGenomes")[0][0].selectedOptions){
+	    comps.push(x.value);
+	}
+	let c = parseCoords(d3.select("#zoomCoords")[0][0].value);
+	this.setContext({ref, comps, chr:c.chr, start:c.start, end: c.end});
+    }
+    //----------------------------------------------
+    // Returns the current context as a parameter string
+    // Current context = ref genome + comp genomes + current range (chr,start,end)
+    getParamString () {
+	let c = this.getContext();
+        let ref = `ref=${c.ref}`;
+        let comps = `comps=${c.comps.join("+")}`;
+	let coords = `chr=${c.chr}&start=${c.start}&end=${c.end}`;
+	return `${ref}&${comps}&${coords}`;
+    }
+    //----------------------------------------------
+    // Returns the current context as an object.
+    // Current context = ref genome + comp genomes + current range (chr,start,end)
+    getContext () {
+        let c = this.zoomView.coords;
+        return {
+	    ref : this.rGenome.label,
+	    comps: this.cGenomes.map(g => g.label),
+	    chr: c.chr,
+	    start: c.start,
+	    end: c.end
+	}
+    }
+
+    //----------------------------------------------
+    // Sets the current context from the config object
+    //
+    setContext (cfg) {
+
+	console.log("SET CONTEXT", cfg);
+
+	let changed = false;
+	// ref genome
+	let rg = this.name2genome[cfg.ref] || this.label2genome[cfg.ref];
+	if (rg && rg !== this.rGenome){
+	    this.rGenome = rg;
+	    this.genomeView.draw();
+	    changed = true;
+	}
+
+	// comp genomes
+	if (cfg.comps) {
+	    let cgs = [];
+	    for( let x of cfg.comps ) {
+		let cg = this.name2genome[x] || this.label2genome[x];
+		cg && cgs.push(cg);
+	    }
+	    this.cGenomes = cgs;
+	    changed = true;
+	}
+
+	// coordinates
+	let coords = this.sanitizeCoords({ chr: cfg.chr, start: cfg.start, end: cfg.end });
+	if (coords) {
+	    this.coords = coords;
+	    changed = true;
+	}
+	else
+	    coords = this.coords;
+
+	if (changed) {
+	    this.genomeView.setBrushCoords(coords);
+	    this.zoomView.update(coords)
+	    this.callback();
+	}
+    }
+
+    //----------------------------------------------
+    sanitizeCoords(coords) {
+	if (typeof(coords) === "string") 
+	    coords = parseCoords(coords);
+	let chromosome = this.rGenome.chromosomes.filter(c => c.name === coords.chr)[0];
+	if (! chromosome) return null;
+	if (coords.start > coords.end) {
+	    let tmp = coords.start; coords.start = coords.end; coords.end = tmp;
+	}
+	coords.start = Math.max(1, Math.floor(coords.start))
+	coords.end   = Math.min(chromosome.length, Math.floor(coords.end))
+        return coords;
+    }
+
+    //----------------------------------------------
+    // Zooms in/out by factor. New zoom width is factor * the current zoom width.
+    // Factor > 1 zooms out, 0 < factor < 1 zooms in.
+    zoom (factor) {
+	let len = this.coords.end - this.coords.start + 1;
+	let newlen = Math.round(factor * len);
+	let x = (this.coords.start + this.coords.end)/2;
+	let newstart = Math.round(x - newlen/2);
+	this.setContext({ chr: this.coords.chr, start: newstart, end: newstart + newlen - 1 });
+    }
+
+    //----------------------------------------------
+    // Pans the view left or right by factor. The distance moved is factor times the current zoom width.
+    // Negative values pan left. Positive values pan right. (Note that panning moves the "camera". Panning to the
+    // right makes the objects in the scene appear to move to the left, and vice versa.)
+    //
+    pan (factor) {
+	let width = this.coords.end - this.coords.start + 1;
+	let d = Math.round(factor * width);
+	let ns;
+	let ne;
+	if (d < 0) {
+	    ns = Math.max(1, this.coords.start+d);
+	    ne = ns + width - 1;
+	}
+	else if (d > 0) {
+	    let chromosome = this.rGenome.chromosomes.filter(c => c.name === this.coords.chr)[0];
+	    ne = Math.min(chromosome.length, this.coords.end+d)
+	    ns = ne - width + 1;
+	}
+	this.setContext({ chr: this.coords.chr, start: ns, end: ne });
+    }
+
     //----------------------------------------------
     initFeatTypeControl (facet) {
 	let self = this;
@@ -1395,87 +1437,10 @@ class MGVApp {
 	    g.xscale = xs;
 	    g.yscale = ys;
 	    g.zoomY  = -1;
-	    this.genomeData[g.name] = g;
 	});
     }
     //----------------------------------------------
-    currentParameters () {
-        let ref = `ref=${this.rGenome.label}`;
-        let comp = `comp=${this.cGenomes.map(g => g.label).join("+")}`;
-        let c = this.zoomView.coords;
-	let coords = `chr=${c.chr}&start=${c.start}&end=${c.end}`;
-	return `${ref}&${comp}&${coords}`;
-    }
-
-    //----------------------------------------------
-    //
-    go () {
-	// reference genome
-	let rs = d3.select("#refGenome");
-	this.rGenome = this.genomeData[rs[0][0].value];
-	// comparison genomes
-	let cs = d3.select("#compGenomes");
-	let csos = cs[0][0].selectedOptions;
-	this.cGenomes = [];
-	for (let i = 0; i < csos.length; i++){
-	    let csn = csos[i].value;
-	    let cg = this.genomeData[csn];
-	    if (cg !== this.rGenome)
-	        this.cGenomes.push(cg);
-	}
-	//
-	this.genomeView.draw();
-	//
-	let coords = parseCoords(d3.select("#zoomCoords")[0][0].value)
-	coords && this.zoomView.setCoords(coords);
-
-    }
 } // end class MGVApp
-
-// ---------------------------------------------
-// UndoManager maintains a history stack of states (arbitrary objects).
-//
-class UndoManager {
-    constructor(limit) {
-        this.clear();
-    }
-    clear () {
-        this.history = [];
-        this.pointer = -1;
-    }
-    get currentState () {
-        if (this.pointer < 0)
-            throw "No current state.";
-        return this.history[this.pointer];
-    }
-    get hasState () {
-        return this.pointer >= 0;
-    }
-    get canUndo () {
-        return this.pointer > 0;
-    }
-    get canRedo () {
-        return this.hasState && this.pointer < this.history.length-1;
-    }
-    add (s) {
-        //console.log("ADD");
-        this.pointer += 1;
-        this.history[this.pointer] = s;
-        this.history.splice(this.pointer+1);
-    }
-    undo () {
-        //console.log("UNDO");
-        if (! this.canUndo) throw "No undo."
-        this.pointer -= 1;
-        return this.history[this.pointer];
-    }
-    redo () {
-        //console.log("REDO");
-        if (! this.canRedo) throw "No redo."
-        this.pointer += 1;
-        return this.history[this.pointer];
-    }
-} // end class UndoManager
 
 //----------------------------------------------
 //---- END CLASS DEFS --------------------------
@@ -1617,13 +1582,13 @@ function pqstring (qstring) {
     // but need a fallback eventually.
     let prms = new URLSearchParams(qstring);
     let comps = new Set();
-    let comps0 = prms.getAll("comp");
+    let comps0 = prms.getAll("comps");
     comps0.forEach(c0 => {
         c0.split(/[, ]+/).forEach(c => comps.add(c));
     });
     let cfg = {
 	ref: prms.get("ref") || "C57BL/6J",
-	comps: comps,
+	comps: Array.from(comps),
 	chr: prms.get("chr") || "1",
 	start: parseInt(prms.get("start") || "1"),
 	end: parseInt(prms.get("end") || "20000000")
@@ -1633,13 +1598,25 @@ function pqstring (qstring) {
     }
     return cfg;
 }
-let qstring = window.location.hash.substring(1);
 
-function setHash () {
-    window.location.hash = mgv.currentParameters();
+let mgv = null;
+function __main__ () {
+    let qstring = window.location.hash.substring(1);
+    function setHash () {
+	let f = window.onpopstate;
+	window.onpopstate = null;
+	window.location.hash = mgv.getParamString();
+	window.onpopstate = f;
+    }
+    window.onpopstate = function(event) {
+	let qstring = document.location.hash.substring(1)
+	let cfg = pqstring(qstring);
+	mgv.setContext(cfg);
+    };
+    mgv = new MGVApp(pqstring(qstring), setHash );
 }
 
-let mgv = new MGVApp(pqstring(qstring), setHash );
+__main__();
 
 // ---------------------------------------------
 })();
