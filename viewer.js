@@ -577,16 +577,35 @@ class GenomeView extends SVGView {
 	    }
 	});
     }
-    //----------------------------------------------
-    draw (fdata) {
 
-	let gdata = this.app.rGenome;
+    //----------------------------------------------
+    getX (chr) {
+	return this.app.rGenome.xscale(chr);
+    }
+    //----------------------------------------------
+    getY (pos) {
+	return this.app.rGenome.yscale(pos);
+    }
+    
+    //----------------------------------------------
+    draw (tickData, blockData) {
 
 	let self = this;
+	let gdata = this.app.rGenome;
 	let xf = function(d){return self.bwidth+gdata.xscale(d.name);};
 
+	// Group to hold synteny blocks. Want this first so everything else overlays it.
+	let sygp = this.svg.selectAll('g[name="synBlocks"]').data([0]);
+	sygp.enter().append("g").attr("name","synBlocks");
+	sygp.exit().remove();
+
 	// Chromosome backbones (lines)
-	let ccels = this.svg.selectAll('line.chr')
+	// group to hold em
+	let bbgp = this.svg.selectAll('g[name="backbones"]').data([0]);
+	bbgp.enter().append("g").attr("name","backbones");
+	bbgp.exit().remove();
+        // now the lines
+	let ccels = bbgp.selectAll('line.chr')
 	  .data(gdata.chromosomes, function(x){return x.name;});
 	ccels.exit().transition().duration(this.app.dur)
 	  .attr("y1", this.height)
@@ -608,7 +627,11 @@ class GenomeView extends SVGView {
 	    ;
 
 	// Chromosome labels
-	let labels = this.svg.selectAll('.chrlabel')
+	let clgp = this.svg.selectAll('g[name="labels"]').data([0]);
+	clgp.enter().append("g").attr("name","labels");
+	clgp.exit().remove();
+	//
+	let labels = clgp.selectAll('.chrlabel')
 	  .data(gdata.chromosomes, function(x){return x.name;});
 	labels.exit().transition().duration(this.app.dur)
 	  .attr('y', this.height)
@@ -626,7 +649,11 @@ class GenomeView extends SVGView {
 	  .attr('y', -2) ;
 
 	// Brushes
-	let brushes = this.svg.selectAll("g.brush")
+	let brgp = this.svg.selectAll('g[name="brushes"]').data([0]);
+	brgp.enter().append("g").attr("name","brushes");
+	brgp.exit().remove();
+	//
+	let brushes = brgp.selectAll("g.brush")
 	    .data(gdata.chromosomes, function(x){return x.name;});
 	brushes.exit().remove();
 	brushes.enter().append('g')
@@ -641,37 +668,70 @@ class GenomeView extends SVGView {
 	    .attr('transform', function(d){return 'translate('+gdata.xscale(d.name)+')';})
 	    .each(function(d){d3.select(this).call(d.brush);})
 	    ;
-	// Ref genome label
-	let rsLabel = this.svg.selectAll("text.genomeLabel")
-	    .data([this.app.rGenome]);
-	rsLabel.enter().append("text").attr("class","genomeLabel");
-	rsLabel.text(s => s.label)
-	    .attr("x", this.width/2)
-	    .attr("y", this.height - 20);
+	//
+	this.drawTitle();
 	    
 	//
-	this.drawTicks(fdata);
+	if (tickData) this.drawTicks(tickData);
+	if (blockData) this.drawBlocks(blockData);
+    }
+
+    // ---------------------------------------------
+    // Args: 
+    //    title (string) main title. optional. if not provided, will use name of current ref genome
+    //    subtitle (string) optional subtitle.
+    drawTitle (title, subtitle) {
+	// Ref genome label
+	let ttl = this.svg.selectAll("text.title")
+	    .data([this.app.rGenome]);
+	ttl.enter().append("text").attr("class","title");
+	ttl.text(s => title || s.label)
+	    .attr("x", this.width/2)
+	    .attr("y", this.height - 20);
+	let sttl = ttl.selectAll("tspan.subtitle")
+	    .data([" " + (subtitle || "")]);
+	sttl.enter().append("tspan")
+	    .attr("class","subtitle");
+	sttl.exit().remove();
+	sttl.text( t => t )
     }
 
     // ---------------------------------------------
     // Draws the outlines of synteny blocks of the ref genome vs.
     // the given genome.
     // Args:
-    //   cGenome (Genome) the comparison genome
-    // Returns:
-    //   nothing
-    drawBlocks (cGenome) {
-	let data = this.app.translator.getBlocks(this.app.rGenome, cGenome);
-	console.log(data);
+    //    blockData == { ref:Genome, comp:Genome, blocks: list of synteny blocks }
+    drawBlocks (blockData) {
+	// group to hold the synteny block rectangles
+        let bgrp = this.svg
+	    .select('g[name="synBlocks"]')
+	    .datum(blockData);
+	
+	// now the rects
+	let rects = bgrp.selectAll("rect.sblock")
+	    .data(d => d.blocks, b => b.blockId);
+	rects.enter().append("rect")
+	    .attr("class","sblock");
+	rects.exit().remove();
+	//
+	let bwidth = 10;
+	rects
+	    .attr("x", b => this.getX(b.fromChr) + (b.ori === "+" ? bwidth : 0))
+	    .attr("y", b => this.getY(b.fromStart))
+	    .attr("width", bwidth)
+	    .attr("height", b => this.getY(b.fromEnd - b.fromStart + 1));
+
+	let subt = `vs ${blockData.comp.label}`;
+	this.drawTitle(null, blockData.ref===blockData.comp ? null : subt);
     }
 
     // ---------------------------------------------
-    drawTicks (fdata) {
+    drawTicks (data) {
 	let gdata = this.app.rGenome;
 	// feature tick marks
 	let tickLength = 10;
         let feats = this.svg.selectAll("line.feature")
-	    .data(fdata||[], d => d.mgiid);
+	    .data(data||[], d => d.mgiid);
 	let nfs = feats.enter()
 	    .append("line")
 	    .attr("class","feature");
@@ -836,8 +896,13 @@ class ZoomView extends SVGView {
     }
 
     //----------------------------------------------
-    highlightStrip (g) {
-        // console.log("highlightstrip", g);
+    highlightStrip (g, elt) {
+	if (g === this.currentHLG) return;
+	let ref = this.app.rGenome;
+	let blks = g === ref ? [] : this.app.translator.getBlocks(ref, g);
+	//
+	this.currentHLG = g;
+	this.app.genomeView.drawBlocks({ ref: ref, comp: g, blocks:blks });
     }
 
     //----------------------------------------------
@@ -889,7 +954,10 @@ class ZoomView extends SVGView {
 	let newZrs = zrs.enter()
 	    .append("svg:g")
 		.attr("class", "zoomStrip")
-		.attr("name", d => d.genome.name);
+		.attr("name", d => d.genome.name)
+		.on("mouseover", function (g) {
+		    self.highlightStrip(g.genome, this);
+		});
 	zrs.exit().remove();
 
 	// reset the svg size based on number of strips
@@ -906,8 +974,7 @@ class ZoomView extends SVGView {
 	    .attr("y", d => d.genome.zoomY - (this.blockHeight/2 + 3))
 	    .attr("font-family","sans-serif")
 	    .attr("font-size", 10)
-	    .text(d => d.genome.label)
-            .on("mouseover", this.highlightStrip.bind(this) );
+	    .text(d => d.genome.label);
 
 	// zoom blocks
 	let zbs = zrs.selectAll(".zoomBlock")

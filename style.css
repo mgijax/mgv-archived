@@ -59,11 +59,17 @@ line.chr {
 #zoomView .brush rect {
    height: 10px;
 }
-.brush .extent {
+.brush > .extent {
     fill-opacity : 0.3;
-    stroke : none;
-    shape-rendering: crispEdges;
+    stroke : blue;
+    fill: blue;
 }
+.brush:hover > rect.background {
+    visibility: visible !important;
+    fill: blue;
+    fill-opacity : 0.15;
+}
+
 .button {
     cursor: pointer;
 }
@@ -88,6 +94,14 @@ line.chr {
 }
 #genomeView svg line.feature {
     stroke: black;
+}
+#genomeView svg g[name="synBlocks"] rect.sblock {
+    fill: #828282;
+    stroke: none;
+}
+#genomeView svg .title {
+}
+#genomeView svg .subtitle {
 }
 
 #zoomView {
