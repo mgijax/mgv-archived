@@ -1157,7 +1157,12 @@ class ZoomView extends SVGView {
 	fd.select('.mgpid span').text(f.mgpid)
 	fd.select('.type span').text(f.type)
 	fd.select('.biotype span').text(f.biotype)
-	fd.select('.mgiid span').text(f.mgiid)
+	if (f.mgiid) {
+	    let lnk = `<a target="_blank" href="http://www.informatics.jax.org/accession/${f.mgiid}">${f.mgiid}</a>`;
+	    fd.select('.mgiid span').html(lnk);
+	}
+	else
+	    fd.select('.mgiid span').text("");
 	fd.select('.symbol span').text(f.symbol)
 	fd.select('.coordinates span').text(`${f.strand}${f.chr}:${f.start}..${f.end}`)
 	fd.select('.length span').text(`${f.end - f.start + 1}`)
