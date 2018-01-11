@@ -915,6 +915,11 @@ class ZoomView extends SVGView {
     //      - each block is an object containing a chromosome, start, end, orientation, etc, and a list of features.
     //        - each feature has chr,start,end,strand,type,biotype,mgpid
     draw (data) {
+	
+	//this.svg
+	    //.style("transition","transform 0.5s")
+	    //.style("transform","translate(0px, 0px)");
+
 	// 
 	let self = this;
 
@@ -1020,14 +1025,10 @@ class ZoomView extends SVGView {
 
 	// draw the zoom block outline
 	zbs.select("rect.block")
-	  .attr("x", b => {
-	      return b.xscale(b.start)
-	  })
-	  .attr("y", (b,i,j) => {
-	      return data[j].genome.zoomY - this.blockHeight / 2;
-	  })
+	  .attr("x",     b => b.xscale(b.start))
+	  .attr("y",     b => b.genome.zoomY - this.blockHeight / 2)
 	  .attr("width", b=>b.xscale(b.end)-b.xscale(b.start))
-	  .attr("height", this.blockHeight);
+	  .attr("height",this.blockHeight);
 
 	// axis line
 	zbs.select("line.axis")
@@ -1521,8 +1522,9 @@ class MGVApp {
     // Negative values pan left. Positive values pan right. (Note that panning moves the "camera". Panning to the
     // right makes the objects in the scene appear to move to the left, and vice versa.)
     //
-    pan (factor) {
+    pan (factor, animate) {
 	let width = this.coords.end - this.coords.start + 1;
+	let panDist = factor * (this.zoomView.xscale.range()[1]);
 	let d = Math.round(factor * width);
 	let ns;
 	let ne;
@@ -1535,6 +1537,13 @@ class MGVApp {
 	    ne = Math.min(chromosome.length, this.coords.end+d)
 	    ns = ne - width + 1;
 	}
+	// this probably doesn't belong here but for now...
+	// To get a smooth panning effect: initialize the translation to the same as
+	// the pan distance, but in the opposite direction...
+	//this.zoomView.svg
+	    //.style("transition", "transform 0s")
+	    //.style("transform", `translate(${-panDist}px,0px)`);
+	// ...then the zoom draw will transition the vector back to (0,0)
 	this.setContext({ chr: this.coords.chr, start: ns, end: ne });
     }
 
