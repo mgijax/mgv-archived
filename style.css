@@ -67,6 +67,10 @@ line.chr {
 .button {
     cursor: pointer;
 }
+.button.more {
+    font-weight: bold;
+    font-size: bigger;
+}
 
 #genomeView {
     background-color: #ccc;
@@ -75,6 +79,8 @@ line.chr {
 }
 #genomeView > div {
     margin-top: 18px;
+    background-color: #b9b9b9;
+    padding: 12px 8px;
 }
 #genomeView > svg {
     height: 250px;
