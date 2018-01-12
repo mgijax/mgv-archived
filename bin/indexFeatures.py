@@ -118,6 +118,25 @@ def buildIndex(fin, fout):
         fout.write(currBlk.rowString()+'\n')
 
 #
+def makeFeature (row, colnames) :
+    f = {}
+    for i,n in enumerate(colnames):
+	f[n] = row[i]
+	if n in ["start","end"]:
+	    f[n] = int(f[n])
+    return f
+
+#
+def readFeatFile(ff) :
+    colnames = ff.readline()[:-1].split("\t")
+    feats = []
+    for line in ff:
+        toks = line[:-1].split("\t")
+	r = makeFeature(toks, colnames)
+	feats.append(r)
+    return feats
+
+#
 def readIndexFile(xf) :
     ix = {} # chr -> list of Blocks
     for ixLine in xf:
@@ -168,6 +187,8 @@ def validate(ff, ix) :
 #	{ chr (string), start (int), end (int), features (list of features) }
 #    
 def lookup(ff, ix, chr, start, end):
+    ff.seek(0)
+    colnames = ff.readline()[:-1].split()
     # get all the index blocks for the given chromosome
     cblocks = ix.get(chr,None)
     if not cblocks:
@@ -182,6 +203,7 @@ def lookup(ff, ix, chr, start, end):
         ff.seek(b.startIndex)
         s = ff.read(b.endIndex-b.startIndex+1)
 	feats = map(lambda l: l.split("\t"), s[:-1].split("\n"))
+	feats = map(lambda f: makeFeature(f, colnames), feats)
 	# add block to answer
 	b2 = b.jsonObj()
 	b2["features"] = feats
@@ -191,23 +213,65 @@ def lookup(ff, ix, chr, start, end):
     return answer
 
 
+# Returns features by MGI id.
+# Args:
+#    ff (open file) the gff file 
+#    ids (list of strings) one or more ids to lookup
+# Returns:
+#    list of [id, feature] pairs. The elements of the returned list map 1:1
+#    with the elements in the ids input. If an id was not found, the feature 
+#    is null. Duplicate ids (or aliases) will returns the same feature multiple times.
+#    
+def idlookup(ff, ids):
+    # read all the features
+    feats = readFeatFile(ff)
+    # build an id index
+    fix = {}
+    for f in feats:
+       fix.setdefault(f["mgiid"], []).append(f)
+    # lookup each id
+    answer = []
+    for i in ids:
+        answer.append((i, fix.get(i,[])))
+    #
+    return answer
+
+# Performs a binary search on a list. Returns the the index of
+# the first item in the list having the given value, or None if not found.
+# Args:
+#    val The value to search for.
+#    lst The list to search. MUST be sorted on val! (Duh)
+#    vf  Function to get the value from a lst item. If None,
+#        (the default) the list items are the values
+# Returns
+#    Index of the first item in the list with the given value, or None
+#    if no item has that value.
 #
 def bsearch(val, lst, vf=None):
+    # if vf is None, use the identity function
     vf = vf if vf else lambda x:x
+    # initialize search range
     iMin = 0
     iMax = len(lst) - 1
+    found = False
+    # go
     while iMin <= iMax and iMax < len(lst):
+	# get value from middle item
         iMid = (iMin + iMax) / 2
         v = vf(lst[iMid])
-        if val <= v:
+        if val < v:
+	    # look in first part of list
             iMax = iMid - 1
         elif val > v:
+	    # look in second part of list
             iMin = iMid + 1
-    #
-    if iMin < len(lst) and vf(lst[iMin]) == val:
-        return iMin
-    #
-    return None
+	else:
+	    # Found one. Set the flag and continue searching the first part of the
+	    # list in order to find the first occurrence.
+	    found = True
+	    iMax = iMid - 1
+    # if found, then iMin is pointing at the first occurrence
+    return iMin if found else None
 
 #
 def initArgParser ():
@@ -215,6 +279,15 @@ def initArgParser ():
     Sets up the parser for the command line args.
     """
     parser = argparse.ArgumentParser(description='Create/verify/use a feature index.')
+
+    parser.add_argument(
+        '-a',
+        dest="action",
+        choices=['create','validate','lookup','idlookup','none'],
+        default='lookup',
+        metavar='ACTION', 
+        help='Action to perform. One of: create, validate, lookup. (Default=lookup.)')
+
     parser.add_argument(
         '-x',
         dest="indexFile",
@@ -228,19 +301,17 @@ def initArgParser ():
         help='Name of feature file.')
 
     parser.add_argument(
-        '-a',
-        dest="action",
-        choices=['create','validate','lookup','none'],
-        default='lookup',
-        metavar='ACTION', 
-        help='Action to perform. One of: create, validate, lookup. (Default=lookup.)')
-
-    parser.add_argument(
         '-p',
         dest="position",
         default=None,
         metavar='CHR:START..END', 
         help='For action=lookup, the coordinate range to use.')
+
+    parser.add_argument(
+        'ids',
+	metavar='IDs',
+	nargs='*',
+	help='An ID')
 
     return parser
 
@@ -263,6 +334,9 @@ def main():
 	ix = readIndexFile(xf)
         ans = lookup(ff, ix, m.group(1), int(m.group(2)), int(m.group(3)))
         print json.dumps(ans, indent=2)
+    elif args.action == "idlookup":
+        ans = idlookup(ff, args.ids)
+	print json.dumps(ans, indent=2)
     elif args.action == "validate":
         print "Validating index..."
         if not args.indexFile:

@@ -59,6 +59,9 @@ line.chr {
     top: 35px;
     width: 225px;
 }
+.featureDetails > .flexrow > label {
+    width: 32%;
+}
 
 #zoomView .brush rect {
    height: 10px;
@@ -112,6 +115,9 @@ line.chr {
     display: inline-block;
     background-color: #ccc;
     border: thin solid black;
+}
+.zoomStrip.highlighted > text {
+   font-size: 16px;
 }
 .zoomStrip line {
     stroke: #aaa;

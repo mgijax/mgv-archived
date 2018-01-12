@@ -16,13 +16,13 @@ class Genome {
 // ---------------------------------------------
 class Feature {
     constructor (cfg) {
-        this.chr     = cfg.chr;
+        this.chr     = cfg.chr || cfg.chromosome;
         this.start   = cfg.start;
         this.end     = cfg.end;
         this.strand  = cfg.strand;
         this.type    = cfg.type;
         this.biotype = cfg.biotype;
-        this.mgpid   = cfg.mgpid;
+        this.mgpid   = cfg.mgpid || cfg.id;
         this.mgiid   = cfg.mgiid;
         this.symbol  = cfg.symbol;
         this.genome  = cfg.genome;
@@ -76,6 +76,7 @@ class FeatureManager {
     constructor (app) {
         this.app = app;
         this.featCache = {};     // index from mgpid -> feature
+	this.mgiCache = {};	 // index from mgiid -> [ features ]
 	this.cache = {};         // {genome.name -> {chr.name -> list of blocks}}
 
 	this.mineFeatureCache = {}; // auxiliary info pulled from MouseMine 
@@ -84,31 +85,24 @@ class FeatureManager {
     //----------------------------------------------
     // Processes the "raw" features returned by the server.
     // Turns them into Feature objects and registers them.
-    // If the same raw feature is registered multiple times,
-    // successive times reuse the Feature object created the first time.
+    // If the same raw feature is registered again,
+    // the Feature object created the first time is returned.
+    // (I.e., registering the same feature multiple times is ok)
     //
     processFeatures (feats, genome) {
 	return feats.map(d => {
-	    // get the ID field
-	    let mgpid = d[6];
 	    // If we've already got this one in the cache, return it.
-	    if (this.featCache[mgpid])
-		return this.featCache[mgpid];
+	    let f = this.featCache[d.mgpid];
+	    if (f) return f;
 	    // Create a new Feature
-	    let f = new Feature({
-	      chr     : d[0],
-	      start   : parseInt(d[1]),
-	      end     : parseInt(d[2]),
-	      strand  : d[3],
-	      type    : d[4],
-	      biotype : d[5],
-	      mgpid   : mgpid,
-	      mgiid   : d[7],
-	      symbol  : d[8],
-	      genome  : genome
-	    });
+	    d.genome = genome
+	    f = new Feature(d);
 	    // Register it.
-	    this.featCache[mgpid] = f;
+	    this.featCache[f.mgpid] = f;
+	    if (f.mgiid) {
+		let lst = this.mgiCache[f.mgiid] = (this.mgiCache[f.mgiid] || []);
+		lst.push(f);
+	    }
 	    // here y'go.
 	    return f;
 	});
@@ -212,17 +206,6 @@ class FeatureManager {
     }
 
     //----------------------------------------------
-    getCachedById (id) {
-	let ans = [];
-	for (let g in this.cache) {
-	    let gc = this.cache[gc];
-	    let f = (gc || {})[id];
-	    f && ans.push(f);
-	}
-	return ans;
-    }
-
-    //----------------------------------------------
     // This is what the user calls. Returns (a promise for) the features in 
     // the specified ranges of the specified genome.
     getFeatures (genome, ranges) {
@@ -233,6 +216,18 @@ class FeatureManager {
 	    });
 	    return { genome, blocks:ranges };
 	}.bind(this));
+    }
+    //----------------------------------------------
+    getFeaturesById (genome, ids) {
+	// subtract ids of features already in the cache
+	let needids = ids.filter(i => !(i in this.featCache || i in this.mgiCache));
+	let dataString = `genome=${genome.name}&ids=${needids.join("+")}`;
+	let url = "./bin/getFeatures.cgi?" + dataString;
+	let self = this;
+	console.log("Requesting IDs:", genome.name, needids);
+	return d3json(url).then(function(data){
+	    console.log("Transferred IDs:", genome.name, feats);
+	});
     }
 
 } // end class Feature Manager
@@ -898,6 +893,10 @@ class ZoomView extends SVGView {
     //----------------------------------------------
     highlightStrip (g, elt) {
 	if (g === this.currentHLG) return;
+	//
+	this.svg.selectAll('.zoomStrip')
+	    .classed("highlighted", d => d.genome === g);
+	//
 	let ref = this.app.rGenome;
 	let blks = g === ref ? [] : this.app.translator.getBlocks(ref, g);
 	//
@@ -1154,6 +1153,7 @@ class ZoomView extends SVGView {
     //----------------------------------------------
     updateFeatureDetails (f) {
 	let fd = d3.select('.featureDetails');
+	fd.select('.genome span').text(f.genome.label)
 	fd.select('.mgpid span').text(f.mgpid)
 	fd.select('.type span').text(f.type)
 	fd.select('.biotype span').text(f.biotype)
@@ -1164,7 +1164,7 @@ class ZoomView extends SVGView {
 	else
 	    fd.select('.mgiid span').text("");
 	fd.select('.symbol span').text(f.symbol)
-	fd.select('.coordinates span').text(`${f.strand}${f.chr}:${f.start}..${f.end}`)
+	fd.select('.coordinates span').text(`${f.chr}:${f.start}..${f.end} (${f.strand})`)
 	fd.select('.length span').text(`${f.end - f.start + 1}`)
     }
     //----------------------------------------------
