@@ -1038,17 +1038,22 @@ class ZoomView extends SVGView {
 	    ;
 
 	// brush
-	zbs.select(".brush").each(function(b) {
-	    if (!b.brush) {
-	        b.brush = d3.svg.brush()
-		    .on("brushstart", function(){ self.bbStart( b, this ); })
-		    .on("brush",      function(){ self.bbBrush( b, this ); })
-		    .on("brushend",   function(){ self.bbEnd( b, this ); })
-	    }
-	    b.brush.x(b.xscale).clear();
-	    d3.select(this).call(b.brush);
-	})
-	.attr("transform", b => `translate(0,${b.genome.zoomY + this.featHeight + 6})`);
+	zbs.select(".brush")
+	    .each(function(b) {
+		if (!b.brush) {
+		    b.brush = d3.svg.brush()
+			.on("brushstart", function(){ self.bbStart( b, this ); })
+			.on("brush",      function(){ self.bbBrush( b, this ); })
+			.on("brushend",   function(){ self.bbEnd( b, this ); })
+		}
+		b.brush.x(b.xscale).clear();
+		d3.select(this).call(b.brush);
+	    })
+	    .selectAll("rect")
+		.attr("height", 10);
+
+	zbs.select(".brush")
+	    .attr("transform", b => `translate(0,${b.genome.zoomY + this.featHeight + 6})`);
 
 	// chromosome label 
 	zbs.select("text.blockLabel")
