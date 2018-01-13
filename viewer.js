@@ -1159,6 +1159,8 @@ class ZoomView extends SVGView {
     updateFeatureDetails (f) {
 	let fd = d3.select('.featureDetails');
 	fd.select('.genome span').text(f.genome.label)
+	fd.select('.coordinates span').text(`${f.chr}:${f.start}..${f.end} (${f.strand})`)
+	fd.select('.length span').text(`${f.end - f.start + 1} bp`)
 	fd.select('.mgpid span').text(f.mgpid)
 	fd.select('.type span').text(f.type)
 	fd.select('.biotype span').text(f.biotype)
@@ -1169,8 +1171,6 @@ class ZoomView extends SVGView {
 	else
 	    fd.select('.mgiid span').text("");
 	fd.select('.symbol span').text(f.symbol)
-	fd.select('.coordinates span').text(`${f.chr}:${f.start}..${f.end} (${f.strand})`)
-	fd.select('.length span').text(`${f.end - f.start + 1}`)
     }
     //----------------------------------------------
     // Draws polygons that connect highlighted features in the view
