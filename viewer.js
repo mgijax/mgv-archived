@@ -233,6 +233,8 @@ class FeatureManager {
 } // end class Feature Manager
 
 // ---------------------------------------------
+// AuxDataManager - knows how to query an external source (right now it's MouseMine) for genes
+// annotated to different ontologies.
 class AuxDataManager {
     constructor (app) {
 	this.app = app;
@@ -265,7 +267,7 @@ class AuxDataManager {
 
     //----------------------------------------------
     // do a LOOKUP query for SequenceFeatures from MouseMine
-    featuresById (qryString) {
+    featuresByLookup (qryString) {
 	let q = `<query name="" model="genomic" view="SequenceFeature.primaryIdentifier SequenceFeature.symbol SequenceFeature.name SequenceFeature.chromosomeLocation.locatedOn.primaryIdentifier SequenceFeature.chromosomeLocation.start SequenceFeature.chromosomeLocation.end SequenceFeature.chromosomeLocation.strand" longDescription="" constraintLogic="A and B">
 	    <constraint path="SequenceFeature" code="A" op="LOOKUP" value="${qryString}"/>
 	    <constraint path="SequenceFeature.organism.taxonId" code="B" op="=" value="10090"/>
@@ -283,6 +285,7 @@ class AuxDataManager {
 	return this.getAuxData(q, ['mgiid','symbol','termid','term','chr','start','end','strand']);
     }
     //----------------------------------------------
+    featuresById        (qryString) { return this.featuresByLookup(qryString); }
     featuresByFunction  (qryString) { return this.featuresByOntologyTerm(qryString, "GOTerm"); }
     featuresByPhenotype (qryString) { return this.featuresByOntologyTerm(qryString, "MPTerm"); }
     featuresByDisease   (qryString) { return this.featuresByOntologyTerm(qryString, "DOTerm"); }

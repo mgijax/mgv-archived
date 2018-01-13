@@ -54,10 +54,6 @@ line.chr {
 
 .featureDetails {
     font-size: 12px;
-    align-self: flex-start;
-    position: relative;
-    top: 35px;
-    width: 225px;
 }
 .featureDetails > .flexrow > label {
     width: 32%;

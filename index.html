@@ -56,25 +56,6 @@
     <div class="middlecolumn flexcolumn">
 	<div id="genomeView" class="flexrow">
 	    <svg></svg>
-	    <div class="flexcolumn">
-		<span>WARNING: this part is experimental!</span>
-		<div class="flexcolumn">
-		    <label>Lookup ID/symbol</label>
-		    <input id="lookup" size="30" type="text"></input>
-		</div>
-		<div class="flexcolumn">
-		    <label>Gene function</label>
-		    <input id="function" size="30" type="text"></input>
-		</div>
-		<div class="flexcolumn">
-		    <label>Phenotype</label>
-		    <input id="phenotype" size="30" type="text"></input>
-		</div>
-		<div class="flexcolumn">
-		    <label>Disease</label>
-		    <input id="disease" size="30" type="text"></input>
-		</div>
-	    </div>
 	</div>
 	<div id="zoomView" class="flexcolumn">
 	    <div class="flexrow">
@@ -99,47 +80,67 @@
 	    </div>
 	    <div class="flexrow">
 
+		<!-- the SVG element for the zoom view panel -->
 		<svg></svg>
 
-		<div class="featureDetails flexcolumn">
-		    <label>Feature details</label>
-		    <div class="genome flexrow">
-			<label>Genome</label>
-			<span></span>
-		    </div>
-		    <div class="coordinates flexrow">
-			<label>Coordinates</label>
-			<span></span>
-		    </div>
-		    <div class="length flexrow">
-			<label>Length</label>
-			<span></span>
-		    </div>
-		    <div class="mgpid flexrow">
-			<label>MGP id</label>
-			<span></span>
-		    </div>
-		    <div class="type flexrow">
-			<label>Type</label>
-			<span></span>
-		    </div>
-		    <div class="biotype flexrow">
-			<label>Biotype</label>
-			<span></span>
-		    </div>
-		    <div class="mgiid flexrow">
-			<label>MGI id</label>
-			<span></span>
-		    </div>
-		    <div class="symbol flexrow">
-			<label>Symbol</label>
-			<span></span>
-		    </div>
-		</div> <!-- end featureDetails -->
 	    </div>
 	</div>
     </div>
     <div class="rightcolumn flexcolumn">
+	<div class="flexcolumn">
+	    <span>WARNING: this part is experimental!</span>
+	    <div class="flexcolumn">
+		<label>Lookup ID/symbol</label>
+		<input id="lookup" size="30" type="text"></input>
+	    </div>
+	    <div class="flexcolumn">
+		<label>Gene function</label>
+		<input id="function" size="30" type="text"></input>
+	    </div>
+	    <div class="flexcolumn">
+		<label>Phenotype</label>
+		<input id="phenotype" size="30" type="text"></input>
+	    </div>
+	    <div class="flexcolumn">
+		<label>Disease</label>
+		<input id="disease" size="30" type="text"></input>
+	    </div>
+	</div>
+	<div class="featureDetails flexcolumn">
+	    <label>Feature details</label>
+	    <div class="genome flexrow">
+		<label>Genome</label>
+		<span></span>
+	    </div>
+	    <div class="coordinates flexrow">
+		<label>Coordinates</label>
+		<span></span>
+	    </div>
+	    <div class="mgpid flexrow">
+		<label>MGP id</label>
+		<span></span>
+	    </div>
+	    <div class="type flexrow">
+		<label>Type</label>
+		<span></span>
+	    </div>
+	    <div class="biotype flexrow">
+		<label>Biotype</label>
+		<span></span>
+	    </div>
+	    <div class="mgiid flexrow">
+		<label>MGI id</label>
+		<span></span>
+	    </div>
+	    <div class="symbol flexrow">
+		<label>Symbol</label>
+		<span></span>
+	    </div>
+	    <div class="length flexrow">
+		<label>Length</label>
+		<span></span>
+	    </div>
+	</div> <!-- end featureDetails -->
     </div>
 </div>
 <div class="footer">
