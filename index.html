@@ -9,20 +9,45 @@
 </head>
 <body>
 <h3>Multi Genome Viewer</h3>
-<div class="flexrow" style="align-items: flex-start;">
+<div id="mgv" class="flexrow" >
     <div class="leftcolumn flexcolumn">
-	<div class="refGenome flexcolumn collapsible">
+	<div class="refGenome flexcolumn">
+	    <i class="material-icons button collapse"></i>
 	    <label>Reference genome</label>
 	    <select id="refGenome"></select>
 	</div>
-	<div class="compGenomes flexcolumn collapsible">
+	<div class="compGenomes flexcolumn ">
+	    <i class="material-icons button collapse"></i>
 	    <label>Comparison genomes</label>
 	    <select id="compGenomes" size="20"></select>
 	</div>
-	<div class="colorKey flexcolumn collapsible">
+	<div class="colorKey flexcolumn ">
+	    <i class="material-icons button collapse"></i>
 	    <label>Feature types</label>
 	</div>
-	<div class="mgiFacet flexcolumn collapsible">
+	<div class="flexcolumn">
+	    <i class="material-icons button collapse"></i>
+	    <label>Queries</label>
+	    <span>WARNING: this part is experimental!</span>
+	    <div class="flexcolumn">
+		<span>Lookup ID/symbol</span>
+		<input id="lookup" size="30" type="text"></input>
+	    </div>
+	    <div class="flexcolumn">
+		<span>Gene function</span>
+		<input id="function" size="30" type="text"></input>
+	    </div>
+	    <div class="flexcolumn">
+		<span>Phenotype</span>
+		<input id="phenotype" size="30" type="text"></input>
+	    </div>
+	    <div class="flexcolumn">
+		<span>Disease</span>
+		<input id="disease" size="30" type="text"></input>
+	    </div>
+	</div>
+	<div class="mgiFacet flexcolumn ">
+	    <i class="material-icons button collapse"></i>
 	    <label>Has MGI ID?</label>
 	    <div class="flexrow">
 		<input type="radio" name="mgiFacet" value="yes" />
@@ -37,7 +62,8 @@
 		<span>Don't care</span>
 	    </div>
 	</div>
-	<div class="hiFacet flexcolumn collapsible">
+	<div class="hiFacet flexcolumn ">
+	    <i class="material-icons button collapse"></i>
 	    <label>Is highlighted?</label>
 	    <div class="flexrow">
 		<input type="radio" name="hiFacet" value="yes" />
@@ -53,60 +79,14 @@
 	    </div>
 	</div>
     </div>
-    <div class="middlecolumn flexcolumn">
-	<div id="genomeView" class="flexrow">
+    <div class="middlecolumn flexcolumn spacer1">
+	<div id="genomeView" class="flexcolumn">
+	    <label>Genome View</label>
+	    <i class="material-icons button collapse"></i>
 	    <svg></svg>
 	</div>
-	<div id="zoomView" class="flexcolumn">
-	    <div class="flexrow">
-		<div class="zoomCoords flexrow">
-		    <label>Ref Genome Coords</label>
-		    <input id="zoomCoords" size="30" type="text"></input>
-		</div>
-		<div class="zoomBtns flexrow">
-		    <label>Zoom</label>
-		    <i id="zoomOutMore" class="material-icons button more" title="Zoom out more">zoom_out</i>
-		    <i id="zoomOut" class="material-icons button" title="Zoom out">zoom_out</i>
-		    <i id="zoomIn" class="material-icons button" title="Zoom in">zoom_in</i>
-		    <i id="zoomInMore" class="material-icons button more" title="Zoom in more">zoom_in</i>
-		</div>
-		<div class="panBtns flexrow">
-		    <label>Pan</label>
-		    <i id="panLeftMore" class="material-icons button more" title="Pan left more." >chevron_left</i>
-		    <i id="panLeft" class="material-icons button" title="Pan left." >chevron_left</i>
-		    <i id="panRight" class="material-icons button" title="Pan right." >chevron_right</i>
-		    <i id="panRightMore" class="material-icons button more" title="Pan right more." >chevron_right</i>
-		</div>
-	    </div>
-	    <div class="flexrow">
-
-		<!-- the SVG element for the zoom view panel -->
-		<svg></svg>
-
-	    </div>
-	</div>
-    </div>
-    <div class="rightcolumn flexcolumn">
-	<div class="flexcolumn">
-	    <span>WARNING: this part is experimental!</span>
-	    <div class="flexcolumn">
-		<label>Lookup ID/symbol</label>
-		<input id="lookup" size="30" type="text"></input>
-	    </div>
-	    <div class="flexcolumn">
-		<label>Gene function</label>
-		<input id="function" size="30" type="text"></input>
-	    </div>
-	    <div class="flexcolumn">
-		<label>Phenotype</label>
-		<input id="phenotype" size="30" type="text"></input>
-	    </div>
-	    <div class="flexcolumn">
-		<label>Disease</label>
-		<input id="disease" size="30" type="text"></input>
-	    </div>
-	</div>
 	<div class="featureDetails flexcolumn">
+	    <i class="material-icons button collapse"></i>
 	    <label>Feature details</label>
 	    <div class="genome flexrow">
 		<label>Genome</label>
@@ -141,6 +121,34 @@
 		<span></span>
 	    </div>
 	</div> <!-- end featureDetails -->
+	<div id="zoomView" class="flexcolumn">
+	    <div class="flexrow">
+		<div class="zoomCoords flexrow">
+		    <label>Ref Genome Coords</label>
+		    <input id="zoomCoords" size="30" type="text"></input>
+		</div>
+		<div class="zoomBtns flexrow">
+		    <label>Zoom</label>
+		    <i id="zoomOutMore" class="material-icons button more" title="Zoom out more">zoom_out</i>
+		    <i id="zoomOut" class="material-icons button" title="Zoom out">zoom_out</i>
+		    <i id="zoomIn" class="material-icons button" title="Zoom in">zoom_in</i>
+		    <i id="zoomInMore" class="material-icons button more" title="Zoom in more">zoom_in</i>
+		</div>
+		<div class="panBtns flexrow">
+		    <label>Pan</label>
+		    <i id="panLeftMore" class="material-icons button more" title="Pan left more." >chevron_left</i>
+		    <i id="panLeft" class="material-icons button" title="Pan left." >chevron_left</i>
+		    <i id="panRight" class="material-icons button" title="Pan right." >chevron_right</i>
+		    <i id="panRightMore" class="material-icons button more" title="Pan right more." >chevron_right</i>
+		</div>
+	    </div>
+	    <div class="flexrow">
+
+		<!-- the SVG element for the zoom view panel -->
+		<svg></svg>
+
+	    </div>
+	</div>
     </div>
 </div>
 <div class="footer">

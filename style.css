@@ -16,31 +16,51 @@ a {
 .spacer13 { flex-grow: 13; }
 
 .flexrow {
+    position: relative;
     display: flex;
     flex-direction: row;
     align-items: center;
     flex-wrap: nowrap;
 }
 
-.flexrow > * {
-    margin: 2px;
-}
-
 .flexcolumn {
+    position: relative;
     display: flex;
     flex-direction: column;
     flex-wrap: nowrap;
 }
 
-.flexcolumn > * {
+.flexcolumn > *,
+.flexrow > * {
     margin: 2px;
 }
 
-.flexcolumn.collapsible > * {
+.flexcolumn.closed > *,
+.flexrow .closed > * {
+    display: none;
 }
-.flexcolumn.collapsible > label:first-child {
+
+.flexcolumn.closed > label,
+.flexcolumn.closed > .button.collapse,
+.flexrow.closed > label,
+.flexrow.closed > .button.collapse
+{
+    display: inherit;
 }
-.flexcolumn.collapsible:hover > * {
+
+.flexcolumn > .button.collapse,
+.flexrow > .button.collapse {
+    position: absolute;
+    top: 0px;
+    right: 0px;
+}
+.flexcolumn > .button.collapse::after,
+.flexrow > .button.collapse::after {
+    content: "arrow_drop_up"
+}
+.flexcolumn.closed > .button.collapse::after,
+.flexrow .closed > .button.collapse::after {
+    content: "arrow_drop_down"
 }
 
 
@@ -81,10 +101,16 @@ line.chr {
     font-size: bigger;
 }
 
+#mgv {
+    align-items: flex-start;
+    justify-content: space-between;
+}
+
 #genomeView {
     background-color: #ccc;
     border: thin solid black;
-    align-items: flex-start;
+    align-items: center;
+    padding: 6px;
 }
 #genomeView > div {
     margin-top: 18px;
@@ -181,6 +207,7 @@ label {
     min-width: 200px;
 }
 .leftcolumn > div,
+.middlecolumn > div,
 .rightcolumn > div {
     background-color: #ccc;
     border: thin solid black;

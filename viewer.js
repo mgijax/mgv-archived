@@ -516,7 +516,7 @@ class SVGView {
     this.id = id;
     this.app = app;
     this.selector = `#${this.id} svg`;
-    this.margin = {top: 35, right: 10, bottom: 20, left: 10};
+    this.margin = {top: 20, right: 10, bottom: 20, left: 10};
     this.outerWidth = width;
     this.outerHeight = height;
     this.width = this.outerWidth - this.margin.left - this.margin.right;
@@ -1368,6 +1368,12 @@ class MGVApp {
 		    return;
 		}
 		self.setContext(coords);
+	    });
+	//
+	d3.selectAll(".button.collapse")
+	    .on("click", function () {
+		let p = d3.select(this.parentNode);
+		p.classed("closed", ! p.classed("closed"));
 	    });
 	//
 	d3.select("#zoomOut").on("click", () => this.zoom(this.defaultZoom));
