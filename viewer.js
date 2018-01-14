@@ -185,9 +185,9 @@ class FeatureManager {
 	let dataString = `genome=${genome.name}&coords=${coordsArg}`;
 	let url = "./bin/getFeatures.cgi?" + dataString;
 	let self = this;
-	console.log("Requesting:", genome.name, newranges);
+	//console.log("Requesting:", genome.name, newranges);
 	return d3json(url).then(function(blocks){
-	    console.log("Transferred:", genome.name, blocks);
+	    //console.log("Transferred:", genome.name, blocks);
 	    blocks.forEach( b => self._registerBlock(genome, b) );
 	});
     }
@@ -513,21 +513,36 @@ class BTManager {
 // ---------------------------------------------
 class SVGView {
   constructor (id, width, height, app) {
-    this.id = id;
     this.app = app;
+    this.id = id;
+    this.container = d3.select(`#${this.id}`);
     this.selector = `#${this.id} svg`;
-    this.margin = {top: 20, right: 10, bottom: 20, left: 10};
-    this.outerWidth = width;
-    this.outerHeight = height;
-    this.width = this.outerWidth - this.margin.left - this.margin.right;
-    this.height = this.outerHeight - this.margin.top - this.margin.bottom;
     this.svg = d3.select(this.selector)
+          .append("g")    // the margin-transated group
+          .append("g");	  // main group for the drawing
+    this.setSize(width, height, {top: 20, right: 10, bottom: 20, left: 10});
+  }
+  setSize (width, height, margin) {
+    this.outerWidth  = width  || this.outerWidth;
+    this.outerHeight = height || this.outerHeight;
+    this.margin      = margin || this.margin;
+    //
+    this.width  = this.outerWidth  - this.margin.left - this.margin.right;
+    this.height = this.outerHeight - this.margin.top  - this.margin.bottom;
+    //
+    d3.select(this.selector)
             .attr("width", this.outerWidth)
             .attr("height", this.outerHeight)
-          .append("g")
-            .attr("transform", `translate(${this.margin.left},${this.margin.top})`)
-          .append("g");
+          .select("g")
+            .attr("transform", `translate(${this.margin.left},${this.margin.top})`);
   }
+  // Args:
+  //   the window width
+  fitToWidth (width) {
+      let r = this.svg[0][0].getBoundingClientRect();
+      this.setSize(width - r.x)
+  }
+
 } // end class SVGView
 
 // ---------------------------------------------
@@ -591,6 +606,23 @@ class GenomeView extends SVGView {
 	let self = this;
 	let gdata = this.app.rGenome;
 	let xf = function(d){return self.bwidth+gdata.xscale(d.name);};
+
+	    //
+	    gdata.xscale = d3.scale.ordinal()
+		 .domain(gdata.chromosomes.map(function(x){return x.name;}))
+		 .rangePoints([0, this.width],2);
+	    gdata.yscale = d3.scale.linear()
+	         .domain([1,gdata.maxlen])
+		 .range([0, this.height]);
+
+	    gdata.chromosomes.forEach(chr => {
+		var sc = d3.scale.linear()
+		    .domain([1,chr.length])
+		    .range([0, gdata.yscale(chr.length)]);
+		chr.brush = d3.svg.brush().y(sc)
+		   .on("brushstart", chr => this.brushstart(chr))
+		   .on("brushend", () => this.brushend());
+	      }, this);
 
 	// Group to hold synteny blocks. Want this first so everything else overlays it.
 	let sygp = this.svg.selectAll('g[name="synBlocks"]').data([0]);
@@ -1411,8 +1443,8 @@ class MGVApp {
 	    initOptList("#refGenome",   this.allGenomes, g=>g.name, g=>g.label, false, g => g.label === cfg.ref);
 	    initOptList("#compGenomes", this.allGenomes, g=>g.name, g=>g.label, true, g => cfg.comps.indexOf(g.label) >= 0);
 	    //
-	    d3.select("#refGenome").on("change", () => this.go());
-	    d3.select("#compGenomes").on("change", () => this.go());
+	    d3.select("#refGenome").on("change", () => this.draw());
+	    d3.select("#compGenomes").on("change", () => this.draw());
 	    //
 	    // Preload all the chromosome files for all the genomes
 	    let cdps = this.allGenomes.map(g => d3tsv(`./data/genomedata/${g.name}-chromosomes.tsv`));
@@ -1420,11 +1452,17 @@ class MGVApp {
 	}.bind(this))
 	.then(function (data) {
 	    this.processChromosomes(data);
-	    this.go();
+	    this.draw();
 	}.bind(this));
     }
     //----------------------------------------------
-    go () {
+    resize (width, height) {
+        this.genomeView.fitToWidth(width-6);
+        this.zoomView.fitToWidth(width-6);
+	this.draw();
+    }
+    //----------------------------------------------
+    draw () {
 	let ref = d3.select("#refGenome")[0][0].value;
 	let comps = [];
 	for(let x of d3.select("#compGenomes")[0][0].selectedOptions){
@@ -1602,38 +1640,22 @@ class MGVApp {
 	this.allGenomes.forEach((g,i) => {
 	    // nicely sort the chromosomes
 	    let chrs = d[i];
-	    let maxlen = 0;
+	    g.maxlen = 0;
 	    chrs.forEach( c => {
 		//
 		c.length = parseInt(c.length)
-		// because I'd rather say "c.name" than "c.chromosome"
+		g.maxlen = Math.max(g.maxlen, c.length);
+		// because I'd rather say "chromosome.name" than "chromosome.chromosome"
 		c.name = c.chromosome;
 		delete c.chromosome;
-		//
-		c.scale = d3.scale.linear().domain([1, c.length]).range([0, this.genomeView.height]);
-		maxlen = Math.max(maxlen, c.length);
 	    });
+	    // nicely sort the chromosomes
 	    chrs.sort((a,b) => {
 		let aa = parseInt(a.name) - parseInt(b.name);
 		if (!isNaN(aa)) return aa;
 		return a.name < b.name ? -1 : a.name > b.name ? +1 : 0;
 	    });
-	    let xs = d3.scale.ordinal()
-		   .domain(chrs.map(function(x){return x.name;}))
-		   .rangePoints([0, this.genomeView.width],2);
-	    let ys = d3.scale.linear().domain([1,maxlen]).range([0, this.genomeView.height]);
-
-	    chrs.forEach(function(chr){
-		var sc = d3.scale.linear().domain([1,chr.length]).range([0, ys(chr.length)]);
-		chr.brush = d3.svg.brush().y(sc)
-		   .on("brushstart", chr => this.genomeView.brushstart(chr))
-		   .on("brushend", () => this.genomeView.brushend());
-	      }, this);
 	    g.chromosomes = chrs;
-	    g.maxlen = maxlen;
-	    g.xscale = xs;
-	    g.yscale = ys;
-	    g.zoomY  = -1;
 	});
     }
     //----------------------------------------------
@@ -1805,21 +1827,42 @@ function pqstring (qstring) {
     return cfg;
 }
 
+// Behold, the MGV application object...
 let mgv = null;
+
+// The main program, wherein the app is created and wired to the browser. 
+// ALL dependencies on the browser environment are confined to this function.
+//
 function __main__ () {
-    let qstring = window.location.hash.substring(1);
+    // Callback to pass into the app to register changes in context.
+    // Uses the current app context to set the hash part of the
+    // browser's location. This also registers the change in 
+    // the browser history.
     function setHash () {
+	// don't want to trigger an infinite loop here!
+	// temporarily disable popstate handler
 	let f = window.onpopstate;
 	window.onpopstate = null;
+	// now set the hash
 	window.location.hash = mgv.getParamString();
+	// re-enable
 	window.onpopstate = f;
     }
+    // Handler called when user clicks the browser's back or forward buttons.
+    // Sets the app's context based on the hash part of the browser's
+    // location.
     window.onpopstate = function(event) {
-	let qstring = document.location.hash.substring(1)
-	let cfg = pqstring(qstring);
+	let cfg = pqstring(document.location.hash.substring(1));
 	mgv.setContext(cfg);
     };
+    // get initial set of context params 
+    let qstring = window.location.hash.substring(1);
+
+    // create the app
     mgv = new MGVApp(pqstring(qstring), setHash );
+    
+    // handle resize events
+    window.onresize = () => mgv.resize(window.innerWidth, window.innerHeight);
 }
 
 __main__();
