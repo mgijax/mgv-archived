@@ -206,6 +206,11 @@ class FeatureManager {
     }
 
     //----------------------------------------------
+    getCachedFeaturesByMgiId (mgiid) {
+        return this.mgiCache[mgiid] || [];
+    }
+
+    //----------------------------------------------
     // This is what the user calls. Returns (a promise for) the features in 
     // the specified ranges of the specified genome.
     getFeatures (genome, ranges) {
@@ -741,7 +746,10 @@ class GenomeView extends SVGView {
 	let rects = bgrp.selectAll("rect.sblock")
 	    .data(d => d.blocks, b => b.blockId);
 	rects.enter().append("rect")
-	    .attr("class","sblock");
+	    .attr("class", "sblock")
+	    .classed("inversion", b => b.ori === "-")
+	    .classed("translocation", b => b.fromChr !== b.toChr)
+	    ;
 	rects.exit().remove();
 	//
 	let bwidth = 10;
@@ -749,7 +757,8 @@ class GenomeView extends SVGView {
 	    .attr("x", b => this.getX(b.fromChr) + (b.ori === "+" ? bwidth : 0))
 	    .attr("y", b => this.getY(b.fromStart))
 	    .attr("width", bwidth)
-	    .attr("height", b => this.getY(b.fromEnd - b.fromStart + 1));
+	    .attr("height", b => this.getY(b.fromEnd - b.fromStart + 1))
+	    ;
 
 	let subt = `vs ${blockData.comp.label}`;
 	this.drawTitle(null, blockData.ref===blockData.comp ? null : subt);
@@ -931,6 +940,8 @@ class ZoomView extends SVGView {
 	//
 	this.svg.selectAll('.zoomStrip')
 	    .classed("highlighted", d => d.genome === g);
+	this.svg.selectAll('.zoomStripShadow')
+	    .classed("highlighted", d => d.genome === g);
 	//
 	let ref = this.app.rGenome;
 	let blks = g === ref ? [] : this.app.translator.getBlocks(ref, g);
@@ -991,10 +1002,10 @@ class ZoomView extends SVGView {
 		  .selectAll("g.zoomStrip")
 		  .data(data, d => d.genome.name);
 	let newZrs = zrs.enter()
-	    .append("svg:g")
+	    .append("g")
 		.attr("class", "zoomStrip")
 		.attr("name", d => d.genome.name)
-		.on("mouseover", function (g) {
+		.on("click", function (g) {
 		    self.highlightStrip(g.genome, this);
 		});
 	zrs.exit().remove();
@@ -1064,6 +1075,19 @@ class ZoomView extends SVGView {
 	  .attr("width", b=>b.xscale(b.end)-b.xscale(b.start))
 	  .attr("height",this.blockHeight);
 
+	// Draw the rectangle for the entire strip (ie be able to outline whole strip for that genome)
+	let zsRects = this.svg.select("g.fiducials")
+	    .selectAll("rect.zoomStripShadow")
+	    .data(data, d => d.genome.name);
+	zsRects.enter().append("rect").attr("class","zoomStripShadow");
+	zsRects.exit().remove();
+	zsRects
+	    .attr("x", -15)
+	    .attr("y", d => d.genome.zoomY - this.blockHeight / 2)
+	    .attr("width", 15)
+	    .attr("height", this.blockHeight)
+	    ;
+
 	// axis line
 	zbs.select("line.axis")
 	    .attr("x1", b => b.xscale.range()[0])
@@ -1104,7 +1128,6 @@ class ZoomView extends SVGView {
 	    .style("fill", f => self.app.cscale(f.getMungedType()))
 	    .on("mouseover", function(f){
 		self.highlight(this);
-		self.updateFeatureDetails(f);
 	    })
 	    .on("mouseout", function(f){
 		self.highlight();
@@ -1188,25 +1211,9 @@ class ZoomView extends SVGView {
 	    data.push({ fid: k, rects: pairs, cls: (f && f.id === k ? 'current' : '') });
 	}
 	this.drawFiducials(data);
+	f && this.app.updateFeatureDetails(f);
     }
 
-    //----------------------------------------------
-    updateFeatureDetails (f) {
-	let fd = d3.select('.featureDetails');
-	fd.select('.genome span').text(f.genome.label)
-	fd.select('.coordinates span').text(`${f.chr}:${f.start}..${f.end} (${f.strand})`)
-	fd.select('.length span').text(`${f.end - f.start + 1} bp`)
-	fd.select('.mgpid span').text(f.mgpid)
-	fd.select('.type span').text(f.type)
-	fd.select('.biotype span').text(f.biotype)
-	if (f.mgiid) {
-	    let lnk = `<a target="_blank" href="http://www.informatics.jax.org/accession/${f.mgiid}">${f.mgiid}</a>`;
-	    fd.select('.mgiid span').html(lnk);
-	}
-	else
-	    fd.select('.mgiid span').text("");
-	fd.select('.symbol span').text(f.symbol)
-    }
     //----------------------------------------------
     // Draws polygons that connect highlighted features in the view
     // Args:
@@ -1328,12 +1335,12 @@ class FacetManager {
 
 // ---------------------------------------------
 class MGVApp {
-    constructor (cfg, callback) {
+    constructor (cfg) {
 	//
 	//console.log("MGVApp. cfg=", cfg);
 	let self = this;
 	//
-	this.callback = callback;
+	this.callback = (cfg.oncontextchange || function(){});
 	//
 	this.name2genome = {}; // map from genome name -> genome data obj
 	this.label2genome = {}; // map from genome label -> genome data obj
@@ -1403,10 +1410,13 @@ class MGVApp {
 	    });
 	//
 	d3.selectAll(".button.collapse")
-	    .on("click", function () {
+	    .on("click.default", function () {
 		let p = d3.select(this.parentNode);
 		p.classed("closed", ! p.classed("closed"));
 	    });
+	d3.select("#featureDetails .button.collapse")
+	    .on("click.extra", () => this.updateFeatureDetails());
+
 	//
 	d3.select("#zoomOut").on("click", () => this.zoom(this.defaultZoom));
 	d3.select("#zoomIn") .on("click", () => this.zoom(1/this.defaultZoom));
@@ -1452,13 +1462,19 @@ class MGVApp {
 	}.bind(this))
 	.then(function (data) {
 	    this.processChromosomes(data);
+	    //
+	    // FINALLY! We are ready to draw the initial scene.
+	    //
 	    this.draw();
+	    // the first time we draw, resize to the dimensions passed in the config
+	    this.resize( cfg.width, cfg.height );
+	    //
 	}.bind(this));
     }
     //----------------------------------------------
     resize (width, height) {
-        this.genomeView.fitToWidth(width-6);
-        this.zoomView.fitToWidth(width-6);
+        this.genomeView.fitToWidth(width-24);
+        this.zoomView.fitToWidth(width-24);
 	this.draw();
     }
     //----------------------------------------------
@@ -1470,6 +1486,78 @@ class MGVApp {
 	}
 	let c = parseCoords(d3.select("#zoomCoords")[0][0].value);
 	this.setContext({ref, comps, chr:c.chr, start:c.start, end: c.end});
+    }
+    //----------------------------------------------
+    updateFeatureDetails (f) {
+
+	// if call with no args, update using the previous feature
+	f = f || this.lastFeature;
+	// remember
+	this.lastFeature = f;
+
+	// list of features to show in details area.
+	// the given feature and all equivalents in other genomes.
+	let flist = [f];
+	if (f.mgiid) {
+	    flist = this.featureManager.getCachedFeaturesByMgiId(f.mgiid);
+	}
+	// Got the list. Now order it the same as the displayed genomes
+	// build index of genome name -> feature in flist
+	let ix = flist.reduce((acc,f) => { acc[f.genome.name] = f; return acc; }, {})
+	let genomeOrder = ([this.rGenome].concat(this.cGenomes));
+	flist = genomeOrder.map(g => ix[g.name] || null);
+	//
+	let colHeaders = [
+	    // columns headers and their % widths
+	    ["Genome"     ,10],
+	    ["MGP id"     ,17],
+	    ["Type"       ,12.5],
+	    ["BioType"    ,12.5],
+	    ["Coords"     ,18],
+	    ["Length"     ,10],
+	    ["MGI id"     ,10],
+	    ["MGI symbol" ,10]
+	];
+	//
+	let fds = d3.select('#featureDetails');
+	// In the closed state, only show the header and the row for the passed feature
+	if (fds.classed('closed'))
+	    flist = flist.filter( (ff, i) => ff === f );
+	// Draw the table
+	let t = d3.select('#featureDetails > table');
+	let rows = t.selectAll('tr').data( [colHeaders].concat(flist) );
+	rows.enter().append('tr');
+	rows.exit().remove();
+	//
+        rows
+	  .classed("highlight", (ff, i) => (i !== 0 && ff === f))
+	  .html( (f,i) => {
+	    if (i === 0) {
+		let colHeaders = f;
+	        return colHeaders.map( h => `<th style="width: ${h[1]}%">${h[0]}</th>` ).join('');
+	    }
+	    let cellData = [ genomeOrder[i-1].label, ".", ".", ".", ".", ".", ".", "." ];
+	    if (f) {
+		let link = "";
+		let mgiid = f.mgiid || "";
+		if (mgiid) {
+		    let url = `http://www.informatics.jax.org/accession/${mgiid}`;
+		    link = `<a target="_blank" href="${url}">${mgiid}</a>`;
+		}
+		cellData = [
+		    f.genome.label,
+		    f.mgpid,
+		    f.type,
+		    f.biotype,
+		    `${f.chr}:${f.start}..${f.end} (${f.strand})`,
+		    `${f.end - f.start + 1} bp`,
+		    link || mgiid,
+		    f.symbol
+		];
+	    }
+	    return cellData.map( d => `<td>${d}</td>` ).join('');
+	})
+	;
     }
     //----------------------------------------------
     // Returns the current context as a parameter string
@@ -1857,9 +1945,13 @@ function __main__ () {
     };
     // get initial set of context params 
     let qstring = window.location.hash.substring(1);
+    let cfg = pqstring(qstring);
+    cfg.width = window.innerWidth;
+    cfg.height= window.innerHeight;
+    cfg.oncontextchange = setHash;
 
     // create the app
-    mgv = new MGVApp(pqstring(qstring), setHash );
+    mgv = new MGVApp(cfg);
     
     // handle resize events
     window.onresize = () => mgv.resize(window.innerWidth, window.innerHeight);

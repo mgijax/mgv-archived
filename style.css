@@ -72,10 +72,10 @@ line.chr {
     text-anchor : middle;
 }
 
-.featureDetails {
+#featureDetails {
     font-size: 12px;
 }
-.featureDetails > .flexrow > label {
+#featureDetails > .flexrow > label {
     width: 32%;
 }
 
@@ -124,9 +124,15 @@ line.chr {
 #genomeView svg line.feature {
     stroke: black;
 }
-#genomeView svg g[name="synBlocks"] rect.sblock {
-    fill: #828282;
+#genomeView .sblock {
+    fill: #bbb;
     stroke: none;
+}
+#genomeView .sblock.inversion {
+}
+#genomeView .sblock.translocation {
+    fill: blue;
+    stroke: blue;
 }
 #genomeView svg .title {
 }
@@ -139,7 +145,6 @@ line.chr {
     border: thin solid black;
 }
 .zoomStrip.highlighted > text {
-   font-size: 16px;
 }
 .zoomStrip line {
     stroke: #aaa;
@@ -155,6 +160,12 @@ line.chr {
 }
 .zoomBlock text {
    font-size: 12px;
+}
+rect.zoomStripShadow {
+   fill: none;
+}
+rect.zoomStripShadow.highlighted {
+   fill: white;
 }
 
 
@@ -193,11 +204,26 @@ label {
     font-size: 16px;
 }
 
-.featureDetails div label {
+#featureDetails > table {
+    font-size: 10px;
+    width: 100%;
+    table-layout: fixed;
+}
+#featureDetails > table tr.highlight {
+    background-color: #eee;
+}
+#featureDetails div label {
     font-size: 12px;
 }
-.featureDetails div span {
+#featureDetails div span {
     white-space: nowrap;
+}
+#featureDetails.closed {
+    flex-direction: row;
+}
+#featureDetails.closed > table {
+    display: inline-table;
+    width: 90%;
 }
 
 .leftcolumn {
