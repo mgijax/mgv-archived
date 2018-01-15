@@ -610,24 +610,23 @@ class GenomeView extends SVGView {
 
 	let self = this;
 	let gdata = this.app.rGenome;
-	let xf = function(d){return self.bwidth+gdata.xscale(d.name);};
 
-	    //
-	    gdata.xscale = d3.scale.ordinal()
-		 .domain(gdata.chromosomes.map(function(x){return x.name;}))
-		 .rangePoints([0, this.width],2);
-	    gdata.yscale = d3.scale.linear()
-	         .domain([1,gdata.maxlen])
-		 .range([0, this.height]);
+	//
+	gdata.xscale = d3.scale.ordinal()
+	     .domain(gdata.chromosomes.map(function(x){return x.name;}))
+	     .rangePoints([0, this.width], 0.5);
+	gdata.yscale = d3.scale.linear()
+	     .domain([1,gdata.maxlen])
+	     .range([0, this.height]);
 
-	    gdata.chromosomes.forEach(chr => {
-		var sc = d3.scale.linear()
-		    .domain([1,chr.length])
-		    .range([0, gdata.yscale(chr.length)]);
-		chr.brush = d3.svg.brush().y(sc)
-		   .on("brushstart", chr => this.brushstart(chr))
-		   .on("brushend", () => this.brushend());
-	      }, this);
+	gdata.chromosomes.forEach(chr => {
+	    var sc = d3.scale.linear()
+		.domain([1,chr.length])
+		.range([0, gdata.yscale(chr.length)]);
+	    chr.brush = d3.svg.brush().y(sc)
+	       .on("brushstart", chr => this.brushstart(chr))
+	       .on("brushend", () => this.brushend());
+	  }, this);
 
 	// Group to hold synteny blocks. Want this first so everything else overlays it.
 	let sygp = this.svg.selectAll('g[name="synBlocks"]').data([0]);
@@ -640,6 +639,7 @@ class GenomeView extends SVGView {
 	bbgp.enter().append("g").attr("name","backbones");
 	bbgp.exit().remove();
         // now the lines
+	let xf = function(d){return self.bwidth+gdata.xscale(d.name);};
 	let ccels = bbgp.selectAll('line.chr')
 	  .data(gdata.chromosomes, function(x){return x.name;});
 	ccels.exit().transition().duration(this.app.dur)
@@ -1211,7 +1211,7 @@ class ZoomView extends SVGView {
 	    data.push({ fid: k, rects: pairs, cls: (f && f.id === k ? 'current' : '') });
 	}
 	this.drawFiducials(data);
-	f && this.app.updateFeatureDetails(f);
+	this.app.updateFeatureDetails(f);
     }
 
     //----------------------------------------------
@@ -1461,21 +1461,16 @@ class MGVApp {
 	    return Promise.all(cdps);
 	}.bind(this))
 	.then(function (data) {
+
 	    this.processChromosomes(data);
-	    //
+
 	    // FINALLY! We are ready to draw the initial scene.
-	    //
 	    this.draw();
+
 	    // the first time we draw, resize to the dimensions passed in the config
 	    this.resize( cfg.width, cfg.height );
-	    //
+
 	}.bind(this));
-    }
-    //----------------------------------------------
-    resize (width, height) {
-        this.genomeView.fitToWidth(width-24);
-        this.zoomView.fitToWidth(width-24);
-	this.draw();
     }
     //----------------------------------------------
     draw () {
@@ -1488,11 +1483,23 @@ class MGVApp {
 	this.setContext({ref, comps, chr:c.chr, start:c.start, end: c.end});
     }
     //----------------------------------------------
+    resize (width, height) {
+        this.genomeView.fitToWidth(width-24);
+        this.zoomView.fitToWidth(width-24);
+	this.draw();
+    }
+    //----------------------------------------------
     updateFeatureDetails (f) {
 
 	// if call with no args, update using the previous feature
 	f = f || this.lastFeature;
+	if (!f) {
+	   let r = this.zoomView.svg.select("rect.feature.highlight")[0][0];
+	   if (!r) r = this.zoomView.svg.select("rect.feature")[0][0];
+	   if (r) f = r.__data__;
+	}
 	// remember
+        if (!f) throw "Cannot update feature details. No feature.";
 	this.lastFeature = f;
 
 	// list of features to show in details area.
@@ -1537,6 +1544,7 @@ class MGVApp {
 	        return colHeaders.map( h => `<th style="width: ${h[1]}%">${h[0]}</th>` ).join('');
 	    }
 	    let cellData = [ genomeOrder[i-1].label, ".", ".", ".", ".", ".", ".", "." ];
+	    // f is null if it doesn't exist for genome i 
 	    if (f) {
 		let link = "";
 		let mgiid = f.mgiid || "";

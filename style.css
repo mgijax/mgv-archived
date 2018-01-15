@@ -209,6 +209,9 @@ label {
     width: 100%;
     table-layout: fixed;
 }
+#featureDetails > table th {
+    text-align: left;
+}
 #featureDetails > table tr.highlight {
     background-color: #eee;
 }
