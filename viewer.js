@@ -707,8 +707,8 @@ class GenomeView extends SVGView {
 	this.drawTitle();
 	    
 	//
-	if (tickData) this.drawTicks(tickData);
-	if (blockData) this.drawBlocks(blockData);
+	this.drawTicks(tickData);
+	this.drawBlocks(blockData);
     }
 
     // ---------------------------------------------
@@ -734,6 +734,7 @@ class GenomeView extends SVGView {
     // ---------------------------------------------
     // Draws the outlines of synteny blocks of the ref genome vs.
     // the given genome.
+    // Passing null erases all synteny blocks.
     // Args:
     //    blockData == { ref:Genome, comp:Genome, blocks: list of synteny blocks }
     drawBlocks (blockData) {
@@ -742,6 +743,11 @@ class GenomeView extends SVGView {
 	    .select('g[name="synBlocks"]')
 	    .datum(blockData);
 	
+	if (!blockData) {
+	    bgrp.selectAll("rect.sblock").remove();
+	    return;
+	}
+
 	// now the rects
 	let rects = bgrp.selectAll("rect.sblock")
 	    .data(d => d.blocks, b => b.blockId);
@@ -769,6 +775,10 @@ class GenomeView extends SVGView {
 	let gdata = this.app.rGenome;
 	// feature tick marks
 	let tickLength = 10;
+	if (!data) {
+	    this.svg.selectAll("line.feature").remove();
+	    return;
+	}
         let feats = this.svg.selectAll("line.feature")
 	    .data(data||[], d => d.mgiid);
 	let nfs = feats.enter()
@@ -1417,20 +1427,24 @@ class MGVApp {
 	d3.select("#featureDetails .button.collapse")
 	    .on("click.extra", () => this.updateFeatureDetails());
 
-	//
+	// zoom controls
 	d3.select("#zoomOut").on("click", () => this.zoom(this.defaultZoom));
 	d3.select("#zoomIn") .on("click", () => this.zoom(1/this.defaultZoom));
 	d3.select("#zoomOutMore").on("click", () => this.zoom(2*this.defaultZoom));
 	d3.select("#zoomInMore") .on("click", () => this.zoom(1/(2*this.defaultZoom)));
-	//
+
+	// pan controls
 	d3.select("#panLeft") .on("click", () => this.pan(-this.defaultPan));
 	d3.select("#panRight").on("click", () => this.pan(+this.defaultPan));
 	d3.select("#panLeftMore") .on("click", () => this.pan(-5*this.defaultPan));
 	d3.select("#panRightMore").on("click", () => this.pan(+5*this.defaultPan));
-	// Initial highlighted set 
+
+	// initial highlighted features 
 	(cfg.highlight || []).forEach(h => this.zoomView.hiFeats[h]=h);
+
 	// ------------------------------
 	// ------------------------------
+	// Query boxes (experimental)
 	let pfs = function(ffun, s) {
 	    self.auxDataManager[ffun](s)
 	      .then(feats => {
@@ -1444,12 +1458,20 @@ class MGVApp {
 	d3.select("#disease")  .on("change", function () { pfs("featuresByDisease",   this.value) });
 	// ------------------------------
 	// ------------------------------
-	//
-	d3tsv("./data/genomeList.tsv").then(function(data){
-	    this.allGenomes   = data.map(g => new Genome(g));
-	    this.name2genome  = this.allGenomes.reduce((acc,g) => { acc[g.name] = g; return acc; }, {});
-	    this.label2genome = this.allGenomes.reduce((acc,g) => { acc[g.label] = g; return acc; }, {});
 
+	// Things are all wired up. Now lets get some data.
+	// Start with the file of all the genomes.
+	d3tsv("./data/genomeList.tsv").then(function(data){
+	    // create Genome objects from the raw data.
+	    this.allGenomes   = data.map(g => new Genome(g));
+	    // build a name->Genome index
+	    this.name2genome  = this.allGenomes
+	        .reduce((acc,g) => { acc[g.name] = g; return acc; }, {});
+	    // build a label->Genome index
+	    this.label2genome = this.allGenomes
+	        .reduce((acc,g) => { acc[g.label] = g; return acc; }, {});
+
+	    // initialize the ref and comp genome option lists
 	    initOptList("#refGenome",   this.allGenomes, g=>g.name, g=>g.label, false, g => g.label === cfg.ref);
 	    initOptList("#compGenomes", this.allGenomes, g=>g.name, g=>g.label, true, g => cfg.comps.indexOf(g.label) >= 0);
 	    //
@@ -1604,6 +1626,7 @@ class MGVApp {
 	// ref genome
 	let rg = this.name2genome[cfg.ref] || this.label2genome[cfg.ref];
 	if (rg && rg !== this.rGenome){
+	    // change the ref genome
 	    this.rGenome = rg;
 	    this.genomeView.draw();
 	    changed = true;
@@ -1611,6 +1634,7 @@ class MGVApp {
 
 	// comp genomes
 	if (cfg.comps) {
+	    // change comparison genomes
 	    let cgs = [];
 	    for( let x of cfg.comps ) {
 		let cg = this.name2genome[x] || this.label2genome[x];
