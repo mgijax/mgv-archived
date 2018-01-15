@@ -1471,11 +1471,26 @@ class MGVApp {
 	    this.label2genome = this.allGenomes
 	        .reduce((acc,g) => { acc[g.label] = g; return acc; }, {});
 
+	    // Initializes the comparison genomes <select> list. 
+	    // The main thing
+	    // is to be sure the currently selected ref genome is not 
+	    // in the comparison genome list.
+	    function initCompGenomesList(selected) {
+		let rg = d3.select("#refGenome").property("selectedOptions")[0];
+		let cgs = self.allGenomes.filter(g => g.label !== rg.innerText);
+		initOptList("#compGenomes", cgs, g=>g.name, g=>g.label, true, d => false, selected );
+	    }
+
 	    // initialize the ref and comp genome option lists
 	    initOptList("#refGenome",   this.allGenomes, g=>g.name, g=>g.label, false, g => g.label === cfg.ref);
-	    initOptList("#compGenomes", this.allGenomes, g=>g.name, g=>g.label, true, g => cfg.comps.indexOf(g.label) >= 0);
+	    initCompGenomesList(function (g) { return cfg.comps.indexOf(g.label) >= 0 });
 	    //
-	    d3.select("#refGenome").on("change", () => this.draw());
+	    d3.select("#refGenome").on("change", () => {
+		// whenever the user changes the reference genome, reinitialize the 
+		// comparison genomes list and redraw
+		initCompGenomesList();
+	        this.draw();
+	    });
 	    d3.select("#compGenomes").on("change", () => this.draw());
 	    //
 	    // Preload all the chromosome files for all the genomes
@@ -1505,10 +1520,104 @@ class MGVApp {
 	this.setContext({ref, comps, chr:c.chr, start:c.start, end: c.end});
     }
     //----------------------------------------------
+    setRefGenome (g) {
+	//
+	if (!g) return false;
+	//
+	let rg = this.name2genome[g] || this.label2genome[g];
+	if (rg && rg !== this.rGenome){
+	    // change the ref genome
+	    this.rGenome = rg;
+	    this.genomeView.draw();
+	    return true;
+	}
+	return false;
+    }
+    //----------------------------------------------
+    // Sets or returns
+    setCompGenomes (glist) {
+        //
+        if (!glist) return false;
+	// 
+	let cgs = [];
+	for( let x of glist ) {
+	    let cg = this.name2genome[x] || this.label2genome[x];
+	    cg && cgs.push(cg);
+	}
+	// compare contents of cgs with the current cGenomes.
+	if (same(cgs, this.cGenomes)) return false;
+
+	//
+	this.cGenomes = cgs;
+	return true;
+    }
+    //----------------------------------------------
+    // Sets the current context from the config object
+    //
+    setContext (cfg) {
+
+	//console.log("SET CONTEXT", cfg);
+
+	let changed = false;
+	// ref genome
+	changed = this.setRefGenome(cfg.ref);
+	changed = changed || this.setCompGenomes(cfg.comps)
+
+	// comp genomes
+
+	// coordinates
+	let coords = this.sanitizeCoords({ chr: cfg.chr, start: cfg.start, end: cfg.end });
+	if (coords) {
+	    this.coords = coords;
+	    changed = true;
+	}
+	else
+	    coords = this.coords;
+
+	// highlighted features
+	let hls = cfg.highlight;
+	if (hls) {
+	    this.zoomView.hiFeats = hls.reduce((a,v) => { a[v]=v; return a; }, {});
+	    changed = true;
+	}
+	
+	//
+	if (changed) {
+	    this.genomeView.setBrushCoords(coords);
+	    this.zoomView.update(coords)
+	    this.callback();
+	}
+    }
+    //----------------------------------------------
     resize (width, height) {
         this.genomeView.fitToWidth(width-24);
         this.zoomView.fitToWidth(width-24);
 	this.draw();
+    }
+    //----------------------------------------------
+    // Returns the current context as a parameter string
+    // Current context = ref genome + comp genomes + current range (chr,start,end)
+    getParamString () {
+	let c = this.getContext();
+        let ref = `ref=${c.ref}`;
+        let comps = `comps=${c.comps.join("+")}`;
+	let coords = `chr=${c.chr}&start=${c.start}&end=${c.end}`;
+	let hls = `highlight=${c.highlight.join("+")}`;
+	return `${ref}&${comps}&${coords}&${hls}`;
+    }
+    //----------------------------------------------
+    // Returns the current context as an object.
+    // Current context = ref genome + comp genomes + current range (chr,start,end)
+    getContext () {
+        let c = this.zoomView.coords;
+        return {
+	    ref : this.rGenome.label,
+	    comps: this.cGenomes.map(g => g.label),
+	    chr: c.chr,
+	    start: c.start,
+	    end: c.end,
+	    highlight: Object.keys(this.zoomView.hiFeats)
+	}
     }
     //----------------------------------------------
     updateFeatureDetails (f) {
@@ -1589,84 +1698,7 @@ class MGVApp {
 	})
 	;
     }
-    //----------------------------------------------
-    // Returns the current context as a parameter string
-    // Current context = ref genome + comp genomes + current range (chr,start,end)
-    getParamString () {
-	let c = this.getContext();
-        let ref = `ref=${c.ref}`;
-        let comps = `comps=${c.comps.join("+")}`;
-	let coords = `chr=${c.chr}&start=${c.start}&end=${c.end}`;
-	let hls = `highlight=${c.highlight.join("+")}`;
-	return `${ref}&${comps}&${coords}&${hls}`;
-    }
-    //----------------------------------------------
-    // Returns the current context as an object.
-    // Current context = ref genome + comp genomes + current range (chr,start,end)
-    getContext () {
-        let c = this.zoomView.coords;
-        return {
-	    ref : this.rGenome.label,
-	    comps: this.cGenomes.map(g => g.label),
-	    chr: c.chr,
-	    start: c.start,
-	    end: c.end,
-	    highlight: Object.keys(this.zoomView.hiFeats)
-	}
-    }
 
-    //----------------------------------------------
-    // Sets the current context from the config object
-    //
-    setContext (cfg) {
-
-	//console.log("SET CONTEXT", cfg);
-
-	let changed = false;
-	// ref genome
-	let rg = this.name2genome[cfg.ref] || this.label2genome[cfg.ref];
-	if (rg && rg !== this.rGenome){
-	    // change the ref genome
-	    this.rGenome = rg;
-	    this.genomeView.draw();
-	    changed = true;
-	}
-
-	// comp genomes
-	if (cfg.comps) {
-	    // change comparison genomes
-	    let cgs = [];
-	    for( let x of cfg.comps ) {
-		let cg = this.name2genome[x] || this.label2genome[x];
-		cg && cgs.push(cg);
-	    }
-	    this.cGenomes = cgs;
-	    changed = true;
-	}
-
-	// coordinates
-	let coords = this.sanitizeCoords({ chr: cfg.chr, start: cfg.start, end: cfg.end });
-	if (coords) {
-	    this.coords = coords;
-	    changed = true;
-	}
-	else
-	    coords = this.coords;
-
-	// highlighted features
-	let hls = cfg.highlight;
-	if (hls) {
-	    this.zoomView.hiFeats = hls.reduce((a,v) => { a[v]=v; return a; }, {});
-	    changed = true;
-	}
-	
-	//
-	if (changed) {
-	    this.genomeView.setBrushCoords(coords);
-	    this.zoomView.update(coords)
-	    this.callback();
-	}
-    }
 
     //----------------------------------------------
     sanitizeCoords(coords) {
@@ -1790,31 +1822,51 @@ class MGVApp {
 // =============================================
 
 // ---------------------------------------------
-// Initializes an option list.
+// (Re-)Initializes an option list.
 // Args:
 //   selector (string) CSS selector of the container <select> element.
 //   opts (list) List of option data objects. May be simple strings. May be more complex.
-//   value (function or null) Function to produce the option value for the option data obj.
+//   value (function or null) Function to produce the <option> value from an opts item
 //       Defaults to the identity function (x=>x).
-//   title (function or null) Function to produce the option label for the option data obj.
+//   label (function or null) Function to produce the <option> label from an opts item
 //       Defaults to the value function.
 //   multi (boolean) Specifies if the list support multiple selections. (default = false)
-//   selected (function or null) Function to determine if a given option is selectd. (default function returns false)
+//   selected (function or null) Function to determine if a given option is selectd.
+//       Defaults to d=>False. Note that this function is only applied to new options.
 // Returns:
 //   The option list in a D3 selection.
-function initOptList( selector, opts, value, text, multi, selected ) {
-    let s = d3.select(selector);
-    s.property('multiple', multi || null) ;
-    let os = s.selectAll("option").data(opts);
+function initOptList( selector, opts, value, label, multi, selected ) {
+
+    // set up the functions
     let ident = d => d;
     value = value || ident;
-    text = text || value;
+    label = label || value;
     selected = selected || (x => false);
-    os.enter().append("option") ;
+
+    // the <select> elt
+    let s = d3.select(selector);
+
+    // bind the opts.
+    let os = s.selectAll("option")
+        .data(opts, label);
+    os.enter()
+        .append("option") 
+        .attr("value", value)
+        .property("selected", o => selected(o) || null)
+        .text(label) 
+        ;
+    //
     os.exit().remove() ;
-    os.attr("value", value)
-      .property("selected", o => selected(o) || null)
-      .text( text ) ;
+    //
+    os.sort( (a,b) => {
+        let ta = label(a);
+	let tb = label(b);
+	return ta < tb ? -1 : ta > tb ? 1 : 0;
+    });
+
+    // multiselect
+    s.property('multiple', multi || null) ;
+    //
     return s;
 }
 
@@ -1912,6 +1964,14 @@ function subtract(a, b) {
 // Creates a list of key,value pairs from the obj.
 function obj2list (o) {
     return Object.keys(o).map(k => [k, o[k]])    
+}
+
+//----------------------------------------------
+// Returns true iff the two lists have the same contents (based on indexOf).
+// Brute force approach. Be careful where you use this.
+function same (alst,blst) {
+   return alst.length === blst.length && 
+       alst.reduce((acc,x) => (acc && blst.indexOf(x)>=0), true);
 }
 
 // ---------------------------------------------
