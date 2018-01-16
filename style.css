@@ -107,6 +107,10 @@ line.chr {
     margin: 2px;
 }
 
+.facet select option {
+    margin: 0px;
+}
+
 #header {
     justify-content: center;
 }

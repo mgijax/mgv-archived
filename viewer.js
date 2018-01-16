@@ -557,6 +557,8 @@ class GenomeView extends SVGView {
 	this.cwidth = 20;        // chromosome width
 	this.brushChr = null;	 // which chr has the current brush
 	this.bwidth = this.cwidth/2;  // block width
+	this.currBlocks = null;
+	this.currTicks = null;
     }
     setBrushCoords (coords) {
 	this.clearBrushes();
@@ -606,8 +608,20 @@ class GenomeView extends SVGView {
     }
     
     //----------------------------------------------
-    draw (tickData, blockData) {
+    redraw () {
+        this.draw(this.currTicks, this.currBlocks);
+    }
 
+    //----------------------------------------------
+    draw (tickData, blockData) {
+	this.drawTitle();
+	this.drawChromosomes();
+	this.drawBlocks(blockData);
+	this.drawTicks(tickData);
+    }
+
+    // ---------------------------------------------
+    drawChromosomes () {
 	let self = this;
 	let gdata = this.app.rGenome;
 
@@ -703,12 +717,6 @@ class GenomeView extends SVGView {
 	    .attr('transform', function(d){return 'translate('+gdata.xscale(d.name)+')';})
 	    .each(function(d){d3.select(this).call(d.brush);})
 	    ;
-	//
-	this.drawTitle();
-	    
-	//
-	this.drawTicks(tickData);
-	this.drawBlocks(blockData);
     }
 
     // ---------------------------------------------
@@ -738,6 +746,9 @@ class GenomeView extends SVGView {
     // Args:
     //    blockData == { ref:Genome, comp:Genome, blocks: list of synteny blocks }
     drawBlocks (blockData) {
+	//
+	this.currBlocks = blockData;
+	//
 	// group to hold the synteny block rectangles
         let bgrp = this.svg
 	    .select('g[name="synBlocks"]')
@@ -772,6 +783,7 @@ class GenomeView extends SVGView {
 
     // ---------------------------------------------
     drawTicks (data) {
+	this.currTicks = data;
 	let gdata = this.app.rGenome;
 	// feature tick marks
 	let tickLength = 10;
@@ -993,6 +1005,10 @@ class ZoomView extends SVGView {
 	// pixels per base
 	let ppb = this.width / (rBlock.end - rBlock.start + 1);
 
+	// The title on the zoomview position controls
+	d3.select("#zoomView .zoomCoords label")
+	    .text(data[0].genome.label + " coords");
+	
 	// x-axis.
 	this.axisFunc = d3.svg.axis()
 	    .scale(this.xscale)
@@ -1582,9 +1598,10 @@ class MGVApp {
 	}
 	
 	//
+	this.genomeView.redraw();
+	this.genomeView.setBrushCoords(coords);
+	this.zoomView.update(coords)
 	if (changed) {
-	    this.genomeView.setBrushCoords(coords);
-	    this.zoomView.update(coords)
 	    this.callback();
 	}
     }
