@@ -835,6 +835,7 @@ class ZoomView extends SVGView {
         let mgv = this.app;
 	// when the translator is ready, we can translate the ref coords to each genome and
 	// issue requests to load the features in those regions.
+	mgv.showBusy(true);
 	mgv.translator.ready().then(function(){
 	    // Now issue requests for features. One request per genome, each request specifies one or more
 	    // coordinate ranges.
@@ -861,7 +862,10 @@ class ZoomView extends SVGView {
 		promises.push(mgv.featureManager.getFeatures(cGenome, ranges))
 	    });
 	    // when everything is ready, call the draw function
-	    Promise.all(promises).then( data => mgv.zoomView.draw(data) );
+	    Promise.all(promises).then( data => {
+	        mgv.zoomView.draw(data);
+		mgv.showBusy(false);
+            });
 	});
 
     }
@@ -1396,6 +1400,14 @@ class MGVApp {
 	this.featureManager = new FeatureManager(this);
 	this.auxDataManager = new AuxDataManager(this);
 
+	// Gear icon to show/hide left column
+	d3.select("#header > .gear.button")
+	    .on("click", () => {
+	        let lc = d3.select("#mgv > .leftcolumn");
+		lc.classed("closed", () => ! lc.classed("closed"));
+		this.resize()
+	    });
+	
 	// Facets
 	//
 	this.facetManager = new FacetManager(this);
@@ -1528,6 +1540,11 @@ class MGVApp {
 	}.bind(this));
     }
     //----------------------------------------------
+    showBusy (isBusy) {
+        d3.select("#header > .gear.button")
+	    .classed("rotating", isBusy);
+    }
+    //----------------------------------------------
     draw () {
 	let ref = d3.select("#refGenome")[0][0].value;
 	let comps = [];
@@ -1622,9 +1639,13 @@ class MGVApp {
     }
     //----------------------------------------------
     resize (width, height) {
+	width = width || this.lastWidth
+	height= height || this.lastHeight;
         this.genomeView.fitToWidth(width-24);
         this.zoomView.fitToWidth(width-24);
 	this.draw();
+	this.lastWidth = width;
+	this.lastHeight = height;
     }
     //----------------------------------------------
     // Returns the current context as a parameter string

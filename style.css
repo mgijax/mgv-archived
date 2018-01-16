@@ -112,13 +112,21 @@ line.chr {
 }
 
 #header {
-    justify-content: center;
+    justify-content: space-between;
+}
+#header > label {
+    text-align: center;
 }
 
 #mgv {
     align-items: flex-start;
     justify-content: space-between;
 }
+
+#mgv .leftcolumn.closed {
+    display: none;
+}
+
 #footer {
     background-color: inherit;
     border: none;
