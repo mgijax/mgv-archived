@@ -547,6 +547,16 @@ class SVGView {
       let r = this.svg[0][0].getBoundingClientRect();
       this.setSize(width - r.x)
   }
+  // Draws this SVG into the given canvas
+  drawToCanvas (selector) {
+     let canvas = d3.select(selector)[0][0];
+     let cxt = canvas.getContext("2d");
+     let svg = d3.select(this.selector)[0][0];
+     drawInlineSVG(svg, cxt, function(img){
+         console.log("Success!", img);
+	 console.log(canvas.toDataURL())
+     });
+  }
 
 } // end class SVGView
 
@@ -1190,6 +1200,9 @@ class ZoomView extends SVGView {
 	// We need to let the view render before doing the highlighting, since it depends on
 	// the positions of rectangles in the scene.
 	window.setTimeout(this.highlight.bind(this), 50);
+
+        //
+	this.drawToCanvas("#canvas canvas");
     };
     //----------------------------------------------
     // Updates highlighting in the current zoom view.
@@ -2027,6 +2040,23 @@ function same (alst,blst) {
    return alst.length === blst.length && 
        alst.reduce((acc,x) => (acc && blst.indexOf(x)>=0), true);
 }
+// ---------------------------------------------
+// Renders SVG into a canvas (using magic I don't understand).
+// Args:
+//     svgElement - the <svg> dom node
+//     ctx - canvas 2D drawing context
+//     callback - invoked when rendering is done
+// Credit:
+//     https://stackoverflow.com/questions/27230293/how-to-convert-svg-to-png-using-html5-canvas-javascript-jquery-and-save-on-serve
+function drawInlineSVG(svgElement, ctx, callback){
+    var svgURL = new XMLSerializer().serializeToString(svgElement);
+    var img  = new Image();
+    img.onload = function(){
+	ctx.drawImage(this, 0,0);
+	callback();
+    }
+    img.src = 'data:image/svg+xml; charset=utf8, '+encodeURIComponent(svgURL);
+}
 
 // ---------------------------------------------
 // ---------------------------------------------
@@ -2107,3 +2137,10 @@ __main__();
 
 // ---------------------------------------------
 })();
+
+
+
+
+
+
+
