@@ -287,6 +287,7 @@ label {
 }
 
 .rotating {
+    transform-origin: 50% 50%;
     -webkit-animation: rotation 2s infinite linear;
 }
 

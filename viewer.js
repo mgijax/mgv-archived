@@ -1494,12 +1494,14 @@ class MGVApp {
 	    function initCompGenomesList(selected) {
 		let rg = d3.select("#refGenome").property("selectedOptions")[0];
 		let cgs = self.allGenomes.filter(g => g.label !== rg.innerText);
-		initOptList("#compGenomes", cgs, g=>g.name, g=>g.label, true, d => false, selected );
+		initOptList("#compGenomes", cgs, g=>g.name, g=>g.label, true, selected );
 	    }
 
 	    // initialize the ref and comp genome option lists
 	    initOptList("#refGenome",   this.allGenomes, g=>g.name, g=>g.label, false, g => g.label === cfg.ref);
-	    initCompGenomesList(function (g) { return cfg.comps.indexOf(g.label) >= 0 });
+	    initCompGenomesList(function (g) { 
+	        return cfg.comps.indexOf(g.label) >= 0
+	    });
 	    //
 	    d3.select("#refGenome").on("change", () => {
 		// whenever the user changes the reference genome, reinitialize the 
@@ -1544,6 +1546,8 @@ class MGVApp {
 	if (rg && rg !== this.rGenome){
 	    // change the ref genome
 	    this.rGenome = rg;
+	    d3.selectAll("#refGenome option")
+	        .property("selected",  gg => (gg.label === g  || null));
 	    this.genomeView.draw();
 	    return true;
 	}
@@ -1560,11 +1564,21 @@ class MGVApp {
 	    let cg = this.name2genome[x] || this.label2genome[x];
 	    cg && cgs.push(cg);
 	}
+	let cgns = cgs.map( cg => cg.label );
+	d3.selectAll("#compGenomes option")
+	        .property("selected",  gg => cgns.indexOf(gg.label) >= 0);
+	//
 	// compare contents of cgs with the current cGenomes.
 	if (same(cgs, this.cGenomes)) return false;
-
 	//
 	this.cGenomes = cgs;
+	return true;
+    }
+    //----------------------------------------------
+    // Sets or returns
+    setHighlight (flist) {
+	if (!flist) return false;
+	this.zoomView.hiFeats = flist.reduce((a,v) => { a[v]=v; return a; }, {});
 	return true;
     }
     //----------------------------------------------
@@ -1574,29 +1588,30 @@ class MGVApp {
 
 	//console.log("SET CONTEXT", cfg);
 
-	let changed = false;
-	// ref genome
-	changed = this.setRefGenome(cfg.ref);
-	changed = changed || this.setCompGenomes(cfg.comps)
 
+	// ref genome
+	let changedRg = this.setRefGenome(cfg.ref);
 	// comp genomes
+	let changedCg = this.setCompGenomes(cfg.comps);
 
 	// coordinates
+	let changedCoords;
 	let coords = this.sanitizeCoords({ chr: cfg.chr, start: cfg.start, end: cfg.end });
 	if (coords) {
 	    this.coords = coords;
-	    changed = true;
+	    changedCoords = true;
 	}
-	else
+	else {
 	    coords = this.coords;
+	    changedCoords = false;
+	}
 
 	// highlighted features
-	let hls = cfg.highlight;
-	if (hls) {
-	    this.zoomView.hiFeats = hls.reduce((a,v) => { a[v]=v; return a; }, {});
-	    changed = true;
-	}
+	let changedHl = this.setHighlight(cfg.highlight);
 	
+	// 
+	let changed = changedRg || changedCg || changedCoords || changedHl;
+
 	//
 	this.genomeView.redraw();
 	this.genomeView.setBrushCoords(coords);
@@ -1863,6 +1878,9 @@ function initOptList( selector, opts, value, label, multi, selected ) {
     // the <select> elt
     let s = d3.select(selector);
 
+    // multiselect
+    s.property('multiple', multi || null) ;
+
     // bind the opts.
     let os = s.selectAll("option")
         .data(opts, label);
@@ -1881,8 +1899,6 @@ function initOptList( selector, opts, value, label, multi, selected ) {
 	return ta < tb ? -1 : ta > tb ? 1 : 0;
     });
 
-    // multiselect
-    s.property('multiple', multi || null) ;
     //
     return s;
 }
@@ -2028,7 +2044,7 @@ function pqstring (qstring) {
 let mgv = null;
 
 // The main program, wherein the app is created and wired to the browser. 
-// ALL dependencies on the browser environment are confined to this function.
+// ALL dependencies on the browser window are confined to this function.
 //
 function __main__ () {
     // Callback to pass into the app to register changes in context.
