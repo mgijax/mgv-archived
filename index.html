@@ -8,122 +8,129 @@
     <title>Multi Genome Viewer</title>
 </head>
 <body>
-<h3>Multi Genome Viewer</h3>
-<div id="mgv" class="flexrow" >
-    <div class="leftcolumn flexcolumn">
-	<div class="refGenome flexcolumn">
-	    <i class="material-icons button collapse"></i>
-	    <label>Reference genome</label>
-	    <select id="refGenome"></select>
-	</div>
-	<div class="compGenomes flexcolumn ">
-	    <i class="material-icons button collapse"></i>
-	    <label>Comparison genomes</label>
-	    <select id="compGenomes" size="20"></select>
-	</div>
-	<div class="colorKey flexcolumn ">
-	    <i class="material-icons button collapse"></i>
-	    <label>Feature types</label>
-	</div>
-	<div class="flexcolumn">
-	    <i class="material-icons button collapse"></i>
-	    <label>Queries</label>
-	    <span>WARNING: this part is experimental!</span>
-	    <div class="flexcolumn">
-		<span>Lookup ID/symbol</span>
-		<input id="lookup" size="30" type="text"></input>
-	    </div>
-	    <div class="flexcolumn">
-		<span>Gene function</span>
-		<input id="function" size="30" type="text"></input>
-	    </div>
-	    <div class="flexcolumn">
-		<span>Phenotype</span>
-		<input id="phenotype" size="30" type="text"></input>
-	    </div>
-	    <div class="flexcolumn">
-		<span>Disease</span>
-		<input id="disease" size="30" type="text"></input>
-	    </div>
-	</div>
-	<div class="mgiFacet flexcolumn ">
-	    <i class="material-icons button collapse"></i>
-	    <label>Has MGI ID?</label>
-	    <div class="flexrow">
-		<input type="radio" name="mgiFacet" value="yes" />
-		<span>Yes</span>
-	    </div>
-	    <div class="flexrow">
-		<input type="radio" name="mgiFacet" value="no" />
-		<span>No</span>
-	    </div>
-	    <div class="flexrow">
-		<input type="radio" name="mgiFacet" value="" checked />
-		<span>Don't care</span>
-	    </div>
-	</div>
-	<div class="hiFacet flexcolumn ">
-	    <i class="material-icons button collapse"></i>
-	    <label>Is highlighted?</label>
-	    <div class="flexrow">
-		<input type="radio" name="hiFacet" value="yes" />
-		<span>Yes</span>
-	    </div>
-	    <div class="flexrow">
-		<input type="radio" name="hiFacet" value="no" />
-		<span>No</span>
-	    </div>
-	    <div class="flexrow">
-		<input type="radio" name="hiFacet" value="" checked />
-		<span>Don't care</span>
-	    </div>
-	</div>
+<div id="container" class="flexcolumn">
+    <!-- HEADER -->
+    <div id="header" class="pagebox flexrow">
+        <label>Multi Genome Viewer</label>
     </div>
-    <div class="middlecolumn flexcolumn spacer1">
-	<div id="genomeView" class="flexcolumn">
-	    <label>Genome View</label>
-	    <i class="material-icons button collapse"></i>
-	    <svg></svg>
-	</div>
-	<div id="featureDetails" class="flexcolumn">
-	    <i class="material-icons button collapse"></i>
-	    <label>Feature details</label>
-	    <table></table>
-	</div> <!-- end featureDetails -->
-	<div id="zoomView" class="flexcolumn">
-	    <div class="flexrow">
-		<div class="zoomCoords flexrow">
-		    <label>Ref Genome Coords</label>
-		    <input id="zoomCoords" size="30" type="text"></input>
+    <!-- APPLICATION MAIN -->
+    <div id="mgv" class="flexrow" >
+	<div class="leftcolumn flexcolumn">
+	    <div class="refGenome pagebox flexcolumn">
+		<i class="material-icons button collapse"></i>
+		<label>Reference genome</label>
+		<select id="refGenome"></select>
+	    </div>
+	    <div class="compGenomes pagebox flexcolumn ">
+		<i class="material-icons button collapse"></i>
+		<label>Comparison genomes</label>
+		<select id="compGenomes" size="20"></select>
+	    </div>
+	    <div class="colorKey pagebox flexcolumn ">
+		<i class="material-icons button collapse"></i>
+		<label>Feature types</label>
+	    </div>
+	    <div class="pagebox flexcolumn">
+		<i class="material-icons button collapse"></i>
+		<label>Queries</label>
+		<span>WARNING: this part is experimental!</span>
+		<div class="flexcolumn">
+		    <span>Lookup ID/symbol</span>
+		    <input id="lookup" size="30" type="text"></input>
 		</div>
-		<div class="zoomBtns flexrow">
-		    <label>Zoom</label>
-		    <i id="zoomOutMore" class="material-icons button more" title="Zoom out more">zoom_out</i>
-		    <i id="zoomOut" class="material-icons button" title="Zoom out">zoom_out</i>
-		    <i id="zoomIn" class="material-icons button" title="Zoom in">zoom_in</i>
-		    <i id="zoomInMore" class="material-icons button more" title="Zoom in more">zoom_in</i>
+		<div class="flexcolumn">
+		    <span>Gene function</span>
+		    <input id="function" size="30" type="text"></input>
 		</div>
-		<div class="panBtns flexrow">
-		    <label>Pan</label>
-		    <i id="panLeftMore" class="material-icons button more" title="Pan left more." >chevron_left</i>
-		    <i id="panLeft" class="material-icons button" title="Pan left." >chevron_left</i>
-		    <i id="panRight" class="material-icons button" title="Pan right." >chevron_right</i>
-		    <i id="panRightMore" class="material-icons button more" title="Pan right more." >chevron_right</i>
+		<div class="flexcolumn">
+		    <span>Phenotype</span>
+		    <input id="phenotype" size="30" type="text"></input>
+		</div>
+		<div class="flexcolumn">
+		    <span>Disease</span>
+		    <input id="disease" size="30" type="text"></input>
 		</div>
 	    </div>
-	    <div class="flexrow">
-
-		<!-- the SVG element for the zoom view panel -->
+	    <div class="mgiFacet pagebox flexcolumn ">
+		<i class="material-icons button collapse"></i>
+		<label>Has MGI ID?</label>
+		<div class="flexrow">
+		    <input type="radio" name="mgiFacet" value="yes" />
+		    <span>Yes</span>
+		</div>
+		<div class="flexrow">
+		    <input type="radio" name="mgiFacet" value="no" />
+		    <span>No</span>
+		</div>
+		<div class="flexrow">
+		    <input type="radio" name="mgiFacet" value="" checked />
+		    <span>Don't care</span>
+		</div>
+	    </div>
+	    <div class="hiFacet pagebox flexcolumn ">
+		<i class="material-icons button collapse"></i>
+		<label>Is highlighted?</label>
+		<div class="flexrow">
+		    <input type="radio" name="hiFacet" value="yes" />
+		    <span>Yes</span>
+		</div>
+		<div class="flexrow">
+		    <input type="radio" name="hiFacet" value="no" />
+		    <span>No</span>
+		</div>
+		<div class="flexrow">
+		    <input type="radio" name="hiFacet" value="" checked />
+		    <span>Don't care</span>
+		</div>
+	    </div>
+	</div>
+	<div class="middlecolumn flexcolumn spacer1">
+	    <div id="genomeView" class="pagebox flexcolumn">
+		<label>Genome View</label>
+		<i class="material-icons button collapse"></i>
 		<svg></svg>
-	    <i class="material-icons button collapse" style="top:-30px"></i>
+	    </div>
+	    <div id="featureDetails" class="pagebox flexcolumn">
+		<i class="material-icons button collapse"></i>
+		<label>Feature details</label>
+		<table></table>
+	    </div> <!-- end featureDetails -->
+	    <div id="zoomView" class="pagebox flexcolumn">
+		<div class="flexrow">
+		    <div class="zoomCoords flexrow">
+			<label>Ref Genome Coords</label>
+			<input id="zoomCoords" size="30" type="text"></input>
+		    </div>
+		    <div class="zoomBtns flexrow">
+			<label>Zoom</label>
+			<i id="zoomOutMore" class="material-icons button more" title="Zoom out more">zoom_out</i>
+			<i id="zoomOut" class="material-icons button" title="Zoom out">zoom_out</i>
+			<i id="zoomIn" class="material-icons button" title="Zoom in">zoom_in</i>
+			<i id="zoomInMore" class="material-icons button more" title="Zoom in more">zoom_in</i>
+		    </div>
+		    <div class="panBtns flexrow">
+			<label>Pan</label>
+			<i id="panLeftMore" class="material-icons button more" title="Pan left more." >chevron_left</i>
+			<i id="panLeft" class="material-icons button" title="Pan left." >chevron_left</i>
+			<i id="panRight" class="material-icons button" title="Pan right." >chevron_right</i>
+			<i id="panRightMore" class="material-icons button more" title="Pan right more." >chevron_right</i>
+		    </div>
+		</div>
+		<div class="flexrow">
 
+		    <!-- the SVG element for the zoom view panel -->
+		    <svg></svg>
+		<i class="material-icons button collapse" style="top:-30px"></i>
+
+		</div>
 	    </div>
 	</div>
     </div>
-</div>
-<div class="footer">
-    <a tabindex="-1" href="https://github.com/JoelRichardson/mgv">MGV@GitHub</a>
-</div>
+    <!-- FOOTER -->
+    <div id="footer" class="pagebox flexrow">
+	<a tabindex="-1" href="https://github.com/JoelRichardson/mgv">MGV@GitHub</a>
+    </div>
+</div>    
 <script src="viewer.js"></script>
 </body>
 </html>

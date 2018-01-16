@@ -30,11 +30,6 @@ a {
     flex-wrap: nowrap;
 }
 
-.flexcolumn > *,
-.flexrow > * {
-    margin: 2px;
-}
-
 .flexcolumn.closed > *,
 .flexrow .closed > * {
     display: none;
@@ -101,16 +96,28 @@ line.chr {
     font-size: bigger;
 }
 
+.pagebox {
+    background-color: #ccc;
+    border: thin solid #777;
+    padding: 6px;
+    margin: 1px;
+}
+
+#header {
+    justify-content: center;
+}
+
 #mgv {
     align-items: flex-start;
     justify-content: space-between;
 }
+#footer {
+    background-color: inherit;
+    border: none;
+}
 
 #genomeView {
-    background-color: #ccc;
-    border: thin solid black;
     align-items: center;
-    padding: 6px;
 }
 #genomeView > div {
     margin-top: 18px;
@@ -141,8 +148,6 @@ line.chr {
 
 #zoomView {
     display: inline-block;
-    background-color: #ccc;
-    border: thin solid black;
 }
 .zoomStrip.highlighted > text {
 }
@@ -235,14 +240,6 @@ label {
 .rightcolumn {
     min-width: 200px;
 }
-.leftcolumn > div,
-.middlecolumn > div,
-.rightcolumn > div {
-    background-color: #ccc;
-    border: thin solid black;
-    padding: 6px;
-}
-
 #zoomView g.axis path {
     stroke: black;
     stroke-width: 1px;
@@ -275,7 +272,16 @@ label {
    display: none;
 }
 
-.footer {
-   position: static;
-   bottom: 0px;
+.rotating {
+    -webkit-animation: rotation 2s infinite linear;
 }
+
+@-webkit-keyframes rotation {
+    from {
+        -webkit-transform: rotate(0deg);
+    }
+    to {
+        -webkit-transform: rotate(-359deg);
+    }
+}
+
