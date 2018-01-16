@@ -103,6 +103,10 @@ line.chr {
     margin: 1px;
 }
 
+.facet * {
+    margin: 2px;
+}
+
 #header {
     justify-content: center;
 }
@@ -235,10 +239,16 @@ label {
 }
 
 .leftcolumn {
-    width: 200px;
+    min-width: 200px;
 }
 .rightcolumn {
     min-width: 200px;
+}
+#zoomView > :first-child {
+    justify-content: center;
+}
+#zoomView > :first-child * {
+    margin-left: 6px;
 }
 #zoomView g.axis path {
     stroke: black;
