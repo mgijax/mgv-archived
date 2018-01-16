@@ -46,7 +46,7 @@ a {
 .flexcolumn > .button.collapse,
 .flexrow > .button.collapse {
     position: absolute;
-    top: 0px;
+    top: -5px;
     right: 0px;
 }
 .flexcolumn > .button.collapse::after,
@@ -125,7 +125,6 @@ line.chr {
 }
 
 #genomeView {
-    align-items: center;
 }
 #genomeView > div {
     margin-top: 18px;
@@ -221,6 +220,7 @@ label {
     font-size: 10px;
     width: 100%;
     table-layout: fixed;
+    white-space: nowrap;
 }
 #featureDetails > table th {
     text-align: left;
@@ -249,7 +249,7 @@ label {
     min-width: 200px;
 }
 #zoomView > :first-child {
-    justify-content: center;
+    justify-content: space-between;
 }
 #zoomView > :first-child * {
     margin-left: 6px;
