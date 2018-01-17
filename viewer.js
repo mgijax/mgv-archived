@@ -1192,21 +1192,32 @@ class ZoomView extends SVGView {
 	window.setTimeout(this.highlight.bind(this), 50);
     };
     //----------------------------------------------
-    // Updates highlighting in the current zoom view.
-    // Highlights features in the current highlight list PLUS the feature corresponding
-    // to rect (if given).  Draws fiducials for features in this list that:
+    // Updates feature highlighting in the current zoom view.
+    // Features to be highlighted include those in the hiFeats list plus the feature
+    // corresponding to the rectangle argument, if given.
+    //
+    // Draws fiducials for features in this list that:
     // 1. overlap the current zoomView coord range
     // 2. are not rendered invisible by current facet settings
     //
     // Args:
-    //    rect (rect element) Optional. A rectangle element that was moused-over. Highlighting
+    //    current (rect element) Optional. A rectangle element that was moused-over. Highlighting
     //        will include the feature corresponding to this rect along with those in the highlight list.
     //
-    highlight (rect) {
+    highlight (current) {
 	let self = this;
-	let f = rect ? rect.__data__ : null;
+	// current's feature
+	let currFeat = current ? current.__data__ : null;
+	// create local copy of hiFeats, with current feature added
 	let hiFeats = Object.assign({}, this.hiFeats);
-	if (f) hiFeats[f.id] = f.id;
+	if (currFeat) hiFeats[currFeat.id] = currFeat.id;
+
+	// Filter all features (rectangles) in the scene for those being highlighted.
+	// Along the way, build index mapping feature id to its "stack" of equivalent features,
+	// i.e. a list of its genologs sorted by y coordinate.
+	// Also, make each highlighted feature taller (so it stands above its neighbors)
+	// and give it the ".highlight" class.
+	//
 	let stacks = {}; // fid -> [ rects ] 
         let feats = this.svg.selectAll(".feature")
 	  // filter rect.features for those in the highlight list
@@ -1222,6 +1233,7 @@ class ZoomView extends SVGView {
 		  if (!stacks[k]) stacks[k] = []
 		  stacks[k].push(this)
 	      }
+	      // 
 	      let dh = hl ? self.blockHeight/2 - self.featHeight : 0;
               let dy = ff.strand === "+" ? (dh ? -self.featHeight-dh : -self.featHeight) : 0;
 	      d3.select(this)
@@ -1230,18 +1242,20 @@ class ZoomView extends SVGView {
 		  .attr("y", ff.genome.zoomY + dy)
 	      return hl;
 	  });
-	// build data array for drawing fiducials
+	// build data array for drawing fiducials between equivalent features
 	let data = [];
 	for (let k in stacks) {
 	    // for each highlighted feature, sort the rectangles in its list by Y-coordinate
 	    let rects = stacks[k];
 	    rects.sort( (a,b) => parseFloat(a.getAttribute("y")) - parseFloat(b.getAttribute("y")) );
 	    // want a polygon between each successive pair of items
+	    // Add a class ("current") for the polygons associated with the mouseover feature so they
+	    // can be distinguished from others.
 	    let pairs = rects.map((r, i) => [r,rects[i+1]]);
-	    data.push({ fid: k, rects: pairs, cls: (f && f.id === k ? 'current' : '') });
+	    data.push({ fid: k, rects: pairs, cls: (currFeat && currFeat.id === k ? 'current' : '') });
 	}
-	this.drawFiducials(data);
-	this.app.updateFeatureDetails(f);
+	this.drawFiducials(data, currFeat);
+	this.app.updateFeatureDetails(currFeat);
     }
 
     //----------------------------------------------
@@ -1252,10 +1266,11 @@ class ZoomView extends SVGView {
     //       cls: extra class for .featureMark group,
     //       rects: list of [rect1,rect2] pairs, 
     //       }
+    //   currFeat : current (mouseover) feature (if any)
     //
-    drawFiducials (data) {
+    drawFiducials (data, currFeat) {
 
-	// put feducial marks in their own group 
+	// put fiducial marks in their own group 
 	let fGrp = this.svg.select("g.fiducials")
 	    .classed("hidden", false);
 
@@ -1273,6 +1288,7 @@ class ZoomView extends SVGView {
 	    .data(d => [{ fid: d.fid, rect: d.rects[0][0] }]);
 	    // .data(d => d.rects.map( function (r) { return { fid: d.fid, rect: r[0] } }));
 	labels.enter().append('text').attr('class','featLabel');
+	labels.exit().remove();
 	labels
 	  .attr("x", d => parseInt(d.rect.getAttribute("x")) + parseInt(d.rect.getAttribute("width"))/2 )
 	  .attr("y", d => d.rect.__data__.genome.zoomY - this.blockHeight/2 - 3)
@@ -1282,6 +1298,37 @@ class ZoomView extends SVGView {
 	       return sym;
 	  });
 
+	// Put a rectangle behind each label (as a background)
+	let lblBoxData = labels.map(lbl => lbl[0].getBBox())
+	let lblBoxes = ffGrps.selectAll('rect.featLabelBox')
+	    .data((d,i) => [lblBoxData[i]]);
+	lblBoxes.enter().insert('rect',':first-child').attr('class','featLabelBox');
+	lblBoxes.exit().remove();
+	lblBoxes
+	    .attr("x",      bb => bb.x-2)
+	    .attr("y",      bb => bb.y-1)
+	    .attr("width",  bb => bb.width+4)
+	    .attr("height", bb => bb.height+2)
+	    ;
+	
+	// if there is a currFeat, move its fiducials to the end (so they're on top of everyone else)
+	if (currFeat) {
+	    // get list of group elements from the d3 selection
+	    let ffList = ffGrps[0];
+	    // find the one whose feature is currFeat
+	    let i = -1;
+	    ffList.forEach( (g,j) => { if (g.__data__.fid === currFeat.id) i = j; });
+	    // if we found it and it's not already the last, move it to the
+	    // last position and reorder in the DOM.
+	    if (i >= 0) {
+		let lasti = ffList.length - 1;
+	        let x = ffList[i];
+		ffList[i] = ffList[lasti];
+		ffList[lasti] = x;
+		ffGrps.order();
+	    }
+	}
+	
 	// Bind second level data (rectangle pairs) to polygons in the group
 	let pgons = ffGrps.selectAll("polygon")
 	    .data(d=>d.rects.filter(r => r[0] && r[1]));

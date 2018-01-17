@@ -286,6 +286,15 @@ label {
    text-anchor: middle;
 }
 
+.fiducials .featLabelBox {
+    stroke: none;
+    fill: white;
+    display: none;
+}
+.fiducials .current .featLabelBox {
+    display: inherit;
+}
+
 .fiducials .current .featLabel {
 }
 
