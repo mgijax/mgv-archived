@@ -422,7 +422,8 @@ class SyntenyBlockGenerator:
 		    # starting new chromosome
 		    pblk = None
 		    continue
-		# distance between previous and current
+		# half the distance between previous and current
+		# FIXME. This arbitrarily chosen point can result in features being split across block boundaries.
 		delta = (cblkfields[which]['start'] - pblkfields[which]['end'] - 1) / 2.0
 		pblkfields[which]['end'] += int(math.floor(delta))
 		cblkfields[which]['start'] -= int(math.ceil(delta))
