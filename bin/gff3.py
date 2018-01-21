@@ -135,6 +135,9 @@ class Feature(types.ListType):
 	if self.end != ".":
 	    self.end = int(self.end)
 
+    def overlaps(self, other):
+	return self.seqid == other.seqid and self.start <= other.end and self.end >= other.start
+
     def __hash__(self):
 	return hash(self.attributes.get('ID',None))
 
