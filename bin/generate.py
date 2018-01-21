@@ -1,3 +1,4 @@
+
 #
 '''
 generate.py
@@ -65,16 +66,6 @@ class SyntenyBlockGenerator:
         #
         self.nBlocks = 0 # number of synteny blocks created.
         #
-        # Create a special object to serve as the "missing" side of an insertion/deletion block.
-        #
-        self.INSERTED = {
-            'index' : -1,
-            'ID' : '',
-            'chr': '',
-            'start': 0,
-            'end' : 0,
-            'strand' : '.',
-        }
 
         self.initArgParser()
 
@@ -92,9 +83,8 @@ class SyntenyBlockGenerator:
         if self.args.debug:
 	    self.writePairs()
         self.generateBlocks()
-	self.closeGaps()
         self.writeBlocks()
-
+#
     def initArgParser (self):
         """
         Sets up the parser for the command line args.
@@ -138,7 +128,9 @@ class SyntenyBlockGenerator:
         If no AB specified, generates AB so that features with same ID correspond.
         """
         self.A = self.readFeatureFile(self.args.fileA)
+	self.ctgsByChrA = self.computeContigs(self.A)
         self.B = self.readFeatureFile(self.args.fileB)
+	self.ctgsByChrB = self.computeContigs(self.B)
         if self.args.fileAB:
             # correspondence is based on data file provided by user
             self.AB = self.readTsv(self.args.fileAB)
@@ -218,6 +210,58 @@ class SyntenyBlockGenerator:
         # reindex with just the 1-1's
         self.indexAB()
 
+    # Finds the contigs (clusters of overlappping features) in the list of features.
+    # We use a gff3.Feature to represent each contig, as we only need its chr, start, and end coordinate.
+    # Args:
+    #    feats (list of Features) must be sorted by chr + start coord
+    # Returns:
+    #    Dict mapping chromosomes to their contigs:
+    #       {chr -> [list-of-contigs for that chr]}.
+    #
+    def computeContigs(self, feats):
+        #
+	contigsByChr = {} # chr -> [ contigs for that chr, sorted by start coord ]
+	currCtg = None
+	#
+	for f in feats:
+	    if currCtg is None \
+	    or not currCtg.overlaps(f):
+	        currCtg = gff3.Feature(f)
+		currCtg.source = '.'
+		currCtg.type = 'contig'
+		currCtg.strand = '.'
+		currCtg.attributes = {'features':[f]}
+		contigsByChr.setdefault(currCtg.seqid, []).append(currCtg)
+	    else:
+	        currCtg.end = max(currCtg.end, f.end);
+		currCtg.attributes['features'].append(f)
+	#
+	return contigsByChr
+
+    # Returns the contig intersected by the specified point (chr + position),
+    # or None if there is no contig at that position
+    # Args:
+    #    which (string) "a" or "b"
+    #    chr   (string) The chromosome. e.g. "17"
+    #    coord (integer) The base position.
+    #
+    def getContigAt(self, which, chr, coord):
+	# Binary search the list of contigs for this chromosome
+        ctgs = (self.ctgsByChrA if which.upper() == "A" else self.ctgsByChrB)[chr]
+	iMin = 0
+	iMax = len(ctgs) - 1
+	while iMin <= iMax:
+	    iMid = (iMin + iMax) / 2
+	    c = ctgs[iMid]
+	    if coord < c.start:
+	        iMax = iMid - 1
+	    elif coord > c.end:
+	        iMin = iMid + 1
+	    else:
+	        return c
+	#
+	return None
+
     def prepGff (self, feats, index) :
         """
         Filters, sorts, and otherwise modifies the list of GFF3 features
@@ -227,7 +271,6 @@ class SyntenyBlockGenerator:
         # a. Filter for features whose ID is in the index
         n = len(feats)
         feats[:] = filter(lambda f: f.ID.startswith("MGI:") and f.ID in index, feats)
-        dn_a = n - len(feats)
 
         # b. Sort by chr+start position.
         def gffSorter (a, b) :
@@ -238,6 +281,7 @@ class SyntenyBlockGenerator:
         #
         feats.sort(gffSorter)
 
+	'''
         # c. Filter to remove any overlaps between features.
         # IS THIS IMPORTANT??
         def overlaps(a, b):
@@ -252,7 +296,7 @@ class SyntenyBlockGenerator:
             pf = f
         n = len(feats)
         feats[:] = nfs
-        dn_c = n - len(feats)
+	'''
         
         # d. Number the features, 1, 2, 3... and project just the bits we need
         nfs = []
@@ -282,7 +326,7 @@ class SyntenyBlockGenerator:
         """
         def _renumber(which):
             self.pairs.sort(
-              lambda x,y: 1 if x[which] is self.INSERTED else -1 if y[which] is self.INSERTED else cmp(x[which]['index'], y[which]['index']))
+              lambda x,y: cmp(x[which]['index'], y[which]['index']))
             for i,p in enumerate(self.pairs): 
                 if p[which]:
                     p[which]['index'] = i
@@ -303,9 +347,9 @@ class SyntenyBlockGenerator:
         for a in self.A:
             aid = a['ID']
             bid = self.a2b.get(aid,[None])[0]
-            b = self.bid2feat.get(bid, self.INSERTED)
+            b = self.bid2feat.get(bid, None)
             #
-            if b is self.INSERTED: continue
+            if not b: continue
             # 
             pair = {
               'a': a,
@@ -313,17 +357,6 @@ class SyntenyBlockGenerator:
               }
             self.pairs.append(pair)
         #
-        '''
-        for b in self.B:
-            bid = b['ID']
-            if not bid in self.b2a:
-                # b outer join row
-                pair = {
-                    'a': self.INSERTED,
-                    'b': b
-                }
-        '''
-
         # the join step may cause genes to drop out, and it is important that the
         # sequence is unbroken for each genome
         self.renumber()
@@ -337,60 +370,47 @@ class SyntenyBlockGenerator:
          - Block orientation ("+" or "-") Specifies whether the A and B regions 
            of the block have the same or opposite orientations in their respective genomes.
          - Block count (integer) Records how many a/b feature pairs combined to generate this block
-         - Pair (pair of feaure-like objects) Looks like this: {a:feature,b:feature}.
-           Each feature (-like object) is used to record the chromosome, start, and end of the syntenic
-           region in its genome.
+         - Pair (pair of feaures) Looks like this: {a:feature,b:feature}.
+           Each feature (actually, feature-like object) is used to record the 
+	   chromosome, start, and end of the syntenic region in its genome.
         """
         self.nBlocks += 1
         blockId = self.nBlocks
         blockCount = 1
-        ori = +1
-        if pair['a'] is self.INSERTED:
-            ids = set([pair['b']['ID']])
-            pcopy = { 'a':self.INSERTED, 'b': pair['b'].copy() }
-        elif pair['b'] is self.INSERTED:
-            ids = set([pair['a']['ID']])
-            pcopy = { 'b':self.INSERTED, 'a': pair['a'].copy() }
-        else:
-            ori = +1 if (pair['a']['strand'] == pair['b']['strand']) else -1
-            ids = set([pair['a']['ID'], pair['b']['ID']])
-            pcopy = pair.copy()
+	ori = +1 if (pair['a']['strand'] == pair['b']['strand']) else -1
+	ids = set([pair['a']['ID'], pair['b']['ID']])
+	pcopy = pair.copy()
         return [ blockId, ori, blockCount, pcopy, ids ]
 
-    def extendBlock(self,currPair,currBlock):
+    def extendBlock(self,newPair,currBlock):
         """
         Extends the given synteny block to include the coordinate
         ranges of the given pair.
         """
-        bname,ori,blockCount,pair,ids = currBlock
-        currBlock[2] = blockCount+1
-        if pair['a'] is not self.INSERTED:
-            pair['a']['start'] = min(pair['a']['start'], currPair['a']['start'])
-            pair['a']['end']   = max(pair['a']['end'],   currPair['a']['end'])
-            ids.add(currPair['a']['ID'])
-        if pair['b'] is not self.INSERTED:
-            pair['b']['start'] = min(pair['b']['start'], currPair['b']['start'])
-            pair['b']['end']   = max(pair['b']['end'],   currPair['b']['end'])
-            pair['b']['index'] = currPair['b']['index']
-            ids.add(currPair['b']['ID'])
+        bname,bori,bcount,bpair,bids = currBlock
+        currBlock[2] = bcount+1
+	bpair['a']['start'] = min(bpair['a']['start'], newPair['a']['start'])
+	bpair['a']['end']   = max(bpair['a']['end'],   newPair['a']['end'])
+	bids.add(newPair['a']['ID'])
+	bpair['b']['start'] = min(bpair['b']['start'], newPair['b']['start'])
+	bpair['b']['end']   = max(bpair['b']['end'],   newPair['b']['end'])
+	bpair['b']['index'] = newPair['b']['index']
+	bids.add(newPair['b']['ID'])
 
-    def canMerge(self,currPair,currBlock):
+    def canMerge(self,newPair,currBlock):
         """
         Returns True iff the given pair can merge with (and extend)
         the given synteny block. 
         """
         if currBlock is None:
-                    return False
-        bid,ori,bcount,pair,ids = currBlock
-        if currPair['a'] is self.INSERTED or currPair['b'] is self.INSERTED:
-            cori = +1
-        else:
-            cori = 1 if (currPair['a']['strand']==currPair['b']['strand']) else -1
+	    return False
+        bid,bori,bcount,bpair,ids = currBlock
+	nori = 1 if (newPair['a']['strand']==newPair['b']['strand']) else -1
         return \
-            currPair['a']['chr'] == pair['a']['chr'] \
-            and currPair['b']['chr'] == pair['b']['chr'] \
-            and ori == cori \
-            and (currPair['b'] is self.INSERTED or currPair['b']['index'] == pair['b']['index']+ori)
+            newPair['a']['chr'] == bpair['a']['chr'] \
+            and newPair['b']['chr'] == bpair['b']['chr'] \
+            and bori == nori \
+            and (newPair['b']['index'] == bpair['b']['index']+bori)
 
     def generateBlocks (self) :
         """
@@ -405,6 +425,36 @@ class SyntenyBlockGenerator:
                 currBlock = self.startBlock(currPair)
                 self.blocks.append(currBlock)
             currPair['block'] = currBlock[0]
+
+	# At this point, each block exends from the start of its first and feature to the end of its last.
+	# The problem is that there are lots of other features that do not participate in the block calculation, 
+	# and they can (and often are) cut by the ends of the blocks.
+	# Here we extend the ends of each block so that no feature is cut.
+	self.extendBlocksToContigBoundaries()
+
+	# At this point, any gaps between blocks are guaranteed to be "empty space". 
+	# Extend neighboring blocks so they meet in the middle.
+	#self.closeGaps()
+
+    # Extends the boundaries of each synteny block to the edges of the end contigs.
+    def extendBlocksToContigBoundaries(self):
+	#
+	def extendOne(which, x):
+	    #
+	    acs = self.getContigAt(which, x['chr'], x['start'])
+	    if not acs:
+	        raise RuntimeError("Hmmm...no contig found at start")
+	    x['start'] = acs.start
+	    #
+	    ace = self.getContigAt(which, x['chr'], x['end'])
+	    if not ace:
+	        raise RuntimeError("Hmmm...no contig found at end")
+	    x['end']   = ace.end
+        #
+	for blk in self.blocks:
+	    blkid, blkori, blkcount, blkfields, blkids = blk
+	    extendOne('a', blkfields['a'])
+	    extendOne('b', blkfields['b'])
 
     def sortBlocksBy (self, which) :
 	self.blocks.sort( cmp = lambda x,y : x[3][which]['index'] - y[3][which]['index'] )
@@ -423,10 +473,10 @@ class SyntenyBlockGenerator:
 		    pblk = None
 		    continue
 		# half the distance between previous and current
-		# FIXME. This arbitrarily chosen point can result in features being split across block boundaries.
 		delta = (cblkfields[which]['start'] - pblkfields[which]['end'] - 1) / 2.0
-		pblkfields[which]['end'] += int(math.floor(delta))
-		cblkfields[which]['start'] -= int(math.ceil(delta))
+		if delta > 0:
+		    pblkfields[which]['end'] += int(math.floor(delta))
+		    cblkfields[which]['start'] -= int(math.ceil(delta))
 	    #
 	    pblk = cblk
 
