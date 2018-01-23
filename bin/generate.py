@@ -258,18 +258,11 @@ class SyntenyBlockGenerator:
 	        return None
 
     #
-    def pj(self, n=1000):
-	pr = None
-	da = 0
-	db = 0
-        for i in range(n):
-	    cr = self.AB[i]
-	    if pr:
-	        da = cr.aIndex - pr.aIndex
-	        db = cr.bIndex - pr.bIndex
-	    print da, db, self.AB[i]
-	    pr = cr
-        
+    def pj(self):
+        c = self.root
+	while c:
+	    print c.dup, len(c), map(lambda r: r.bIndex, c.getRecs())
+	    c = c.next
     #
     def join (self) :
         """
@@ -357,90 +350,29 @@ class SyntenyBlockGenerator:
 	while cb:
 	    # loop through the recs in the current block, 
 	    # splitting on every seq run boundary
-	    pr = None 
-	    di = 0
-            for r in cb.getRecs():
-		if pr: di =  r.bIndex - pr.bIndex
+	    pr = None  # prev record
+	    di = 0     # diff between prev index and current
+	    dir = 0    # seq run direction (+1/-1). If not yet known, == 0.
+	    #
+	    # Iterate thru elements of current block until we detect a break in the sequence.
+	    # At that point, break the block.
+            for (i,r) in enumerate(cb.getRecs()):
+		if i > 0:
+		    di =  r.bIndex - pr.bIndex
+		if (dir and dir != di) or di < -1 or di > 1:
+		    # seq break. Break the current block here. Reset cb to the tail section and break 
+		    # to next iteration of the while loop.
+		    cb = cb.split(i)
+		    break
+		# continue the sequence
+		dir = di
 	        pr = r
-	    cb = cb.next
-	
-
-    '''
-    def startBlock(self,pair):
-        """
-        Starts a new synteny block from the given feature pair.
-        Returns the block, which is a list of 4 values:
-         - Block id (integer) Block ids are assigned starting at 0.
-           They have no meaning outside a given set of results.
-         - Block orientation ("+" or "-") Specifies whether the A and B regions 
-           of the block have the same or opposite orientations in their respective genomes.
-         - Block count (integer) Records how many a/b feature pairs combined to generate this block
-         - Pair (pair of feaures) Looks like this: {a:feature,b:feature}.
-           Each feature (actually, feature-like object) is used to record the 
-	   chromosome, start, and end of the syntenic region in its genome.
-        """
-        self.nBlocks += 1
-        blockId = self.nBlocks
-        blockCount = 1
-	ori = +1 if (pair['a']['strand'] == pair['b']['strand']) else -1
-	ids = set([pair['a']['ID'], pair['b']['ID']])
-	pcopy = pair.copy()
-        return [ blockId, ori, blockCount, pcopy, ids ]
-
-    def extendBlock(self,newPair,currBlock):
-        """
-        Extends the given synteny block to include the coordinate
-        ranges of the given pair.
-        """
-        bname,bori,bcount,bpair,bids = currBlock
-        currBlock[2] = bcount+1
-	bpair['a']['start'] = min(bpair['a']['start'], newPair['a']['start'])
-	bpair['a']['end']   = max(bpair['a']['end'],   newPair['a']['end'])
-	bids.add(newPair['a']['ID'])
-	bpair['b']['start'] = min(bpair['b']['start'], newPair['b']['start'])
-	bpair['b']['end']   = max(bpair['b']['end'],   newPair['b']['end'])
-	bpair['b']['index'] = newPair['b']['index']
-	bids.add(newPair['b']['ID'])
-
-    def canMerge(self,newPair,currBlock):
-        """
-        Returns True iff the given pair can merge with (and extend)
-        the given synteny block. 
-        """
-        if currBlock is None:
-	    return False
-        bid,bori,bcount,bpair,ids = currBlock
-	nori = 1 if (newPair['a']['strand']==newPair['b']['strand']) else -1
-        return \
-            newPair['a']['chr'] == bpair['a']['chr'] \
-            and newPair['b']['chr'] == bpair['b']['chr'] \
-            and bori == nori \
-            and (newPair['b']['index'] == bpair['b']['index']+bori)
-
-    def generateBlocks (self) :
-        """
-        Scans the pairs, generating synteny blocks.
-        """
-        self.blocks = []
-        currBlock = None
-        for currPair in self.pairs:
-            if self.canMerge(currPair,currBlock):
-                self.extendBlock(currPair,currBlock)
-            else:
-                currBlock = self.startBlock(currPair)
-                self.blocks.append(currBlock)
-            currPair['block'] = currBlock[0]
-
-	# At this point, each block exends from the start of its first and feature to the end of its last.
-	# The problem is that there are lots of other features that do not participate in the block calculation, 
-	# and they can (and often are) cut by the ends of the blocks.
-	# Here we extend the ends of each block so that no feature is cut.
-	self.extendBlocksToContigBoundaries()
-
-	# At this point, any gaps between blocks are guaranteed to be "empty space". 
-	# Extend neighboring blocks so they meet in the middle.
-	#self.closeGaps()
-    '''
+	    else:
+		# completed the for without breaking.
+		# proceed to next block
+		cb = cb.next
+	    # end for
+	# end while
 
     # Extends the boundaries of each synteny block to the edges of the end contigs.
     def extendBlocksToContigBoundaries(self):
