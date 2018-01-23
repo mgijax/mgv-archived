@@ -26,6 +26,7 @@ import sys
 import re
 import argparse
 import json
+import gff3
 
 class Block:
     MAXBLKSIZE = 5000000
@@ -92,7 +93,7 @@ class Block:
 # feature in a block must the max end coord of any feature in that block.
 # UPDATE: close the gaps between blocks. These gaps contain no features,
 # but we want those regions "covered" by blocks. In fact, what we really
-# want (to put it more simply) is that the blocks partition the chromosome.
+# want (to put it more simply) is that the index partitions the chromosome.
 #
 def buildIndex(fin, fout):
     allBlocks = []
@@ -104,8 +105,8 @@ def buildIndex(fin, fout):
         index += lineLen
         if i == 0: continue # skip header line
         fields = line[:-1].split('\t')
-        start = int(fields[1])
-        blk = Block(index-lineLen, index-1, fields[0], int(fields[1]), int(fields[2]))
+	f = gff3.Feature(line[:-1])
+        blk = Block(index-lineLen, index-1, f.seqid, f.start, f.end)
         if currBlk:
             if not currBlk.extend(blk):
 		if currBlk.chr == blk.chr:
@@ -117,6 +118,21 @@ def buildIndex(fin, fout):
     if currBlk:
         fout.write(currBlk.rowString()+'\n')
 
+# Validates an index against a feature file.
+def validate(ff, ix) :
+    items = ix.items()
+    items.sort()
+    for (c,blocks) in items:
+        for b in blocks:
+            ff.seek(b.startIndex)
+            x = ff.read(b.endIndex-b.startIndex+1)
+            lines = x[:-1].split('\n')
+            if len(lines) != b.count:
+                print "Crap",
+            else:
+                print ".",
+    print
+
 #
 def makeFeature (row, colnames) :
     f = {}
@@ -125,16 +141,6 @@ def makeFeature (row, colnames) :
 	if n in ["start","end"]:
 	    f[n] = int(f[n])
     return f
-
-#
-def readFeatFile(ff) :
-    colnames = ff.readline()[:-1].split("\t")
-    feats = []
-    for line in ff:
-        toks = line[:-1].split("\t")
-	r = makeFeature(toks, colnames)
-	feats.append(r)
-    return feats
 
 #
 def readIndexFile(xf) :
@@ -154,20 +160,22 @@ def readIndexFile(xf) :
         ix.setdefault(c,[]).append(blk)
     #
     return ix
-#
-def validate(ff, ix) :
-    items = ix.items()
-    items.sort()
-    for (c,blocks) in items:
-        for b in blocks:
-            ff.seek(b.startIndex)
-            x = ff.read(b.endIndex-b.startIndex+1)
-            lines = x[:-1].split('\n')
-            if len(lines) != b.count:
-                print "Crap",
-            else:
-                print ".",
-    print
+
+def makeJsonFeat(f):
+    mgiid = f.attributes.get("geneId",None)
+    if mgiid and not mgiid.startswith("MGI:"): mgiid = None
+    symbol = f.attributes.get("geneLabel",None)
+    return {
+	"id"         : f.ID,
+	"mgiid"      : mgiid,
+	"symbol"     : symbol,
+	"chromosome" : f.seqid,
+	"start"      : f.start,
+	"end"        : f.end,
+	"strand"     : f.strand,
+	"type"       : f.type,
+	"biotype"    : f.attributes.get("biotype","")
+    }
 
 # Returns all features in all the index blocks touched by the 
 # specified coordinate range. From caller's perspective, the requested
@@ -188,7 +196,6 @@ def validate(ff, ix) :
 #    
 def lookup(ff, ix, chr, start, end):
     ff.seek(0)
-    colnames = ff.readline()[:-1].split()
     # get all the index blocks for the given chromosome
     cblocks = ix.get(chr,None)
     if not cblocks:
@@ -196,14 +203,13 @@ def lookup(ff, ix, chr, start, end):
     # filter for blocks that overlap the start,end range.
     cblocks = filter(lambda b : b.start <= end and b.end >= start, cblocks)
     #
-    # each block ...
+    # each remaining block ...
     answer = []
     for b in cblocks:
 	# read the features
         ff.seek(b.startIndex)
         s = ff.read(b.endIndex-b.startIndex+1)
-	feats = map(lambda l: l.split("\t"), s[:-1].split("\n"))
-	feats = map(lambda f: makeFeature(f, colnames), feats)
+	feats = map(lambda l: makeJsonFeat(gff3.Feature(l)), s[:-1].split("\n"))
 	# add block to answer
 	b2 = b.jsonObj()
 	b2["features"] = feats
@@ -211,7 +217,6 @@ def lookup(ff, ix, chr, start, end):
 	answer.append(b2)
     #
     return answer
-
 
 # Returns features by MGI id.
 # Args:
@@ -235,43 +240,6 @@ def idlookup(ff, ids):
         answer.append((i, fix.get(i,[])))
     #
     return answer
-
-# Performs a binary search on a list. Returns the the index of
-# the first item in the list having the given value, or None if not found.
-# Args:
-#    val The value to search for.
-#    lst The list to search. MUST be sorted on val! (Duh)
-#    vf  Function to get the value from a lst item. If None,
-#        (the default) the list items are the values
-# Returns
-#    Index of the first item in the list with the given value, or None
-#    if no item has that value.
-#
-def bsearch(val, lst, vf=None):
-    # if vf is None, use the identity function
-    vf = vf if vf else lambda x:x
-    # initialize search range
-    iMin = 0
-    iMax = len(lst) - 1
-    found = False
-    # go
-    while iMin <= iMax and iMax < len(lst):
-	# get value from middle item
-        iMid = (iMin + iMax) / 2
-        v = vf(lst[iMid])
-        if val < v:
-	    # look in first part of list
-            iMax = iMid - 1
-        elif val > v:
-	    # look in second part of list
-            iMin = iMid + 1
-	else:
-	    # Found one. Set the flag and continue searching the first part of the
-	    # list in order to find the first occurrence.
-	    found = True
-	    iMax = iMid - 1
-    # if found, then iMin is pointing at the first occurrence
-    return iMin if found else None
 
 #
 def initArgParser ():

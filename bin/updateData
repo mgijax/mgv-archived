@@ -15,7 +15,7 @@ mkdir -p ${DDIR}
 mkdir -p ${SDIR}
 
 # generate genome list file (a simple table of genome names and labels)
-genomeList="${DIR}/data/genomeList.tsv"
+genomeList="${DIR}/data/allGenomes.tsv"
 echo "name	label" > "${genomeList}"
 count=0
 for sn in "${ALL_GENOME_NAMES[@]}"
@@ -29,7 +29,7 @@ function download {
    genome=$1
    fname="${DDIR}/$2"
    url="${BASEURL}/${genome}/$2"
-   featFile="${SDIR}/${genome}-features.tsv"
+   featFile="${SDIR}/${genome}-features.gff"
    chrFile="${SDIR}/${genome}-chromosomes.tsv"
    ixFile="${SDIR}/${genome}-index.tsv"
    echo ${genome}
@@ -45,14 +45,15 @@ function download {
 }
 
 
-for sn in "${ALL_GENOME_NAMES[@]}"
+for gn in "${ALL_GENOME_NAMES[@]}"
 do : 
     # For every genome name, there is an env var of that name containing the file name for that genome
     # This gets the file name.
-    eval fname=\$$sn
+    eval fname=\$$gn
     # call the download function for this pair
-    download "${sn}" "${fname}"
-    echo ${sn}
+    download "${gn}" "${fname}"
+    echo ${gn}
 done
+exit
 
 ./generateBlockFiles

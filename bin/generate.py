@@ -1,93 +1,46 @@
-
 #
-'''
-generate.py
-
-Given two sets of features, one from genome A and one from genome B,
-and a file of a/b feature pairs defining corrospondence between features in A and B,
-generates synteny blocks between genome A and genome B via interpolation.
-
-Inputs: 2 files, plus optional 3rd:
-    1. A file of features from genome A. We'll call this "A". Required.
-    2. A file of features from genome B. We'll call this "B". Required.
-    3. A 2-column, tab delimited file of A/B ID pairs, which defines 
-       the correspondence between A and B features. We'll call this "AB".
-       This file is optional. If not given, then features from A and B are
-       considered equivalent if they have the same ID attribute.
-
-Outputs a tab-delimited file of inferred synteny blocks.
-Each row corresponds to one block, and has the following fields:
-    1. block id, integer
-    2. block count, number of AB pairs used to infer this block
-    3. block orientation, + or -
-    4. aChr: chromosome in A genome
-    5. aStart: start position on aChr
-    6. aEnd: end position on aChr
-    7. bChr: chromosome in b genome
-    8. bStart: start position on bChr
-    9. bEnd: end position on bChr
-
-Implementation outline:
-
-1. Filter AB to contain only 1:1 relationships.
-
-2. a. Filter file A for features whose ID appears in AB.
-   b. Sort by chr+start position.
-   c. Filter to remove any overlaps between features.
-   d. Number the features, 1, 2, 3...
-
-3. Repeat steps 2a-d, for file B.
-
-4. a. Join A-AB-B to obtain a table of feature pairs.
-   b. Project the needed columns:
-       aIndex, aID, aChr, aStart, aEnd, aStrand,
-       bIndex, bID, bChr, bStart, bEnd, bStrand
-
-5. Generate synteny blocks. The heart of the algorithm is here.
-   Given the output of step 4 (a file of corresponding pairs (a,b), separately numbered by position in each genome),
-   we sort the table by aIndex, then scan the results, looking for breaks in the sequece of bIndex values - these 
-   indicate synteny block boundaries. (Detail: also look for changes in aChr or bChr)
-'''
+# g2.py
+#
 import argparse
 import sys
 import gff3
 import math
+import itertools
 
 class SyntenyBlockGenerator:
 
+    #
     def __init__ (self):
         """
         Initializes the SyntenyBlockGenerator instance.
         """
         #
-        self.A = None   # list of gff3.Features
-        self.B = None   # list of gff3.Features
-        self.AB = None  # list of [aid,bid] pairs
-        #
-        self.nBlocks = 0 # number of synteny blocks created.
-        #
+        self.A = []   # list of gff3.Features
+	self.id2a = {}
+	self.mgi2a = {}
+	#
+        self.B = []   # list of gff3.Features
+	self.id2b = {}
+	self.mgi2b = {}
+	#
+	self.AB = []
+	#
+	self.parseArgs()
 
-        self.initArgParser()
-
+    #
     def go (self):
         """
         The generator's main program. Reads the inputs, does the computation,
         and writes the synteny blocks to the output.
         """
-        self.parseArgs()
         self.readFiles()
-        self.prepAB()
-        self.aid2feat = self.prepGff(self.A, self.a2b)
-        self.bid2feat = self.prepGff(self.B, self.b2a)
         self.join()
-        if self.args.debug:
-	    self.writePairs()
+	return
         self.generateBlocks()
         self.writeBlocks()
-#
-    def initArgParser (self):
+    #
+    def parseArgs (self) :
         """
-        Sets up the parser for the command line args.
         """
         self.parser = argparse.ArgumentParser(description='Generate synteny blocks.')
         self.parser.add_argument(
@@ -104,111 +57,59 @@ class SyntenyBlockGenerator:
             metavar='BFEATURES', 
             help='GFF3 file of features from genome B.')
 
-        self.parser.add_argument(
-            '-AB',
-            dest="fileAB",
-            metavar='FILE', 
-            help='Tab delimited, 2-column file of A/B id pairs. These pairs define correspondence between features in AFEATURES and BFEATURES. If no -AB is provided, then features correspond if they have the same ID.')
-
-        self.parser.add_argument(
-            '-d',
-            dest="debug",
-            action="store_true",
-            default=False,
-            help='Debug mode.')
-
-    def parseArgs (self) :
-        """
-        """
         self.args = self.parser.parse_args()
 
+    # 
+    def indexBy(self, feats, attr):
+	ix = {}
+        for f in feats:
+	    v = f.attributes.get(attr, None)
+	    ix.setdefault(v,[]).append(f)
+	return ix
+
+    #
     def readFiles (self) :
         """
         Loads the 2 GFF3 files and the AB file (if specified).
         If no AB specified, generates AB so that features with same ID correspond.
         """
+	#
         self.A = self.readFeatureFile(self.args.fileA)
+	self.id2a = self.indexBy(self.A, "ID") 
+	self.mgi2a= self.indexBy(self.A, "geneId")
 	self.ctgsByChrA = self.computeContigs(self.A)
+	#
         self.B = self.readFeatureFile(self.args.fileB)
+	self.id2b = self.indexBy(self.B, "ID") 
+	self.mgi2b= self.indexBy(self.B, "geneId")
 	self.ctgsByChrB = self.computeContigs(self.B)
-        if self.args.fileAB:
-            # correspondence is based on data file provided by user
-            self.AB = self.readTsv(self.args.fileAB)
-        else:
-            # correspondence is based on shared ID.
-            allIds = set([f.ID for f in self.A] + [f.ID for f in self.B])
-            self.AB = [ [i,i] for i in allIds ]
 
+    # Comparator functions for sorting features by chr + start pos.
+    def cmpFeatures(self, a, b):
+        if a[0] < b[0]:    # compare seqids
+	    return -1
+	elif a[0] > b[0]:
+	    return 1
+	elif a[3] < b[3]:  # compare start coordinates
+	    return -1
+	elif a[3] > b[3]:
+	    return 1
+	else:
+	    return 0;
+	
+    #
     def readFeatureFile (self, fname) :
         """
-        Reads a tsv file of features. Returns list of gff3.Feature objects.
-	Each row has these fields: chromosome, start, end, strand, type, biotype, id, mgiid, symbol
+        Reads a gff3 file of features.
+	Sorts them by chr+start
+	Numbers the features.
+	Returns the list.
         """
-	feats = []
-	for r in self.readTsv(fname):
-	    if r[0] == "chromosome":
-	        continue
-	    idval = r[6] if r[7] == "." else r[7]
-	    f = gff3.Feature([
-	        r[0],
-		".",
-		r[4],
-		r[1],
-		r[2],
-		".",
-		r[3],
-		".",
-		{ "ID" : idval,
-		  "bioType": r[5],
-		  "mgpId" : r[6]
-		}
-	    ])
-	    if r[7] != ".":
-	        f.attributes["mgiId"] = r[7]
-		f.attributes["mgiSymbol"] = r[8]
-	    feats.append(f);
+	feats = [f for f in gff3.iterate(fname)]
+	feats.sort(self.cmpFeatures)
+	for i,f in enumerate(feats):
+	    f.attributes["index"] = i
         return feats
-
-    def readTsv (self, fname) :
-        """
-        Reads a tab delimited text file.
-        Returns list of records, each a list of field values.
-        """
-        rows = []
-        fd = open(fname, 'r')
-        for line in fd:
-            rows.append( line[:-1].split("\t") )
-        fd.close()
-        return rows
-
-    def indexAB (self) :
-        """
-        Creates a mapping from aid to list of corresponding bids.
-        Creates a mapping from bid to list of corresponding aids.
-        """
-        self.a2b = {}  # map from a -> [ b's ]
-        self.b2a = {}  # map from b -> [ a's ]
-        for a,b in self.AB:
-            self.a2b.setdefault(a,[]).append(b)
-            self.b2a.setdefault(b,[]).append(a)
-
-    def prepAB (self) :
-        """
-        Filters the A/B pairs to contain only the 1:1s.
-        """
-        # index all relationships
-        self.indexAB()
-        # look for the 1-1's, build new list of a,b pairs
-        ab1_1 = []
-        for a in self.a2b:
-            if len(self.a2b[a]) == 1:
-                b = self.a2b[a][0]
-                if len(self.b2a[b]) == 1:
-                    ab1_1.append([a,b])
-        #
-        self.AB = ab1_1
-        # reindex with just the 1-1's
-        self.indexAB()
 
     # Finds the contigs (clusters of overlappping features) in the list of features.
     # We use a gff3.Feature to represent each contig, as we only need its chr, start, and end coordinate.
@@ -261,106 +162,210 @@ class SyntenyBlockGenerator:
 	        return c
 	#
 	return None
+	
+    # Helper class for the join() method
+    #
+    class ABJoinRec:
+	#
+	def __init__(self, a, b):
+	    self.a = a
+	    self.aIndex = 0
+	    self.b = b
+	    self.bIndex = 0
+	#
+	def __getitem__(self, n):
+	    return self.__dict__[n]
+	#
+	def __setitem__(self, n, v):
+	    self.__dict__[n] = v
+	#
+	def __str__(self):
+	    return "%d %s %d %s" % (self.aIndex, self.a.ID, self.bIndex, self.b.ID)
 
-    def prepGff (self, feats, index) :
-        """
-        Filters, sorts, and otherwise modifies the list of GFF3 features
-        to the refined list of (feature-like) objects.
-        Returns an index from ID to feature-like object.
-        """
-        # a. Filter for features whose ID is in the index
-        n = len(feats)
-        feats[:] = filter(lambda f: f.ID.startswith("MGI:") and f.ID in index, feats)
+    # Helper class allowing us to cover a list with "block" and be able to repeatedly split that block
+    class SBlock:
+	#
+        def __init__(self, recs):
+	    # the whole list
+	    self.recs = recs
+	    # my slice coodinates into the list
+	    self.start = 0
+	    self.end = len(recs)
+	    #
+	    self.next = None
+	    self.prev = None
+	    #
+	    self.dup = False
 
-        # b. Sort by chr+start position.
-        def gffSorter (a, b) :
-            if a.seqid == b.seqid:
-                return cmp(a.start, b.start)
-            else:
-                return cmp(a.seqid, b.seqid)
-        #
-        feats.sort(gffSorter)
+	def __getitem__(self, i):
+	    return self.recs[self.start + i]
 
-	'''
-        # c. Filter to remove any overlaps between features.
-        # IS THIS IMPORTANT??
-        def overlaps(a, b):
-            return a.seqid == b.seqid and a.start <= b.end and a.end >= b.start
-        #
-        nfs = []
-        pf = None
-        for f in feats:
-            if pf and overlaps(pf, f):
-                continue
-            nfs.append(f)
-            pf = f
-        n = len(feats)
-        feats[:] = nfs
-	'''
+	# length of my slice
+	def __len__(self):
+	    return self.end - self.start
+
+	# return my slice
+	def getRecs(self):
+	    return self.recs[ self.start : self.end ]
+
+	# Splits this block at the specified position and returns the new block.
+	# Position is relative to this block, i.e, the valid split positions are 
+	# between 0 and the length of the block (non-inclusive).
+	# Any value outside this range has no effect and returns None.
+	# Args:
+	#    pos (integer) split position, >0 and <len(self)
+	# Returns:
+	#    The new SBlock, which is the tail segment of the split. Self is truncated at the split point.
+	#    If the specified split position is outside the valid range, returns None, and self is unchanged.
+	# Side effects:
+	#    Links are maintained between split neighbors, so that all the blocks together form a 
+	#    doubly-linked list,
+	def split(self, pos):
+	    if pos <= 0 or pos >= len(self):
+	        return None
+	    #
+	    gpos = pos + self.start
+	    other = self.__class__(self.recs)
+	    #
+	    other.start = gpos
+	    other.end = self.end
+	    self.end = gpos
+	    #
+	    other.prev = self
+	    other.next = self.next
+	    self.next = other
+	    #
+	    return other
+
+	# Similar to split() with two big diffs:
+	# 1. Takes a global position (i.e., relative to whole list)
+	# 2. Traverses next/prev links as needed to find the block containing
+	# the position before doing the split.
+	# 
+	def splitG(self, gpos):
+	    # traverse left or right till we find the block or run out of room
+	    bb = self
+	    if gpos < bb.start:
+		while bb and gpos < bb.start: bb = bb.prev
+	    elif gpos > bb.end:
+		while bb and gpos > bb.end: bb = bb.next
+	
+	    if bb:
+		# found it. Do a local split
+		return bb.split( gpos - bb.start )
+	    else:
+		# nada
+	        return None
+
+    #
+    def pj(self, n=1000):
+	pr = None
+	da = 0
+	db = 0
+        for i in range(n):
+	    cr = self.AB[i]
+	    if pr:
+	        da = cr.aIndex - pr.aIndex
+	        db = cr.bIndex - pr.bIndex
+	    print da, db, self.AB[i]
+	    pr = cr
         
-        # d. Number the features, 1, 2, 3... and project just the bits we need
-        nfs = []
-        for i,f in enumerate(feats) :
-            nf = {
-                'index'  :   i,
-                'ID'     :   f.ID,
-                'chr'    :   f.seqid,
-                'start'  :   f.start,
-                'end'    :   f.end,
-                'strand' :   f.strand
-            }
-            nfs.append(nf)
-        feats[:] = nfs;
-        #
-        # e. Build an index from ID to feature, and return it.
-        ix = {}
-        for f in feats:
-            ix[f['ID']] = f
-        #
-        return ix
-
-    def renumber(self):
-        """
-        Renumbers the features in the current list of feature pairs to fill any gaps in the
-        numbering sequence.
-        """
-        def _renumber(which):
-            self.pairs.sort(
-              lambda x,y: cmp(x[which]['index'], y[which]['index']))
-            for i,p in enumerate(self.pairs): 
-                if p[which]:
-                    p[which]['index'] = i
-        #
-        _renumber('b')
-        _renumber('a')
-        # leave it sorted by a
-
-
+    #
     def join (self) :
         """
-        Joins the features in A to their corresponding features in B.
-        Generates a list of feature pairs. 
-        Update: add pairs that contain just an A or just a B (to deal with
-        insertions/deletions).
+        Joins the features in A to their corresponding features in B, based on shared geneId.
         """
-        self.pairs = []
-        for a in self.A:
-            aid = a['ID']
-            bid = self.a2b.get(aid,[None])[0]
-            b = self.bid2feat.get(bid, None)
-            #
-            if not b: continue
-            # 
-            pair = {
-              'a': a,
-              'b': b
-              }
-            self.pairs.append(pair)
-        #
-        # the join step may cause genes to drop out, and it is important that the
-        # sequence is unbroken for each genome
-        self.renumber()
+	# where the results go. Each element it an AJJoinRec
+	self.AB = []
 
+	# Join
+        for a in self.A:
+	    mgi = a.attributes.get("geneId", None)
+	    bs = self.mgi2b.get(mgi, [])
+	    for b in self.mgi2b.get(mgi,[]):
+	        r = self.ABJoinRec(a, b)
+		self.AB.append(r)
+	#
+	def sortAndNumber(which):
+	    # Sort by B, and number
+	    self.AB.sort( lambda r1, r2: r1[which].attributes['index'] - r2[which].attributes['index'] )
+	    i = 0
+	    pr = None
+	    for r in self.AB:
+		# increment for each new feature
+		if not pr or pr[which] != r[which]:
+		    i += 1
+		# extra increment at chromosome boundaries
+		if pr and pr[which].seqid != r[which].seqid:
+		    i += 10000
+		# 
+		r[which+'Index'] = i
+		pr = r
+
+	# Sort and number each side (A and B). Do B first, because we want to end up with
+	# things sorted on the A side.
+	sortAndNumber('b')
+	sortAndNumber('a')
+
+	# Create a block to cover the lot,
+	# then start splitting.
+	self.root = self.SBlock(self.AB)
+
+	# Split on A-side chromosome boundaries
+	cblock = self.root # current block
+	pr = None     # previous block
+	di = 1	      # index delta
+	for j,cr in enumerate(self.AB):
+	    if pr:
+	        di = cr.aIndex - pr.aIndex
+	    if di > 1:
+	        cblock = cblock.splitG(j)
+	    pr = cr
+	
+	# Split on A-side repeats
+	cb = self.root
+	while cb:
+	    dupBlk = None
+	    cb.dup = False
+	    count = 0
+	    for x,g in itertools.groupby(cb.getRecs(), lambda x:x.aIndex):
+	        g = list(g)
+		if len(g) > 1:
+		    #dup detected
+		    if not dupBlk:
+		        # start of dup block. split
+		        if count == 0:
+		            dupBlk = cb
+			else:
+			    dupBlk = cb.split(count)
+			    count = 0
+			dupBlk.dup = True
+		else:
+		    #non-dup
+		    if dupBlk:
+		        # end of dup block. split
+		        cb = dupBlk.split(count)
+			count = 0
+		        dupBlk = None
+		count += len(g)
+	    # end for
+	    cb = cb.next
+	# end while
+
+	# Split on B-side sequence runs
+	cb = self.root # current block
+	while cb:
+	    # loop through the recs in the current block, 
+	    # splitting on every seq run boundary
+	    pr = None 
+	    di = 0
+            for r in cb.getRecs():
+		if pr: di =  r.bIndex - pr.bIndex
+	        pr = r
+	    cb = cb.next
+	
+
+    '''
     def startBlock(self,pair):
         """
         Starts a new synteny block from the given feature pair.
@@ -435,6 +440,7 @@ class SyntenyBlockGenerator:
 	# At this point, any gaps between blocks are guaranteed to be "empty space". 
 	# Extend neighboring blocks so they meet in the middle.
 	#self.closeGaps()
+    '''
 
     # Extends the boundaries of each synteny block to the edges of the end contigs.
     def extendBlocksToContigBoundaries(self):
@@ -539,6 +545,7 @@ class SyntenyBlockGenerator:
 
 #
 def main () :
+    global sbg
     sbg = SyntenyBlockGenerator()
     sbg.go()
 

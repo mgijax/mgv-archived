@@ -1,20 +1,20 @@
-
 #
 # prepGenomeFile.py
 #
+# Preprocesses the GFF file for a genome. Extracts the MGI id and symbol (if present) and makes them
+# explicit attributes (they come embedded in a description field). Also writes out a chromosome information
+# file containing the names and lengths of each chromosome.
 #
-
 import sys
 import gff3
 import re
 import argparse
 
-
 class Prep:
     def __init__(self):
         self.args = None
         self.gffIn = None
-        self.tsvOut = None
+        self.gffOut = None
         self.chrOut = None
         self.mgi_re = re.compile(r'(MGI:[0-9]+)')
         self.initArgParser()
@@ -23,7 +23,7 @@ class Prep:
         """
         Sets up the parser for the command line args.
         """
-        self.parser = argparse.ArgumentParser(description='Generate synteny blocks.')
+        self.parser = argparse.ArgumentParser(description='')
         self.parser.add_argument(
             '-f',
             dest="gffFile",
@@ -51,9 +51,9 @@ class Prep:
         self.gffIn = sys.stdin
         if self.args.gffFile:
             self.gffIn = open(self.args.gffFile, "r")
-        self.tsvOut = sys.stdout
+        self.gffOut = sys.stdout
         if self.args.ofile:
-           self.tsvOut  = open(self.args.ofile, "w")
+           self.gffOut  = open(self.args.ofile, "w")
         if self.args.chrFile is None:
             if self.args.ofile:
                 self.args.chrFile = "chromosomes." + self.args.ofile 
@@ -65,24 +65,11 @@ class Prep:
         self.parseArgs()
         self.openFiles()
         # 
-        #
-        h1 = [
-            "chromosome",
-            "start",
-            "end",
-            "strand",
-            "type",
-            "biotype",
-            "id",
-            "mgiid",
-            "symbol",
-        ]
-        self.tsvOut.write('\t'.join(h1) + '\n')
-        #
         h2 = [
             "chromosome",
             "length",
         ]
+	self.gffOut.write(gff3.HEADER)
         self.chrOut.write('\t'.join(h2) + '\n')
         #
         for f in gff3.iterate(self.gffIn):
@@ -96,24 +83,28 @@ class Prep:
                 ]
                 self.chrOut.write('\t'.join(r) + '\n')
                 continue
-            # get the MGI id, if any
+	    # the MGP identifier. Unique across all the genomes.
+	    mgpId = f.ID.replace("gene:","")
+            # get the associated MGI id, if any
             m = self.mgi_re.search(f.attributes.get('description',''))
-            mgiid = "."
+            mgiId = "."
+	    #
+	    geneId = mgpId
+	    geneLabel = mgpId
             if m:
-                mgiid = m.group(1)
+                mgiId = m.group(1)
+		geneId = mgiId
+		geneLabel = f.attributes.get("Name",".")
             #
-            r = [
-                f.seqid,
-                str(f.start),
-                str(f.end),
-                f.strand,
-                f.type,
-                f.attributes.get("biotype","."),
-                f.ID.replace("gene:",""),
-                mgiid,
-                f.attributes.get("Name","."),
-            ]
-            self.tsvOut.write('\t'.join(r) + '\n')
+	    r = gff3.Feature(f)
+	    r.attributes = {
+	        'ID': mgpId,
+		'geneId': geneId,
+		'geneLabel': geneLabel,
+		'biotype': f.attributes.get("biotype",""),
+	    }
+	    #
+            self.gffOut.write(str(r))
             #
 #
 Prep().go()

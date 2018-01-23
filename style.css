@@ -257,7 +257,7 @@ label {
     min-width: 200px;
 }
 #zoomView > :first-child {
-    justify-content: space-between;
+    justify-content: space-around;
 }
 #zoomView > :first-child * {
     margin-left: 6px;

@@ -18,7 +18,7 @@ def getByCoords(datadir, form):
     coords = "4:65219973..91282907"
     '''
     # open the feature file
-    featfile = os.path.join(datadir, '%s-features.tsv' % genome)
+    featfile = os.path.join(datadir, '%s-features.gff' % genome)
     ff = open(featfile,'r')
     # read the index file
     indexfile = os.path.join(datadir, '%s-index.tsv' % genome)

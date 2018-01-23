@@ -351,9 +351,11 @@ class BlockTranslator {
 	let fromC = from+"Chr";
 	let fromS = from+"Start";
 	let fromE = from+"End";
+	let fromI = from+"Index";
 	let toC = to+"Chr";
 	let toS = to+"Start";
 	let toE = to+"End";
+	let toI = to+"Index";
 	let mapper = from+to+"Map";
 	// 
 	let blks = this.blocks
@@ -368,11 +370,13 @@ class BlockTranslator {
 		let s2 = Math.ceil(blk[mapper](s));
 		let e2 = Math.floor(blk[mapper](e));
 	        return {
+		    index: blk[toI],
 		    chr:   blk[toC],
 		    start: Math.min(s2,e2),
 		    end:   Math.max(s2,e2),
 		    ori:   blk.blockOri,
 		    // also return the fromGenome coordinates corresponding to this piece of the translation
+		    fIndex: blk[fromI],
 		    fChr:   blk[fromC],
 		    fStart: s,
 		    fEnd:   e,
@@ -380,7 +384,9 @@ class BlockTranslator {
 		    blockId: blk.blockId
 		};
 	    })
-	// 
+	// make sure blocks are sorted according to the destination genome
+	blks.sort( (a,b) => a.index - b.index );
+	//
 	return blks;
     }
     // Given a genome (either the a or b genome)
@@ -1078,16 +1084,16 @@ class ZoomView extends SVGView {
 	//
 	zbs.exit().remove();
 
-	// To line each chunk up with the corresponding chunk in the reference genome,
-	// create the appropriate x scales.
-	let offset = []; // offset of start  position of next block, by strip index (0===ref)
+	// Create xscale for each zoom block.
+	let offset = []; // offset of start position of next block, by strip index (0===ref)
 	zbs.each( (b,i,j) => { // b=block, i=index within strip, j=strip index
 	    // This one scales each comp block to be the same width as its ref range.
 	    // let x1 = this.xscale(b.fStart);
 	    // let x2 = this.xscale(b.fEnd);
 	    //
 	    // This one lets each comp block be its 'actual' width
-	    let x1 = i === 0 ? this.xscale(b.fStart) : offset[j];
+	    let xfs = this.xscale(b.fStart);
+	    let x1 = i === 0 ? xfs : Math.max(xfs, offset[j]+2);
 	    let x2 = x1 + ppb * (b.end - b.start + 1)
 	    b.xscale = d3.scale.linear().domain([b.start, b.end]).range([x1, x2]);
 	    offset[j] = x2;
@@ -1535,7 +1541,7 @@ class MGVApp {
 
 	// Things are all wired up. Now lets get some data.
 	// Start with the file of all the genomes.
-	d3tsv("./data/genomeList.tsv").then(function(data){
+	d3tsv("./data/allGenomes.tsv").then(function(data){
 	    // create Genome objects from the raw data.
 	    this.allGenomes   = data.map(g => new Genome(g));
 	    // build a name->Genome index
