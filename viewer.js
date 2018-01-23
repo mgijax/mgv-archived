@@ -579,11 +579,14 @@ class GenomeView extends SVGView {
     //----------------------------------------------
     brushend (){
 	if(!this.brushChr) return;
-	if(this.brushChr.brush.empty()) {
-	    this.brushChr = null;
-	    return;
-	}
 	var xtnt = this.brushChr.brush.extent();
+	if (xtnt[0] === xtnt[1]){
+	    // user clicked
+	    let cxt = this.app.getContext()
+	    let w = cxt.end - cxt.start + 1;
+	    xtnt[0] -= w/2;
+	    xtnt[1] += w/2;
+	}
 	let coords = { chr:this.brushChr.name, start:Math.floor(xtnt[0]), end: Math.floor(xtnt[1]) };
 	this.app.setContext(coords);
     }
@@ -938,6 +941,7 @@ class ZoomView extends SVGView {
       });
     }
     bbEnd () {
+      let xt = this.brushing.brush.extent();
       let r = this.bbGetRefCoords();
       this.brushing = null;
       //
@@ -947,7 +951,14 @@ class ZoomView extends SVGView {
           return;
       }
       //
-      if (se.shiftKey) {
+      if (xt[0] === xt[1]){
+          // user clicked instead of dragged. Recenter the view instead of zooming.
+	  let cxt = this.app.getContext();
+	  let w = cxt.end - cxt.start + 1;
+	  r.start -= w/2;
+	  r.end += w/2;
+      }
+      else if (se.shiftKey) {
           // zoom out
 	  let currWidth = this.coords.end - this.coords.start + 1;
 	  let brushWidth = r.end - r.start + 1;
