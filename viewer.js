@@ -1091,11 +1091,12 @@ class ZoomView extends SVGView {
 	    // let x2 = this.xscale(b.fEnd);
 	    //
 	    // This one lets each comp block be its 'actual' width
-	    let x1 = i === 0 ? this.xscale(b.fStart) : offset[j];
+	    let fsx = this.xscale(b.fStart);
+	    let x1 = i === 0 ? fsx : Math.max(fsx, offset[j]);
 	    let x2 = x1 + ppb * (b.end - b.start + 1)
 	    let delta = 0; // a hook for adjusting range (for line-em-up function)
 	    b.xscale = d3.scale.linear().domain([b.start, b.end]).range([x1+delta, x2+delta]);
-	    offset[j] = x2;
+	    offset[j] = x2+2;
 	});
 
 	//
