@@ -2,6 +2,8 @@
 #
 # prepGenomeFile.py
 #
+# Write out chromosome file (chr name + length).
+# Excludes features on contigs
 #
 
 import sys
@@ -14,6 +16,7 @@ class Prep:
     def __init__(self):
         self.args = None
         self.gffIn = None
+	self.mapping = None
         self.tsvOut = None
         self.chrOut = None
         self.mgi_re = re.compile(r'(MGI:[0-9]+)')
@@ -29,6 +32,12 @@ class Prep:
             dest="gffFile",
             metavar='GFF file', 
             help='Genome GFF3 input file. (Default=reads from stdin)')
+
+        self.parser.add_argument(
+            '-m',
+            dest="mappingfile",
+            metavar='FILE', 
+            help='File of MGI primary and secondary ids. 2 columns, tab delimited. Columns=primaryId, secondaryId')
 
         self.parser.add_argument(
             '-o',
@@ -51,6 +60,16 @@ class Prep:
         self.gffIn = sys.stdin
         if self.args.gffFile:
             self.gffIn = open(self.args.gffFile, "r")
+	#
+	if self.args.mappingfile:
+	    # read the mapping file, build a dict
+	    self.mapping = {}
+	    for line in open( self.args.mappingfile, "r"):
+	        toks = line[:-1].split("\t")
+		if len(toks) != 3: continue
+		if not toks[0].startswith("MGI:") or not toks[1].startswith("MGI:"): continue
+		self.mapping[toks[0]] = (toks[1],toks[2])
+	#
         self.tsvOut = sys.stdout
         if self.args.ofile:
            self.tsvOut  = open(self.args.ofile, "w")
@@ -89,18 +108,27 @@ class Prep:
             # exclude features on contigs.
             if len(f.seqid) > 2:
                 continue
+	    #
             if f.type == "chromosome":
+		# chromosome. write data and continue
                 r = [
                     f.seqid,
                     str(f.end - f.start + 1),
                 ]
                 self.chrOut.write('\t'.join(r) + '\n')
                 continue
-            # get the MGI id, if any
-            m = self.mgi_re.search(f.attributes.get('description',''))
+            # feature. get the MGI id, if any
             mgiid = "."
+	    symbol = f.attributes.get("Name",".")
+            m = self.mgi_re.search(f.attributes.get('description',''))
             if m:
                 mgiid = m.group(1)
+		# in case they used secondary ids, convert to primary
+		primary = self.mapping.get(mgiid, None)
+		if primary:
+		    sys.stderr.write("Secondary %s (%s) converted to primary %s (%s)\n" %(mgiid, symbol, primary[0], primary[1]))
+		    mgiid = primary[0]
+		    symbol = primary[1]
             #
             r = [
                 f.seqid,
@@ -111,7 +139,7 @@ class Prep:
                 f.attributes.get("biotype","."),
                 f.ID.replace("gene:",""),
                 mgiid,
-                f.attributes.get("Name","."),
+                symbol
             ]
             self.tsvOut.write('\t'.join(r) + '\n')
             #
