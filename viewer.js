@@ -765,8 +765,6 @@ class GenomeView extends SVGView {
 	    .data(d => d.blocks, b => b.blockId);
 	rects.enter().append("rect")
 	    .attr("class", "sblock")
-	    .classed("inversion", b => b.ori === "-")
-	    .classed("translocation", b => b.fromChr !== b.toChr)
 	    ;
 	rects.exit().remove();
 	//
@@ -776,6 +774,8 @@ class GenomeView extends SVGView {
 	    .attr("y", b => this.getY(b.fromStart))
 	    .attr("width", bwidth)
 	    .attr("height", b => this.getY(b.fromEnd - b.fromStart + 1))
+	    .classed("inversion", b => b.ori === "-")
+	    .classed("translocation", b => b.fromChr !== b.toChr)
 	    ;
 
 	let subt = `vs ${blockData.comp.label}`;
