@@ -1453,8 +1453,8 @@ class MGVApp {
 	this.cscale = d3.scale.category10().domain([
 	    "protein_coding_gene",
 	    "pseudogene",
-	    "gene_segment",
 	    "ncRNA_gene",
+	    "gene_segment",
 	    "other_gene",
 	    "other_feature_type"
 	]);
