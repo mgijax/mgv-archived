@@ -148,13 +148,13 @@ line.chr {
 }
 #genomeView .sblock {
     fill: #bbb;
-    stroke: none;
+    stroke: #aaa;
 }
 #genomeView .sblock.inversion {
 }
 #genomeView .sblock.translocation {
-    fill: blue;
-    stroke: blue;
+    fill: #f7cd97;
+    stroke: #f1a541;
 }
 #genomeView svg .title {
 }
@@ -257,7 +257,7 @@ label {
     min-width: 200px;
 }
 #zoomView > :first-child {
-    justify-content: space-between;
+    justify-content: space-around;
 }
 #zoomView > :first-child * {
     margin-left: 6px;

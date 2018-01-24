@@ -325,17 +325,15 @@ class BlockTranslator {
 	blk.baMap = blk.abMap.invert
 	return blk;
     }
-    setSort (aorb) {
-	if (aorb !== 'a' && aorb !== 'b') throw "Bar argument:" + aorb;
-        if (this.currentSort === aorb) return;
-	this.flipSort();
-    }
-    flipSort () {
-	let newSort = this.currSort === "a" ? "b" : "a";
-	let sortCol = newSort === "a" ? "aIndex" : "bIndex";
+    setSort (which) {
+	if (which !== 'a' && which !== 'b') throw "Bad argument:" + which;
+	let sortCol = which + "Index";
 	let cmp = (x,y) => x[sortCol] - y[sortCol];
 	this.blocks.sort(cmp);
-	this.currSort = newSort;
+	this.currSort = which;
+    }
+    flipSort () {
+	this.setSort(this.currSort === "a" ? "b" : "a");
     }
     // Given a genome (either the a or b genome) and a coordinate range,
     // returns the equivalent coordinate range(s) in the other genome
@@ -580,7 +578,7 @@ class GenomeView extends SVGView {
     brushend (){
 	if(!this.brushChr) return;
 	var xtnt = this.brushChr.brush.extent();
-	if (xtnt[0] === xtnt[1]){
+	if (Math.abs(xtnt[0] - xtnt[1]) <= 10){
 	    // user clicked
 	    let cxt = this.app.getContext()
 	    let w = cxt.end - cxt.start + 1;
@@ -822,7 +820,6 @@ class ZoomView extends SVGView {
       this.stripHeight = 60;    // height per genome in the zoom view
       //
       this.coords = null;	// curr zoom view coords { chr, start, end }
-      this.history = [];	// so user can go back
       this.hiFeats = {};	// IDs of Features we're highlighting. May be mgpid  or mgiId
       this.svg.append("g")
         .attr("class","fiducials");
@@ -951,7 +948,7 @@ class ZoomView extends SVGView {
           return;
       }
       //
-      if (xt[0] === xt[1]){
+      if (Math.abs(xt[0] - xt[1]) <= 10){
           // user clicked instead of dragged. Recenter the view instead of zooming.
 	  let cxt = this.app.getContext();
 	  let w = cxt.end - cxt.start + 1;
@@ -992,16 +989,11 @@ class ZoomView extends SVGView {
     // Data is structured as follows:
     //  - data is a list of items, one per strip to be displayed. Item[0] is data for the ref genome.
     //    Items[1+] are data for the comparison genome.
-    //    - each strip item is an object containing a genome and a list of blocks. Item[0] always has 
-    //      a single block.
-    //      - each block is an object containing a chromosome, start, end, orientation, etc, and a list of features.
-    //        - each feature has chr,start,end,strand,type,biotype,mgpid
+    //  - each strip item is an object containing a genome and a list of blocks. Item[0] always has 
+    //    a single block.
+    //  - each block is an object containing a chromosome, start, end, orientation, etc, and a list of features.
+    //  - each feature has chr,start,end,strand,type,biotype,mgpid
     draw (data) {
-	
-	//this.svg
-	    //.style("transition","transform 0.5s")
-	    //.style("transform","translate(0px, 0px)");
-
 	// 
 	let self = this;
 
@@ -1101,7 +1093,8 @@ class ZoomView extends SVGView {
 	    // This one lets each comp block be its 'actual' width
 	    let x1 = i === 0 ? this.xscale(b.fStart) : offset[j];
 	    let x2 = x1 + ppb * (b.end - b.start + 1)
-	    b.xscale = d3.scale.linear().domain([b.start, b.end]).range([x1, x2]);
+	    let delta = 0; // a hook for adjusting range (for line-em-up function)
+	    b.xscale = d3.scale.linear().domain([b.start, b.end]).range([x1+delta, x2+delta]);
 	    offset[j] = x2;
 	});
 
@@ -1116,7 +1109,7 @@ class ZoomView extends SVGView {
 	  .attr("width", b=>b.xscale(b.end)-b.xscale(b.start))
 	  .attr("height",this.blockHeight);
 
-	// Draw the rectangle for the entire strip (ie be able to outline whole strip for that genome)
+	// shadow box
 	let zsRects = this.svg.select("g.fiducials")
 	    .selectAll("rect.zoomStripShadow")
 	    .data(data, d => d.genome.name);
@@ -1166,6 +1159,7 @@ class ZoomView extends SVGView {
 	feats.exit().remove();
 	let newFeats = feats.enter().append("rect")
 	    .attr("class", f => "feature" + (f.strand==="-" ? " minus" : " plus"))
+	    .attr("name", f => f.mgpid)
 	    .style("fill", f => self.app.cscale(f.getMungedType()))
 	    .on("mouseover", function(f){
 		self.highlight(this);
@@ -1205,14 +1199,14 @@ class ZoomView extends SVGView {
     //----------------------------------------------
     // Updates feature highlighting in the current zoom view.
     // Features to be highlighted include those in the hiFeats list plus the feature
-    // corresponding to the rectangle argument, if given.
+    // corresponding to the rectangle argument, if given. (The mouseover feature.)
     //
     // Draws fiducials for features in this list that:
     // 1. overlap the current zoomView coord range
     // 2. are not rendered invisible by current facet settings
     //
     // Args:
-    //    current (rect element) Optional. A rectangle element that was moused-over. Highlighting
+    //    current (rect element) Optional. Add'l rectangle element, e.g., that was moused-over. Highlighting
     //        will include the feature corresponding to this rect along with those in the highlight list.
     //
     highlight (current) {
@@ -1369,6 +1363,16 @@ class ZoomView extends SVGView {
     hideFiducials () {
 	this.svg.select("g.fiducials")
 	    .classed("hidden", true);
+    }
+    //----------------------------------------------
+    // Translates each strip in the x-dimension as needed so that the
+    // rectangles for the given feature line up.
+    // The translation is sticky.
+    // 
+    alignOn (feat) {
+        // get the feature's rect
+	let fr = this.svg.select(`rect.feature[name="${feat.mgpid}"]`);
+	let frs = this.svg.selectAll("rect.feature")
     }
 
 
