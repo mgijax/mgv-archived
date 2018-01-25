@@ -67,6 +67,25 @@ line.chr {
     text-anchor : middle;
 }
 
+#cxtMenu {
+    position: absolute;
+    border: thin solid #8c8c8c;
+    border-radius: 4px;
+    padding: 4px;
+    background-color: #eee;
+    display: none;
+}
+#cxtMenu.showing {
+    display: inherit;
+}
+.menuItem label {
+    font-weight: normal;
+}
+.menuItem:hover {
+    color: white;
+    background-color: #2076b4;
+}
+
 #featureDetails {
     font-size: 12px;
 }

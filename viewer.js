@@ -133,8 +133,8 @@ class FeatureManager {
 	    cc.push(blk);
 	    cc.sort( (a,b) => a.start - b.start );
 	}
-	else
-	    console.log("Skipped block. Already seen.", genome.name, blk.id);
+	//else
+	    //console.log("Skipped block. Already seen.", genome.name, blk.id);
     }
 
     //----------------------------------------------
@@ -1198,6 +1198,14 @@ class ZoomView extends SVGView {
 	window.setTimeout(this.highlight.bind(this), 50);
     };
     //----------------------------------------------
+    // Clear all current highlighting
+    //
+    clearHighlight () {
+        this.hiFeats = {};
+	this.highlight();
+    }
+
+    //----------------------------------------------
     // Updates feature highlighting in the current zoom view.
     // Features to be highlighted include those in the hiFeats list plus the feature
     // corresponding to the rectangle argument, if given. (The mouseover feature.)
@@ -1462,6 +1470,25 @@ class MGVApp {
 	this.translator = new BTManager(this);
 	this.featureManager = new FeatureManager(this);
 	this.auxDataManager = new AuxDataManager(this);
+
+	// Context menu.
+	this.initContextMenu([
+	     { label: "Clear selections", handler: ()=>this.setContext({highlight:[]}) }
+	    ,{ label: "Foo", handler: ()=>console.log("Foo.") }
+	    ,{ label: "Bar", handler: ()=>console.log("Bar.") }
+	]);
+	d3.select("#container")
+	  .on("contextmenu", () => {
+	      // show context menu at mouse event coordinates
+	      d3.event.stopPropagation();
+	      d3.event.preventDefault();
+	      let cx = d3.event.clientX;
+	      let cy = d3.event.clientY;
+	      let bb = d3.select('#container')[0][0].getBoundingClientRect();
+	      this.showContextMenu(cx-bb.left,cy-bb.top);
+	  })
+	  // click on background hides it
+	  .on("click", () => this.hideContextMenu());
 
 	// Gear icon to show/hide left column
 	d3.select("#header > .gear.button")
@@ -1925,6 +1952,38 @@ class MGVApp {
 	    });
 	    g.chromosomes = chrs;
 	});
+    }
+    //----------------------------------------------
+    // Args:
+    //     data (list of menuItem configs) Each config looks like {label:string, handler: function}
+    initContextMenu (data) {
+	let menu = d3.select("#cxtMenu");
+	menu.selectAll(".menuItem").remove(); // in case of re-init
+        let mitems = d3.select("#cxtMenu")
+	  .selectAll(".menuItem")
+	  .data(data);
+	let news = mitems.enter()
+	  .append("div")
+	  .attr("class", "menuItem flexrow");
+	news.append("label")
+	  .text(d => d.label)
+	  .on("click", d => {
+	      d.handler();
+	      this.hideContextMenu();
+	  });
+    }
+
+    //----------------------------------------------
+    showContextMenu (x,y) {
+        d3.select("#cxtMenu")
+	    .classed("showing", true)
+	    .style("left", `${x}px`)
+	    .style("top", `${y}px`)
+	    ;
+    }
+    //----------------------------------------------
+    hideContextMenu () {
+        d3.select("#cxtMenu").classed("showing", false);
     }
     //----------------------------------------------
 } // end class MGVApp
