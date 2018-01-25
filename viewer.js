@@ -1155,8 +1155,19 @@ class ZoomView extends SVGView {
 	    .attr("y", b => b.genome.zoomY + 25);
 
 	// features
+	//
+	// never draw the same feature twice
+	let drawn = new Set();	// set of mgpids of drawn features
+	let filterDrawn = function (f) {
+	    // returns true if we've not seen this one before.
+	    // registers that we've seen it.
+	    let fid = f.mgpid;
+	    let v = ! drawn.has(fid);
+	    drawn.add(fid);
+	    return v;
+	};
 	let feats = zbs.select('.features').selectAll(".feature")
-	    .data(d=>d.features, d=>d.mgpid);
+	    .data(d=>d.features.filter(filterDrawn), d=>d.mgpid);
 	feats.exit().remove();
 	let newFeats = feats.enter().append("rect")
 	    .attr("class", f => "feature" + (f.strand==="-" ? " minus" : " plus"))
