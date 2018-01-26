@@ -1247,14 +1247,17 @@ class ZoomView extends SVGView {
     // Args:
     //    current (rect element) Optional. Add'l rectangle element, e.g., that was moused-over. Highlighting
     //        will include the feature corresponding to this rect along with those in the highlight list.
+    //    pulseCurrent (boolean) If true and current is given, cause it to pulse briefly.
     //
-    highlight (current) {
+    highlight (current, pulseCurrent) {
 	let self = this;
 	// current's feature
-	let currFeat = current ? current.__data__ : null;
+	let currFeat = current ? (current instanceof Feature ? current : current.__data__) : null;
 	// create local copy of hiFeats, with current feature added
 	let hiFeats = Object.assign({}, this.hiFeats);
-	if (currFeat) hiFeats[currFeat.id] = currFeat.id;
+	if (currFeat) {
+	    hiFeats[currFeat.id] = currFeat.id;
+	}
 
 	// Filter all features (rectangles) in the scene for those being highlighted.
 	// Along the way, build index mapping feature id to its "stack" of equivalent features,
@@ -1282,6 +1285,7 @@ class ZoomView extends SVGView {
               let dy = ff.strand === "+" ? (dh ? -self.featHeight-dh : -self.featHeight) : 0;
 	      d3.select(this)
 		  .classed("highlight", hl)
+		  .classed("extra", pulseCurrent && ff === currFeat)
 	          .attr("height", self.featHeight + dh)
 		  .attr("y", ff.genome.zoomY + dy)
 	      return hl;
@@ -1865,7 +1869,10 @@ class MGVApp {
 	// Draw the table
 	let t = d3.select('#featureDetails > table');
 	let rows = t.selectAll('tr').data( [colHeaders].concat(flist) );
-	rows.enter().append('tr');
+	rows.enter().append('tr')
+	  .on("mouseover", f => this.zoomView.highlight(f, true))
+	  .on("mouseout",  f => this.zoomView.highlight());
+	      
 	rows.exit().remove();
 	//
         rows

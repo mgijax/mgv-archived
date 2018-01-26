@@ -214,9 +214,16 @@ rect.feature {
     fill : #aaa;
     stroke: none;
 }
-rect.feature.highlight {
+rect.feature.highlight.extra {
+    stroke: red;
+    stroke-width: 0px;
+    -webkit-animation: pulse 1.5s ease-out;
+    -webkit-animation-iteration-count: 2; 
 }
-
+@-webkit-keyframes pulse {
+    0%   { stroke: red;    stroke-width: 0px;  }
+    100% { stroke: white;  stroke-width: 8px;  }
+}
 .colorKey {
     align-items: flex-start !important;
     padding: 6px;
@@ -327,6 +334,11 @@ label {
 .rotating {
     transform-origin: 50% 50%;
     -webkit-animation: rotation 2s infinite linear;
+}
+
+.rotateOnce {
+    transform-origin: 50% 50%;
+    -webkit-animation: rotation 2s linear;
 }
 
 @-webkit-keyframes rotation {
