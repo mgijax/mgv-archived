@@ -1502,10 +1502,17 @@ class MGVApp {
 	this.auxDataManager = new AuxDataManager(this);
 
 	// Context menu.
-	this.initContextMenu([
-	     { label: "Clear selections", handler: ()=>this.setContext({highlight:[]}) }
-	    ,{ label: "Other function", handler: ()=>alert('A hollow voice says, "Plugh."') }
-	]);
+	this.initContextMenu([{
+            label: "Clear selections",
+            icon: "clear",
+	    tooltip: "Unselects/unhighlights all current selections.",
+            handler: ()=>this.setContext({highlight:[]}) 
+        },{
+            label: "MGI SNPs", 
+	    icon: "open_in_new",
+	    tooltip: "Get SNPs from MGI for the current strains in the current region. (Some strains not available.)",
+	    handler: ()=> this.linkToMgiSnpReport()
+	}]);
 	d3.select("#container")
 	  .on("contextmenu", () => {
 	      // show context menu at mouse event coordinates
@@ -1790,6 +1797,7 @@ class MGVApp {
 	if (changed) {
 	    this.callback();
 	}
+	//
     }
     //----------------------------------------------
     resize (width, height) {
@@ -2014,13 +2022,17 @@ class MGVApp {
 	  .data(data);
 	let news = mitems.enter()
 	  .append("div")
-	  .attr("class", "menuItem flexrow");
+	  .attr("class", "menuItem flexrow")
+	  .attr("title", d => d.tooltip || null );
 	news.append("label")
 	  .text(d => d.label)
 	  .on("click", d => {
 	      d.handler();
 	      this.hideContextMenu();
 	  });
+	news.append("i")
+	  .attr("class", "material-icons")
+	  .text( d=>d.icon );
     }
 
     //----------------------------------------------
@@ -2036,6 +2048,19 @@ class MGVApp {
         d3.select("#cxtMenu").classed("showing", false);
     }
     //----------------------------------------------
+    linkToMgiSnpReport () {
+	let c = this.getContext();
+	let urlBase = 'http://www.informatics.jax.org/snp/summary';
+	let tabArg = 'selectedTab=1';
+	let searchByArg = 'searchBySameDiff=';
+	let chrArg = `selectedChromosome=${c.chr}`;
+	let coordArg = `coordinate=${c.start}-${c.end}`;
+	let unitArg = 'coordinateUnit=bp';
+	let csArgs = c.comps.map(g => `selectedStrains=${g}`)
+	let rsArg = `referenceStrain=${c.ref}`;
+	let linkUrl = `${urlBase}?${tabArg}&${searchByArg}&${chrArg}&${coordArg}&${unitArg}&${rsArg}&${csArgs.join('&')}`
+	window.open(linkUrl, "_blank");
+    }
 } // end class MGVApp
 
 //----------------------------------------------

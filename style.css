@@ -78,6 +78,9 @@ line.chr {
 #cxtMenu.showing {
     display: inherit;
 }
+.menuItem {
+    justify-content: space-between;
+}
 .menuItem label {
     font-weight: normal;
 }
@@ -85,7 +88,6 @@ line.chr {
     color: white;
     background-color: #2076b4;
 }
-
 #featureDetails {
     font-size: 12px;
 }
