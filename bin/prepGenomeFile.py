@@ -126,7 +126,8 @@ class Prep:
 		# in case they used secondary ids, convert to primary
 		primary = self.mapping.get(mgiid, None)
 		if primary:
-		    sys.stderr.write("Secondary %s (%s) converted to primary %s (%s)\n" %(mgiid, symbol, primary[0], primary[1]))
+		    sys.stderr.write("Secondary %s (%s) converted to primary %s (%s)\n"
+		        % (mgiid, symbol, primary[0], primary[1]))
 		    mgiid = primary[0]
 		    symbol = primary[1]
             #

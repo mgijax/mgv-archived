@@ -831,6 +831,7 @@ class ZoomView extends SVGView {
     update (coords) {
 	let c = this.coords = coords;
 	d3.select("#zoomCoords")[0][0].value = formatCoords(c.chr, c.start, c.end);
+	d3.select("#zoomWSize")[0][0].value = Math.round(c.end - c.start + 1)
 	//
         let mgv = this.app;
 	// when the translator is ready, we can translate the ref coords to each genome and
@@ -1041,7 +1042,16 @@ class ZoomView extends SVGView {
 		.on("click", function (g) {
 		    self.highlightStrip(g.genome, this);
 		});
+	//
 	zrs.exit().remove();
+	//
+	newZrs.append("g").attr("class","layer0").append("text");
+	newZrs.append("g").attr("class","layer1");
+	newZrs.append("g").attr("class","layer2");
+	//
+        let zrFids     = zrs.select(".layer0"); // underlay (fiducials)
+        let zrFeats    = zrs.select(".layer1"); // main (features)
+        let zrTop      = zrs.select(".layer2");	// overlay (axes, brushes)
 
 	// reset the svg size based on number of strips
 	d3.select(this.selector)
@@ -1051,41 +1061,45 @@ class ZoomView extends SVGView {
 	data.forEach( (d,i) => d.genome.zoomY = this.topOffset + (i * this.stripHeight) );
 	//
 	// genome labels
-	newZrs.append("text") ;
-	zrs.select("text")
+	zrFids.select("text")
 	    .attr("x", 0)
 	    .attr("y", d => d.genome.zoomY - (this.blockHeight/2 + 3))
 	    .attr("font-family","sans-serif")
 	    .attr("font-size", 10)
 	    .text(d => d.genome.label);
 
-	// zoom blocks
-	let zbs = zrs.selectAll(".zoomBlock")
+	// feature blocks
+	let fbs = zrFeats.selectAll(".zoomBlock")
 	    .data(d => d.blocks, d => d.blockId);
-	//
-	let newZbs = zbs.enter().append("g")
+	let newFbs = fbs.enter().append("g")
 	    .attr("class", b => "zoomBlock" + (b.ori==="+" ? " plus" : " minus"))
 	    .attr("name", b=>b.blockId);
+	//
+	fbs.exit().remove();
 
+	// fiducial blocks
+	let fids = zrFids.selectAll(".zoomBlock")
+	    .data(d => d.blocks, d => d.blockId);
+	let newFids = fids.enter().append("g")
+	    .attr("class", b => "zoomBlock" + (b.ori==="+" ? " plus" : " minus"))
+	    .attr("name", b=>b.blockId);
+	//
+	fids.exit().remove();
 	// rectangle for the whole block
-	newZbs.append("rect").attr("class", "block");
-	// group to hold features
-	newZbs.append('g').attr('class','features');
+	newFids.append("rect").attr("class", "block");
 	// the axis line
-	newZbs.append("line").attr("class","axis") ;
+	newFids.append("line").attr("class","axis") ;
 	// label
-	newZbs.append("text")
+	newFids.append("text")
 	    .attr("class","blockLabel") ;
 	// brush
-	newZbs.append("g").attr("class","brush");
+	newFids.append("g").attr("class","brush");
 
-	//
-	zbs.exit().remove();
 
 	// To line each chunk up with the corresponding chunk in the reference genome,
 	// create the appropriate x scales.
 	let offset = []; // offset of start  position of next block, by strip index (0===ref)
-	zbs.each( (b,i,j) => { // b=block, i=index within strip, j=strip index
+	fbs.each( (b,i,j) => { // b=block, i=index within strip, j=strip index
 	    // This one scales each comp block to be the same width as its ref range.
 	    // let x1 = this.xscale(b.fStart);
 	    // let x2 = this.xscale(b.fEnd);
@@ -1099,18 +1113,18 @@ class ZoomView extends SVGView {
 	    offset[j] = x2+2;
 	});
 
-	//
-	zbs.select("text.blockLabel")
+	// sblock label
+	fids.select("text.blockLabel")
 	    .text( b => b.chr );
 
-	// draw the zoom block outline
-	zbs.select("rect.block")
+	// shadow box for the sblock
+	fids.select("rect.block")
 	  .attr("x",     b => b.xscale(b.start))
 	  .attr("y",     b => b.genome.zoomY - this.blockHeight / 2)
 	  .attr("width", b=>b.xscale(b.end)-b.xscale(b.start))
 	  .attr("height",this.blockHeight);
 
-	// shadow box
+	// shadow box for the strip
 	let zsRects = this.svg.select("g.fiducials")
 	    .selectAll("rect.zoomStripShadow")
 	    .data(data, d => d.genome.name);
@@ -1124,7 +1138,7 @@ class ZoomView extends SVGView {
 	    ;
 
 	// axis line
-	zbs.select("line.axis")
+	fids.select("line.axis")
 	    .attr("x1", b => b.xscale.range()[0])
 	    .attr("y1", b => b.genome.zoomY)
 	    .attr("x2", b => b.xscale.range()[1])
@@ -1132,7 +1146,7 @@ class ZoomView extends SVGView {
 	    ;
 
 	// brush
-	zbs.select(".brush")
+	fids.select(".brush")
 	    .each(function(b) {
 		if (!b.brush) {
 		    b.brush = d3.svg.brush()
@@ -1146,11 +1160,11 @@ class ZoomView extends SVGView {
 	    .selectAll("rect")
 		.attr("height", 10);
 
-	zbs.select(".brush")
+	fids.select(".brush")
 	    .attr("transform", b => `translate(0,${b.genome.zoomY + this.featHeight + 6})`);
 
 	// chromosome label 
-	zbs.select("text.blockLabel")
+	fids.select("text.blockLabel")
 	    .attr("x", b => (b.xscale(b.start) + b.xscale(b.end))/2 )
 	    .attr("y", b => b.genome.zoomY + 25);
 
@@ -1166,7 +1180,7 @@ class ZoomView extends SVGView {
 	    drawn.add(fid);
 	    return v;
 	};
-	let feats = zbs.select('.features').selectAll(".feature")
+	let feats = fbs.selectAll(".feature")
 	    .data(d=>d.features.filter(filterDrawn), d=>d.mgpid);
 	feats.exit().remove();
 	let newFeats = feats.enter().append("rect")
@@ -1192,7 +1206,7 @@ class ZoomView extends SVGView {
 
 	// draw the rectangles
 	let fBlock = function (featElt) {
-	    let blkElt = featElt.parentNode.parentNode;
+	    let blkElt = featElt.parentNode;
 	    return blkElt.__data__;
 	}
 	feats
@@ -1547,6 +1561,27 @@ class MGVApp {
 		}
 		self.setContext(coords);
 	    });
+	// 
+	d3.select("#zoomWSize")
+	    .on("change", function() {
+	        let ws = parseInt(this.value);
+		let c = self.zoomView.coords;
+		if (isNaN(ws) || ws < 100) {
+		    alert("Invalid window size. Please enter an integer >= 100.");
+		    this.value = Math.round(c.end - c.start + 1);
+		}
+		else {
+		    let mid = (c.start + c.end) / 2;
+		    let news = Math.round(mid - ws/2);
+		    let newe = news + ws - 1;
+		    self.setContext({
+		        chr: c.chr,
+			start: news,
+			end: newe
+
+		    });
+		}
+	    });
 	//
 	d3.selectAll(".button.collapse")
 	    .on("click.default", function () {
@@ -1700,6 +1735,20 @@ class MGVApp {
 	return true;
     }
     //----------------------------------------------
+    // Returns the current context as an object.
+    // Current context = ref genome + comp genomes + current range (chr,start,end)
+    getContext () {
+        let c = this.zoomView.coords;
+        return {
+	    ref : this.rGenome.label,
+	    comps: this.cGenomes.map(g => g.label),
+	    chr: c.chr,
+	    start: c.start,
+	    end: c.end,
+	    highlight: Object.keys(this.zoomView.hiFeats)
+	}
+    }
+    //----------------------------------------------
     // Sets the current context from the config object
     //
     setContext (cfg) {
@@ -1758,20 +1807,6 @@ class MGVApp {
 	let coords = `chr=${c.chr}&start=${c.start}&end=${c.end}`;
 	let hls = `highlight=${c.highlight.join("+")}`;
 	return `${ref}&${comps}&${coords}&${hls}`;
-    }
-    //----------------------------------------------
-    // Returns the current context as an object.
-    // Current context = ref genome + comp genomes + current range (chr,start,end)
-    getContext () {
-        let c = this.zoomView.coords;
-        return {
-	    ref : this.rGenome.label,
-	    comps: this.cGenomes.map(g => g.label),
-	    chr: c.chr,
-	    start: c.start,
-	    end: c.end,
-	    highlight: Object.keys(this.zoomView.hiFeats)
-	}
     }
     //----------------------------------------------
     updateFeatureDetails (f) {
