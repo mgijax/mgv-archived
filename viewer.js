@@ -520,8 +520,9 @@ class SVGView {
     this.id = id;
     this.container = d3.select(`#${this.id}`);
     this.selector = `#${this.id} svg`;
-    this.svg = d3.select(this.selector)
-          .append("g")    // the margin-transated group
+    this.svg = d3.select(this.selector);
+    this.svgMain = this.svg
+          .append("g")    // the margin-translated group
           .append("g");	  // main group for the drawing
     this.setSize(width, height, {top: 20, right: 10, bottom: 20, left: 10});
   }
@@ -533,8 +534,7 @@ class SVGView {
     this.width  = this.outerWidth  - this.margin.left - this.margin.right;
     this.height = this.outerHeight - this.margin.top  - this.margin.bottom;
     //
-    d3.select(this.selector)
-            .attr("width", this.outerWidth)
+    this.svg.attr("width", this.outerWidth)
             .attr("height", this.outerHeight)
           .select("g")
             .attr("transform", `translate(${this.margin.left},${this.margin.top})`);
@@ -591,7 +591,7 @@ class GenomeView extends SVGView {
 
     //----------------------------------------------
     clearBrushes (except){
-	this.svg.selectAll('.brush').each(function(chr){
+	this.svgMain.selectAll('.brush').each(function(chr){
 	    if (chr.brush !== except) {
 		chr.brush.clear();
 		chr.brush(d3.select(this));
@@ -644,13 +644,13 @@ class GenomeView extends SVGView {
 	  }, this);
 
 	// Group to hold synteny blocks. Want this first so everything else overlays it.
-	let sygp = this.svg.selectAll('g[name="synBlocks"]').data([0]);
+	let sygp = this.svgMain.selectAll('g[name="synBlocks"]').data([0]);
 	sygp.enter().append("g").attr("name","synBlocks");
 	sygp.exit().remove();
 
 	// Chromosome backbones (lines)
 	// group to hold em
-	let bbgp = this.svg.selectAll('g[name="backbones"]').data([0]);
+	let bbgp = this.svgMain.selectAll('g[name="backbones"]').data([0]);
 	bbgp.enter().append("g").attr("name","backbones");
 	bbgp.exit().remove();
         // now the lines
@@ -677,7 +677,7 @@ class GenomeView extends SVGView {
 	    ;
 
 	// Chromosome labels
-	let clgp = this.svg.selectAll('g[name="labels"]').data([0]);
+	let clgp = this.svgMain.selectAll('g[name="labels"]').data([0]);
 	clgp.enter().append("g").attr("name","labels");
 	clgp.exit().remove();
 	//
@@ -699,7 +699,7 @@ class GenomeView extends SVGView {
 	  .attr('y', -2) ;
 
 	// Brushes
-	let brgp = this.svg.selectAll('g[name="brushes"]').data([0]);
+	let brgp = this.svgMain.selectAll('g[name="brushes"]').data([0]);
 	brgp.enter().append("g").attr("name","brushes");
 	brgp.exit().remove();
 	//
@@ -726,7 +726,7 @@ class GenomeView extends SVGView {
     //    subtitle (string) optional subtitle.
     drawTitle (title, subtitle) {
 	// Ref genome label
-	let ttl = this.svg.selectAll("text.title")
+	let ttl = this.svgMain.selectAll("text.title")
 	    .data([this.app.rGenome]);
 	ttl.enter().append("text").attr("class","title");
 	ttl.text(s => title || s.label)
@@ -789,10 +789,10 @@ class GenomeView extends SVGView {
 	// feature tick marks
 	let tickLength = 10;
 	if (!data) {
-	    this.svg.selectAll("line.feature").remove();
+	    this.svgMain.selectAll("line.feature").remove();
 	    return;
 	}
-        let feats = this.svg.selectAll("line.feature")
+        let feats = this.svgMain.selectAll("line.feature")
 	    .data(data||[], d => d.mgiid);
 	let nfs = feats.enter()
 	    .append("line")
@@ -821,9 +821,9 @@ class ZoomView extends SVGView {
       //
       this.coords = null;	// curr zoom view coords { chr, start, end }
       this.hiFeats = {};	// IDs of Features we're highlighting. May be mgpid  or mgiId
-      this.svg.append("g")
+      this.svgMain.append("g")
         .attr("class","fiducials");
-      this.svg.append("g")
+      this.svgMain.append("g")
         .attr("class","strips");
       // so user can go back
     }
@@ -930,7 +930,7 @@ class ZoomView extends SVGView {
 	  // note that translated results include block identifiers, which tell
 	  // us the block (and hence, brushes) in the display to target.
 	  rs.forEach( rr => {
-	      let bb = this.svg.select(`.zoomStrip[name="${g.name}"] .zoomBlock[name="${rr.blockId}"] .brush`)
+	      let bb = this.svgMain.select(`.zoomStrip[name="${g.name}"] .zoomBlock[name="${rr.blockId}"] .brush`)
 	      bb.each( function(b) {
 	          b.brush.extent([rr.start, rr.end]);
 		  d3.select(this).call(b.brush);
@@ -973,9 +973,9 @@ class ZoomView extends SVGView {
     highlightStrip (g, elt) {
 	if (g === this.currentHLG) return;
 	//
-	this.svg.selectAll('.zoomStrip')
+	this.svgMain.selectAll('.zoomStrip')
 	    .classed("highlighted", d => d.genome === g);
-	this.svg.selectAll('.zoomStripShadow')
+	this.svgMain.selectAll('.zoomStripShadow')
 	    .classed("highlighted", d => d.genome === g);
 	//
 	let ref = this.app.rGenome;
@@ -1025,14 +1025,14 @@ class ZoomView extends SVGView {
 	    .ticks(5)
 	    ;
 	// axis container
-	let axis = this.svg.selectAll("g.axis")
+	let axis = this.svgMain.selectAll("g.axis")
 	    .data([this]);
 	axis.enter().append("g").attr("class","axis");
 	// inject the axis elts
 	axis.call(this.axisFunc);
 
 	// strips, one per genome
-	let zrs = this.svg.select("g.strips")
+	let zrs = this.svgMain.select("g.strips")
 		  .selectAll("g.zoomStrip")
 		  .data(data, d => d.genome.name);
 	let newZrs = zrs.enter()
@@ -1061,7 +1061,7 @@ class ZoomView extends SVGView {
 	data.forEach( (d,i) => d.genome.zoomY = this.topOffset + (i * this.stripHeight) );
 	//
 	// genome labels. Put them in the view's fiducial layer
-	let gLabels = this.svg.select("g.fiducials")
+	let gLabels = this.svgMain.select("g.fiducials")
 	    .selectAll("text.genomeLabel")
 	    .data(data, d => d.genome.name);
 	gLabels.enter().insert("text").attr("class","genomeLabel");
@@ -1130,7 +1130,7 @@ class ZoomView extends SVGView {
 	  .attr("height",this.blockHeight);
 
 	// shadow box for the strip
-	let zsRects = this.svg.select("g.fiducials")
+	let zsRects = this.svgMain.select("g.fiducials")
 	    .selectAll("rect.zoomStripShadow")
 	    .data(data, d => d.genome.name);
 	zsRects.enter().append("rect").attr("class","zoomStripShadow");
@@ -1263,7 +1263,7 @@ class ZoomView extends SVGView {
 	// and give it the ".highlight" class.
 	//
 	let stacks = {}; // fid -> [ rects ] 
-        let feats = this.svg.selectAll(".feature")
+        let feats = this.svgMain.selectAll(".feature")
 	  // filter rect.features for those in the highlight list
 	  .filter(function(ff){
 	      // highlight ff if either id is in the list AND it's not been hidden
@@ -1315,7 +1315,7 @@ class ZoomView extends SVGView {
     drawFiducials (data, currFeat) {
 
 	// put fiducial marks in their own group 
-	let fGrp = this.svg.select("g.fiducials")
+	let fGrp = this.svgMain.select("g.fiducials")
 	    .classed("hidden", false);
 
 	// Bind first level data to "featureMarks" groups
@@ -1400,7 +1400,7 @@ class ZoomView extends SVGView {
     }
     //----------------------------------------------
     hideFiducials () {
-	this.svg.select("g.fiducials")
+	this.svgMain.select("g.fiducials")
 	    .classed("hidden", true);
     }
     //----------------------------------------------
@@ -1410,8 +1410,8 @@ class ZoomView extends SVGView {
     // 
     alignOn (feat) {
         // get the feature's rect
-	let fr = this.svg.select(`rect.feature[name="${feat.mgpid}"]`);
-	let frs = this.svg.selectAll("rect.feature")
+	let fr = this.svgMain.select(`rect.feature[name="${feat.mgpid}"]`);
+	let frs = this.svgMain.selectAll("rect.feature")
     }
 
 
@@ -1459,7 +1459,7 @@ class FacetManager {
     applyAll () {
 	let show = null;
 	let hide = "none";
-	mgv.zoomView.svg.select("g.strips").selectAll('rect.feature')
+	mgv.zoomView.svgMain.select("g.strips").selectAll('rect.feature')
 	    .style("display", f => this.test(f) ? show : hide);
     }
 } // end class FacetManager
@@ -1826,8 +1826,8 @@ class MGVApp {
 	// if call with no args, update using the previous feature
 	f = f || this.lastFeature;
 	if (!f) {
-	   let r = this.zoomView.svg.select("rect.feature.highlight")[0][0];
-	   if (!r) r = this.zoomView.svg.select("rect.feature")[0][0];
+	   let r = this.zoomView.svgMain.select("rect.feature.highlight")[0][0];
+	   if (!r) r = this.zoomView.svgMain.select("rect.feature")[0][0];
 	   if (r) f = r.__data__;
 	}
 	// remember
