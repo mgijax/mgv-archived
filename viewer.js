@@ -1045,7 +1045,7 @@ class ZoomView extends SVGView {
 	//
 	zrs.exit().remove();
 	//
-	newZrs.append("g").attr("class","layer0").append("text");
+	newZrs.append("g").attr("class","layer0");
 	newZrs.append("g").attr("class","layer1");
 	newZrs.append("g").attr("class","layer2");
 	//
@@ -1060,8 +1060,13 @@ class ZoomView extends SVGView {
 	// y-coords for each genome in the zoom view
 	data.forEach( (d,i) => d.genome.zoomY = this.topOffset + (i * this.stripHeight) );
 	//
-	// genome labels
-	zrFids.select("text")
+	// genome labels. Put them in the view's fiducial layer
+	let gLabels = this.svg.select("g.fiducials")
+	    .selectAll("text.genomeLabel")
+	    .data(data, d => d.genome.name);
+	gLabels.enter().insert("text").attr("class","genomeLabel");
+	gLabels.exit().remove();
+	gLabels
 	    .attr("x", 0)
 	    .attr("y", d => d.genome.zoomY - (this.blockHeight/2 + 3))
 	    .attr("font-family","sans-serif")
@@ -1499,8 +1504,7 @@ class MGVApp {
 	// Context menu.
 	this.initContextMenu([
 	     { label: "Clear selections", handler: ()=>this.setContext({highlight:[]}) }
-	    ,{ label: "Foo", handler: ()=>console.log("Foo.") }
-	    ,{ label: "Bar", handler: ()=>console.log("Bar.") }
+	    ,{ label: "Other function", handler: ()=>alert('A hollow voice says, "Plugh."') }
 	]);
 	d3.select("#container")
 	  .on("contextmenu", () => {
