@@ -47,6 +47,7 @@ function download {
        | grep -v "^#" \
        | grep -v "Parent=" \
        | grep -v biological_region \
+       | sort -k 1,1 -k 4,4n \
        | python "${BDIR}/prepGenomeFile.py" -m "${secondaryIdFile}" -o "${featFile}" -c "${chrFile}"
    python "${BDIR}/indexFeatures.py" -f "${featFile}" -x "${ixFile}" -a create
 }

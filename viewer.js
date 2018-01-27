@@ -26,6 +26,8 @@ class Feature {
         this.mgiid   = cfg.mgiid;
         this.symbol  = cfg.symbol;
         this.genome  = cfg.genome;
+	this.contig  = parseInt(cfg.contig);
+	this.lane    = parseInt(cfg.lane);
         if (this.mgiid === ".") this.mgiid = null;
         if (this.symbol === ".") this.symbol = null;
     }
@@ -814,10 +816,10 @@ class ZoomView extends SVGView {
       //
       this.minSvgHeight = 250;
       this.stripHeight = 36;
-      this.blockHeight = 30;
+      this.blockHeight = 40;
       this.topOffset = 45;
       this.featHeight = 10;	// height of a rectangle representing a feature
-      this.stripHeight = 60;    // height per genome in the zoom view
+      this.stripHeight = 70;    // height per genome in the zoom view
       //
       this.coords = null;	// curr zoom view coords { chr, start, end }
       this.hiFeats = {};	// IDs of Features we're highlighting. May be mgpid  or mgiId
@@ -1166,12 +1168,12 @@ class ZoomView extends SVGView {
 		.attr("height", 10);
 
 	fids.select(".brush")
-	    .attr("transform", b => `translate(0,${b.genome.zoomY + this.featHeight + 6})`);
+	    .attr("transform", b => `translate(0,${b.genome.zoomY + this.blockHeight / 2})`);
 
 	// chromosome label 
 	fids.select("text.blockLabel")
 	    .attr("x", b => (b.xscale(b.start) + b.xscale(b.end))/2 )
-	    .attr("y", b => b.genome.zoomY + 25);
+	    .attr("y", b => b.genome.zoomY + this.blockHeight / 2 + 10);
 
 	// features
 	//
@@ -1215,10 +1217,18 @@ class ZoomView extends SVGView {
 	    return blkElt.__data__;
 	}
 	feats
-	  .attr("width", function (f) { return fBlock(this).xscale(f.end)-fBlock(this).xscale(f.start)+1 })
-	  .attr("height", this.featHeight)
 	  .attr("x", function (f) { return fBlock(this).xscale(f.start) })
-	  .attr("y", function (f) { return f.genome.zoomY - (f.strand === "-" ? 0 : self.featHeight) })
+	  .attr("width", function (f) { return fBlock(this).xscale(f.end)-fBlock(this).xscale(f.start)+1 })
+	  //.attr("y", function (f) { return f.genome.zoomY - (f.strand === "-" ? 0 : self.featHeight) })
+	  //.attr("height", this.featHeight)
+	  .attr("y", function (f) {
+	       if (f.strand == "+")
+		   return f.genome.zoomY - 8*(f.lane-1) - 8;
+	       else
+	           return f.genome.zoomY + 8*((-f.lane) - 1) + 2;
+	       })
+	  .attr("height", 6)
+	  ;
 	
 	//
 	this.app.facetManager.applyAll();
@@ -1289,8 +1299,8 @@ class ZoomView extends SVGView {
 	      d3.select(this)
 		  .classed("highlight", hl)
 		  .classed("extra", pulseCurrent && ff === currFeat)
-	          .attr("height", self.featHeight + dh)
-		  .attr("y", ff.genome.zoomY + dy)
+	          //.attr("height", self.featHeight + dh)
+		  //.attr("y", ff.genome.zoomY + dy)
 	      return hl;
 	  })
 	  ;
