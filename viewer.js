@@ -1257,6 +1257,8 @@ class ZoomView extends SVGView {
 	let hiFeats = Object.assign({}, this.hiFeats);
 	if (currFeat) {
 	    hiFeats[currFeat.id] = currFeat.id;
+	    //if (currFeat.mgiid)
+		//console.log(this.app.featureManager.getCachedFeaturesByMgiId(currFeat.mgiid));
 	}
 
 	// Filter all features (rectangles) in the scene for those being highlighted.
@@ -1266,6 +1268,7 @@ class ZoomView extends SVGView {
 	// and give it the ".highlight" class.
 	//
 	let stacks = {}; // fid -> [ rects ] 
+	let dh = this.blockHeight/2 - this.featHeight;
         let feats = this.svgMain.selectAll(".feature")
 	  // filter rect.features for those in the highlight list
 	  .filter(function(ff){
@@ -1289,7 +1292,8 @@ class ZoomView extends SVGView {
 	          .attr("height", self.featHeight + dh)
 		  .attr("y", ff.genome.zoomY + dy)
 	      return hl;
-	  });
+	  })
+	  ;
 	// build data array for drawing fiducials between equivalent features
 	let data = [];
 	for (let k in stacks) {
@@ -1507,27 +1511,27 @@ class MGVApp {
 
 	// Context menu.
 	this.initContextMenu([{
-            label: "Clear selections",
-            icon: "clear",
-	    tooltip: "Unselects/unhighlights all current selections.",
-            handler: ()=>this.setContext({highlight:[]}) 
-        },{
             label: "MGI SNPs", 
 	    icon: "open_in_new",
 	    tooltip: "Get SNPs from MGI for the current strains in the current region. (Some strains not available.)",
 	    handler: ()=> this.linkToMgiSnpReport()
+        },{
+            label: "Clear selections",
+            icon: "clear",
+	    tooltip: "Unselects/unhighlights all current selections.",
+            handler: ()=>this.setContext({highlight:[]}) 
 	}]);
-	d3.select("#container")
-	  .on("contextmenu", () => {
+	d3.select("#zoomView .menu > .button")
+	  .on("click", function () {
 	      // show context menu at mouse event coordinates
 	      d3.event.stopPropagation();
 	      d3.event.preventDefault();
 	      let cx = d3.event.clientX;
 	      let cy = d3.event.clientY;
-	      let bb = d3.select('#container')[0][0].getBoundingClientRect();
-	      this.showContextMenu(cx-bb.left,cy-bb.top);
-	  })
-	  // click on background hides it
+	      let bb = d3.select(this)[0][0].getBoundingClientRect();
+	      self.showContextMenu(cx-bb.left,cy-bb.top);
+	  });
+	d3.select("#container")
 	  .on("click", () => this.hideContextMenu());
 
 	// Gear icon to show/hide left column
@@ -1825,12 +1829,14 @@ class MGVApp {
 	return `${ref}&${comps}&${coords}&${hls}`;
     }
     //----------------------------------------------
+    //
     updateFeatureDetails (f) {
-
-	// if call with no args, update using the previous feature
+	// if called with no args, update using the previous feature
 	f = f || this.lastFeature;
 	if (!f) {
+	   // fallback. take the first highlighted.
 	   let r = this.zoomView.svgMain.select("rect.feature.highlight")[0][0];
+	   // fallback. take the first feature
 	   if (!r) r = this.zoomView.svgMain.select("rect.feature")[0][0];
 	   if (r) f = r.__data__;
 	}
@@ -1870,17 +1876,18 @@ class MGVApp {
 	let t = d3.select('#featureDetails > table');
 	let rows = t.selectAll('tr').data( [colHeaders].concat(flist) );
 	rows.enter().append('tr')
-	  .on("mouseover", f => this.zoomView.highlight(f, true))
-	  .on("mouseout",  f => this.zoomView.highlight());
+	  .on("mouseenter", (f,i) => i !== 0 && this.zoomView.highlight(f, true))
+	  .on("mouseleave", (f,i) => i !== 0 && this.zoomView.highlight());
 	      
 	rows.exit().remove();
+	rows.classed("highlight", (ff, i) => (i !== 0 && ff === f));
 	//
-        rows
-	  .classed("highlight", (ff, i) => (i !== 0 && ff === f))
-	  .html( (f,i) => {
+	// Given a feature, returns a list of strings for populating a table row.
+	// If i===0, then f is not a feature, but a list columns names+widths.
+	// 
+	let cellData = function (f, i) {
 	    if (i === 0) {
-		let colHeaders = f;
-	        return colHeaders.map( h => `<th style="width: ${h[1]}%">${h[0]}</th>` ).join('');
+		return f;
 	    }
 	    let cellData = [ genomeOrder[i-1].label, ".", ".", ".", ".", ".", ".", "." ];
 	    // f is null if it doesn't exist for genome i 
@@ -1902,9 +1909,17 @@ class MGVApp {
 		    f.symbol
 		];
 	    }
-	    return cellData.map( d => `<td>${d}</td>` ).join('');
+	    //return cellData.map( d => `<td>${d}</td>` ).join('');
+	    return cellData;
+	};
+	let cells = rows.selectAll("td")
+	    .data((f,i) => cellData(f,i));
+	cells.enter().append("td");
+	cells.exit().remove();
+	cells.html((d,i,j) => {
+	    return j === 0 ? d[0] : d
 	})
-	;
+	.style("width", (d,i,j) => j === 0 ? `${d[1]}%` : null);
     }
 
 

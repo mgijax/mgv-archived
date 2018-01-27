@@ -74,6 +74,8 @@ line.chr {
     padding: 4px;
     background-color: #eee;
     display: none;
+    z-index: 100;
+    white-space: nowrap;
 }
 #cxtMenu.showing {
     display: inherit;
@@ -93,6 +95,9 @@ line.chr {
 }
 #featureDetails > .flexrow > label {
     width: 32%;
+}
+#featureDetails table > tr:first-child {
+    font-weight: bold;
 }
 
 #zoomView .brush rect {

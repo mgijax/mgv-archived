@@ -98,15 +98,26 @@
 	    </div> <!-- end featureDetails -->
 	    <div id="zoomView" class="pagebox flexcolumn">
 		<div class="flexrow">
+		    <!-- menu -->
+		    <div class = "menu flexrow">
+			<i class="material-icons button" title="More functions...">menu</i>
+			<div id="cxtMenu" class="flexcolumn">
+			    <div class="menuItem flexrow">
+			    </div>
+			</div>
+		    </div>
+		    <!-- coordinates display/input -->
 		    <div class="zoomCoords flexrow">
 			<label>Ref Genome Coords</label>
 			<input id="zoomCoords" size="30" type="text"></input>
 		    </div>
+		    <!-- coord window size display/input -->
 		    <div class="zoomWSize flexrow">
 			<label>Showing</label>
 			<input id="zoomWSize" size="10" type="text"></input>
 			<span>bp</span>
 		    </div>
+		    <!-- zoom buttons -->
 		    <div class="zoomBtns flexrow">
 			<label>Zoom</label>
 			<i id="zoomOutMore" class="material-icons button more" title="Zoom out more">zoom_out</i>
@@ -114,6 +125,7 @@
 			<i id="zoomIn" class="material-icons button" title="Zoom in">zoom_in</i>
 			<i id="zoomInMore" class="material-icons button more" title="Zoom in more">zoom_in</i>
 		    </div>
+		    <!-- pan buttons -->
 		    <div class="panBtns flexrow">
 			<label>Pan</label>
 			<i id="panLeftMore" class="material-icons button more" title="Pan left more." >chevron_left</i>
@@ -137,12 +149,6 @@
 	<a tabindex="-1" href="https://github.com/JoelRichardson/mgv">MGV@GitHub</a>
     </div>
 
-    <!-- Context menu -->
-    <div id="cxtMenu" class="flexcolumn">
-        <div class="menuItem flexrow">
-	    <span>Clear selection</span>
-	</div>
-    </div>
 
 </div>    
 <script src="viewer.js"></script>
