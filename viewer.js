@@ -1,5 +1,37 @@
 (function () {
  
+const PREFIX = "org.jax.mgi.app.mgv"; // for unique-ification of localStorage names.
+
+// ---------------------------------------------
+// Interacts with localStorage.
+class StorageManager {
+    constructor (name) {
+	this.name = name;
+	this.prefix = PREFIX;
+	this.storage = window.localStorage;
+	this.myDataObj = null;
+	//
+	this._load();
+    }
+    _load () {
+	// loads myDataObj from storage
+        let s = this.storage.getItem(this.prefix + "." + this.name);
+	this.myDataObj = s ? JSON.parse(s) : {};
+    }
+    _save () {
+	// writes myDataObj to storage
+        let s = JSON.stringify(this.myDataObj);
+	this.storage.setItem(this.prefix + "." + this.name, s)
+    }
+    get (n) {
+        return this.myDataObj[n];
+    }
+    put (n, v) {
+        this.myDataObj[n] = v;
+	this._save();
+    }
+}
+
 // ---------------------------------------------
 class Genome {
   constructor (cfg) {
@@ -240,56 +272,39 @@ class FeatureManager {
 } // end class Feature Manager
 
 // ---------------------------------------------
-// AuxDataManager - knows how to query an external source (right now it's MouseMine) for genes
-// annotated to different ontologies.
+// AuxDataManager - knows how to query an external source (i.e., MouseMine) for genes
+// annotated to different ontologies. 
 class AuxDataManager {
     constructor (app) {
 	this.app = app;
-        this.cache = {};
     }
 
     //----------------------------------------------
-    merge (newdata, fields) {
-	let mgiix = fields.indexOf('mgiid');
-	if (mgiix < 0) throw "No mgiid field in field name list."
-        return newdata.map(d => {
-	    let mgiid = d[mgiix];
-	    let f ;
-	    if (this.cache[mgiid])
-		f = this.cache[mgiid];
-	    else
-		f = this.cache[mgiid] = { mgiid };
-	    fields.forEach( (fn,i) => f[fn] = d[i] );
-	    return f;
-	})
-    }
-
-    //----------------------------------------------
-    getAuxData (q, fields) {
-	let url = "http://www.mousemine.org/mousemine/service/query/results?format=json&query=" + encodeURIComponent(q) ;
-	return d3json(url).then( data => {
-	    return this.merge(data.results, fields);
-	});
+    getAuxData (q) {
+	let format = 'jsonobjects';
+	let query = encodeURIComponent(q);
+	let url = `http://www.mousemine.org/mousemine/service/query/results?format=${format}&query=${query}`;
+	return d3json(url).then(data => data.results);
     }
 
     //----------------------------------------------
     // do a LOOKUP query for SequenceFeatures from MouseMine
     featuresByLookup (qryString) {
-	let q = `<query name="" model="genomic" view="SequenceFeature.primaryIdentifier SequenceFeature.symbol SequenceFeature.name SequenceFeature.chromosomeLocation.locatedOn.primaryIdentifier SequenceFeature.chromosomeLocation.start SequenceFeature.chromosomeLocation.end SequenceFeature.chromosomeLocation.strand" longDescription="" constraintLogic="A and B">
+	let q = `<query name="" model="genomic" view="SequenceFeature.primaryIdentifier SequenceFeature.symbol" longDescription="" constraintLogic="A and B">
 	    <constraint path="SequenceFeature" code="A" op="LOOKUP" value="${qryString}"/>
 	    <constraint path="SequenceFeature.organism.taxonId" code="B" op="=" value="10090"/>
 	    </query>`;
-	return this.getAuxData(q, ['mgiid','symbol','name','chr','start','end','strand']);
+	return this.getAuxData(q);
     }
     //----------------------------------------------
     featuresByOntologyTerm (qryString,termType) {
-        let q = `<query name="" model="genomic" view="SequenceFeature.primaryIdentifier SequenceFeature.symbol SequenceFeature.ontologyAnnotations.ontologyTerm.identifier SequenceFeature.ontologyAnnotations.ontologyTerm.name SequenceFeature.chromosomeLocation.locatedOn.primaryIdentifier SequenceFeature.chromosomeLocation.start SequenceFeature.chromosomeLocation.end SequenceFeature.chromosomeLocation.strand" longDescription="" sortOrder="SequenceFeature.symbol asc">
+        let q = `<query name="" model="genomic" view="SequenceFeature.primaryIdentifier SequenceFeature.symbol" longDescription="" sortOrder="SequenceFeature.symbol asc">
 	  <constraint path="SequenceFeature.ontologyAnnotations.ontologyTerm" type="${termType}"/>
 	  <constraint path="SequenceFeature.ontologyAnnotations.ontologyTerm.parents" type="${termType}"/>
 	  <constraint path="SequenceFeature.ontologyAnnotations.ontologyTerm.parents" code="A" op="LOOKUP" value="${qryString}"/>
 	  <constraint path="SequenceFeature.organism.taxonId" code="B" op="=" value="10090"/>
 	  </query>`
-	return this.getAuxData(q, ['mgiid','symbol','termid','term','chr','start','end','strand']);
+	return this.getAuxData(q);
     }
     //----------------------------------------------
     featuresById        (qryString) { return this.featuresByLookup(qryString); }
@@ -297,6 +312,75 @@ class AuxDataManager {
     featuresByPhenotype (qryString) { return this.featuresByOntologyTerm(qryString, "MPTerm"); }
     featuresByDisease   (qryString) { return this.featuresByOntologyTerm(qryString, "DOTerm"); }
     //----------------------------------------------
+}
+
+// ---------------------------------------------
+// Maintains lists of IDs
+class ListManager {
+    constructor () {
+	this.name2list = null;
+	this._lists = new StorageManager("listManager.lists")
+	//
+	this._load();
+    }
+    _load () {
+        this.name2list = this._lists.get("all");
+	if (!this.name2list){
+	    this.name2list = {};
+	    this._save();
+	}
+    }
+    _save () {
+        this._lists.put("all", this.name2list);
+    }
+    getNames () {
+        let nms = Object.keys(this.name2list);
+	nms.sort();
+	return nms;
+    }
+    has (name) {
+        return name in this.name2list;
+    }
+    get (name) {
+        return this.name2list[name];
+    }
+    create (name, ids) {
+	if (this.has(name)) return this.updateList(name,ids);
+	//
+	this.name2list[name] = new List(name, ids);
+	this._save();
+    }
+    updateList (name, ids) {
+	let lst = this.get(name);
+        if (! lst) throw "No such list: " + name;
+	lst.ids = ids;
+	this._save();
+    }
+    purge () {
+        this.name2list = {}
+	this._save();
+    }
+}
+class List {
+    constructor (name, ids) {
+	this.name = name;
+	this.ids = ids;
+	this.creationDate = new Date() + "";
+    }
+    _op_ (op, other, name) {
+        let newids = Array.from( (new Set(this.ids))[op](new Set(other.ids)) );
+	if (!name) name = `(${this.name} ${op} ${other.name})`;
+	return new List( name, newids );
+    }
+    union (other, name) {
+        return this._op_("union", other, name);
+    }
+    intersect (other, name) {
+        return this._op_("intersection", other, name);
+    }
+    subtract (other, name) {
+        return this._op_("difference", other, name);
+    }
 }
 
 // ---------------------------------------------
@@ -1211,6 +1295,7 @@ class ZoomView extends SVGView {
 		    delete self.hiFeats[id]
 		else
 		    self.hiFeats[id] = id;
+		self.app.listManager.updateList("selected", Object.keys(self.hiFeats));
 		self.highlight();
 		self.app.callback();
 	    });
@@ -1240,13 +1325,6 @@ class ZoomView extends SVGView {
 	// the positions of rectangles in the scene.
 	window.setTimeout(this.highlight.bind(this), 50);
     };
-    //----------------------------------------------
-    // Clear all current highlighting
-    //
-    clearHighlight () {
-        this.hiFeats = {};
-	this.highlight();
-    }
 
     //----------------------------------------------
     // Updates feature highlighting in the current zoom view.
@@ -1514,6 +1592,10 @@ class MGVApp {
 	    "other_gene",
 	    "other_feature_type"
 	]);
+	//
+	this.listManager = new ListManager();
+	this.listManager.create("selected", []);
+	//
 	this.translator = new BTManager(this);
 	this.featureManager = new FeatureManager(this);
 	this.auxDataManager = new AuxDataManager(this);
@@ -1529,6 +1611,11 @@ class MGVApp {
             icon: "clear",
 	    tooltip: "Unselects/unhighlights all current selections.",
             handler: ()=>this.setContext({highlight:[]}) 
+        },{
+            label: "Purge lists",
+            icon: "delete",
+	    tooltip: "Deletes all saved lists from local storage.",
+            handler: ()=>this.listManager.purge()
 	}]);
 	d3.select("#zoomView .menu > .button")
 	  .on("click", function () {
@@ -1637,17 +1724,17 @@ class MGVApp {
 	// ------------------------------
 	// ------------------------------
 	// Query boxes (experimental)
-	let pfs = function(ffun, s) {
+	let pfs = function(ffun, s, lstName) {
 	    self.auxDataManager[ffun](s)
 	      .then(feats => {
 		  feats.forEach(f => self.zoomView.hiFeats[f.mgiid] = f.mgiid);
-	          self.genomeView.drawTicks(feats);
+		  self.listManager.create(lstName, feats.map(f => f.primaryIdentifier))
 	      });
 	};
-	d3.select("#lookup")   .on("change", function () { pfs("featuresById",        this.value) });
-	d3.select("#function") .on("change", function () { pfs("featuresByFunction",  this.value) });
-	d3.select("#phenotype").on("change", function () { pfs("featuresByPhenotype", this.value) });
-	d3.select("#disease")  .on("change", function () { pfs("featuresByDisease",   this.value) });
+	d3.select("#lookup")   .on("change", function () { pfs("featuresById",        this.value, `id=${this.value}` ) });
+	d3.select("#function") .on("change", function () { pfs("featuresByFunction",  this.value, `function=${this.value}` ) });
+	d3.select("#phenotype").on("change", function () { pfs("featuresByPhenotype", this.value, `phenotype=${this.value}` ) });
+	d3.select("#disease")  .on("change", function () { pfs("featuresByDisease",   this.value, `disease=${this.value}` ) });
 	// ------------------------------
 	// ------------------------------
 
@@ -1760,6 +1847,7 @@ class MGVApp {
     setHighlight (flist) {
 	if (!flist) return false;
 	this.zoomView.hiFeats = flist.reduce((a,v) => { a[v]=v; return a; }, {});
+	this.listManager.updateList("selected", Object.keys(this.zoomView.hiFeats));
 	return true;
     }
     //----------------------------------------------
@@ -2256,6 +2344,34 @@ function same (alst,blst) {
        alst.reduce((acc,x) => (acc && blst.indexOf(x)>=0), true);
 }
 
+//---------------------------------------------
+// Add basic set ops to Set prototype.
+// Stolen from: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set
+Set.prototype.union = function(setB) {
+    var union = new Set(this);
+    for (var elem of setB) {
+        union.add(elem);
+    }
+    return union;
+}
+
+Set.prototype.intersection = function(setB) {
+    var intersection = new Set();
+    for (var elem of setB) {
+        if (this.has(elem)) {
+            intersection.add(elem);
+        }
+    }
+    return intersection;
+}
+
+Set.prototype.difference = function(setB) {
+    var difference = new Set(this);
+    for (var elem of setB) {
+        difference.delete(elem);
+    }
+    return difference;
+}
 // ---------------------------------------------
 // ---------------------------------------------
 function pqstring (qstring) {
@@ -2330,6 +2446,7 @@ function __main__ () {
     // handle resize events
     window.onresize = () => mgv.resize(window.innerWidth, window.innerHeight);
 }
+
 
 __main__();
 
