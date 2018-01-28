@@ -177,8 +177,8 @@ class Prep:
 		    lane[1].append(f)
 		    break
             else:
-		fLane = sign
 	        pool.append( [f.end, [f]] ) # lane = [hwm, [list o' features]]
+		fLane = len(pool) * sign
 
 
             # write the feature record
