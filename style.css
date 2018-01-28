@@ -219,6 +219,9 @@ rect.feature {
     fill : #aaa;
     stroke: none;
 }
+rect.feature.highlight {
+    stroke: #f2ffa0;
+}
 rect.feature.highlight.extra {
     stroke: red;
     stroke-width: 0px;

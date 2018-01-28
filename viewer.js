@@ -340,6 +340,8 @@ class BlockTranslator {
     // Given a genome (either the a or b genome) and a coordinate range,
     // returns the equivalent coordinate range(s) in the other genome
     translate (fromGenome, chr, start, end) {
+	//
+	end = end === undefined ? start : end;
 	// from = "a" or "b", depending on which genome is given.
         let from = (fromGenome === this.aGenome ? "a" : fromGenome === this.bGenome ? "b" : null);
 	if (!from) throw "Bad argument. Genome neither A nor B.";
@@ -818,7 +820,9 @@ class ZoomView extends SVGView {
       this.stripHeight = 36;
       this.blockHeight = 40;
       this.topOffset = 45;
-      this.featHeight = 10;	// height of a rectangle representing a feature
+      this.featHeight = 6;	// height of a rectangle representing a feature
+      this.laneGap = 2;	        // space between swim lanes
+      this.laneHeight = this.featHeight + this.laneGap;
       this.stripHeight = 70;    // height per genome in the zoom view
       //
       this.coords = null;	// curr zoom view coords { chr, start, end }
@@ -1219,15 +1223,14 @@ class ZoomView extends SVGView {
 	feats
 	  .attr("x", function (f) { return fBlock(this).xscale(f.start) })
 	  .attr("width", function (f) { return fBlock(this).xscale(f.end)-fBlock(this).xscale(f.start)+1 })
-	  //.attr("y", function (f) { return f.genome.zoomY - (f.strand === "-" ? 0 : self.featHeight) })
-	  //.attr("height", this.featHeight)
 	  .attr("y", function (f) {
 	       if (f.strand == "+")
-		   return f.genome.zoomY - 8*(f.lane-1) - 8;
+		   return f.genome.zoomY - self.laneHeight*f.lane;
 	       else
-	           return f.genome.zoomY + 8*((-f.lane) - 1) + 2;
+		   // f.lane is negative for "-" strand
+	           return f.genome.zoomY - self.laneHeight*f.lane - self.featHeight; 
 	       })
-	  .attr("height", 6)
+	  .attr("height", this.featHeight)
 	  ;
 	
 	//
@@ -1294,13 +1297,9 @@ class ZoomView extends SVGView {
 		  stacks[k].push(this)
 	      }
 	      // 
-	      let dh = hl ? self.blockHeight/2 - self.featHeight : 0;
-              let dy = ff.strand === "+" ? (dh ? -self.featHeight-dh : -self.featHeight) : 0;
 	      d3.select(this)
 		  .classed("highlight", hl)
 		  .classed("extra", pulseCurrent && ff === currFeat)
-	          //.attr("height", self.featHeight + dh)
-		  //.attr("y", ff.genome.zoomY + dy)
 	      return hl;
 	  })
 	  ;
