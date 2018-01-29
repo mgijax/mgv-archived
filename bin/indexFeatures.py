@@ -127,14 +127,16 @@ def makeFeature (row, colnames) :
     return f
 
 #
-def readFeatFile(ff) :
+def iterFeatFile(ff) :
     colnames = ff.readline()[:-1].split("\t")
-    feats = []
     for line in ff:
         toks = line[:-1].split("\t")
 	r = makeFeature(toks, colnames)
-	feats.append(r)
-    return feats
+	yield r
+
+#
+def readFeatFile(ff) :
+    return list(iterFeatFile(ff))
 
 #
 def readIndexFile(xf) :
@@ -223,17 +225,15 @@ def lookup(ff, ix, chr, start, end):
 #    is null. Duplicate ids (or aliases) will returns the same feature multiple times.
 #    
 def idlookup(ff, ids):
-    # read all the features
-    feats = readFeatFile(ff)
-    # build an id index
-    fix = {}
-    for f in feats:
-       fix.setdefault(f["mgiid"], []).append(f)
-    # lookup each id
-    answer = []
-    for i in ids:
-        answer.append((i, fix.get(i,[])))
+    # make a set for fast lookup
+    idset = set(ids)
+    # 
+    results = {}
+    for f in iterFeatFile(ff):
+        if f["mgiid"] in idset:
+	    results[f["mgiid"]] = f
     #
+    answer = [(i,results.get(i,[])) for i in ids]
     return answer
 
 # Performs a binary search on a list. Returns the the index of
