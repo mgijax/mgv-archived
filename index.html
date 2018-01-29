@@ -11,50 +11,56 @@
 <div id="container" class="flexcolumn">
     <!-- HEADER -->
     <div id="header" class="pagebox flexrow">
-	<i class="material-icons button gear">settings</i>
+	<i class="material-icons button gear" title="Show/hide left column.">settings</i>
         <label class="spacer1">Multi Genome Viewer</label>
     </div>
     <!-- APPLICATION MAIN -->
     <div id="mgv" class="flexrow" >
+	<!-- Left column. -->
 	<div class="leftcolumn flexcolumn">
-	    <div class="refGenome facet pagebox flexcolumn">
+	    <!-- Reference strain. -->
+	    <div class="refGenome pagebox flexcolumn">
 		<i class="material-icons button collapse"></i>
-		<label>Reference genome</label>
+		<label><i class="material-icons"></i> Reference genome</label>
 		<select id="refGenome"></select>
 	    </div>
-	    <div class="compGenomes facet pagebox flexcolumn">
+	    <!-- Comparison strains. -->
+	    <div class="compGenomes pagebox flexcolumn">
 		<i class="material-icons button collapse"></i>
-		<label>Comparison genomes</label>
+		<label><i class="material-icons"></i> Comparison genomes</label>
 		<select id="compGenomes" size="20"></select>
 	    </div>
-	    <div class="colorKey facet pagebox flexcolumn">
-		<i class="material-icons button collapse"></i>
-		<label>Feature types</label>
-	    </div>
+	    <!-- Find genes (aka create lists). -->
 	    <div class="pagebox flexcolumn">
 		<i class="material-icons button collapse"></i>
-		<label>Queries</label>
-		<span>WARNING: this part is experimental!</span>
+		<label><i class="material-icons">search</i> Find genes</label>
 		<div class="facet flexcolumn">
-		    <span>Lookup ID/symbol</span>
+		    <span>...by ID/symbol</span>
 		    <input id="lookup" size="30" type="text"></input>
 		</div>
 		<div class="facet flexcolumn">
-		    <span>Gene function</span>
+		    <span>...by cellular function</span>
 		    <input id="function" size="30" type="text"></input>
 		</div>
 		<div class="facet flexcolumn">
-		    <span>Phenotype</span>
+		    <span>...by mutant phenotype</span>
 		    <input id="phenotype" size="30" type="text"></input>
 		</div>
 		<div class="facet flexcolumn">
-		    <span>Disease</span>
+		    <span>...by disease association</span>
 		    <input id="disease" size="30" type="text"></input>
 		</div>
+		<span style="font-size: smaller">WARNING: this part is experimental!</span>
 	    </div>
+	    <!-- Facet: feature type -->
+	    <div class="colorKey facet pagebox flexcolumn">
+		<i class="material-icons button collapse"></i>
+		<label><i class="material-icons"></i> Feature types</label>
+	    </div>
+	    <!-- Facet: has MGI id -->
 	    <div class="mgiFacet facet pagebox flexcolumn ">
 		<i class="material-icons button collapse"></i>
-		<label>Has MGI ID?</label>
+		<label><i class="material-icons"></i> Has MGI ID?</label>
 		<div class="flexrow">
 		    <input type="radio" name="mgiFacet" value="yes" />
 		    <span>Yes</span>
@@ -68,9 +74,10 @@
 		    <span>Don't care</span>
 		</div>
 	    </div>
+	    <!-- Facet: is highlighted -->
 	    <div class="hiFacet facet pagebox flexcolumn ">
 		<i class="material-icons button collapse"></i>
-		<label>Is highlighted?</label>
+		<label><i class="material-icons"></i> Is highlighted?</label>
 		<div class="flexrow">
 		    <input type="radio" name="hiFacet" value="yes" />
 		    <span>Yes</span>
@@ -85,18 +92,24 @@
 		</div>
 	    </div>
 	</div>
+
+	<!-- Middle column -->
 	<div class="middlecolumn flexcolumn spacer1">
+	    <!-- Genome view -->
 	    <div id="genomeView" class="pagebox flexcolumn">
 		<label>Genome View</label>
 		<i class="material-icons button collapse"></i>
 		<svg></svg>
 	    </div>
+	    <!-- Feature details -->
 	    <div id="featureDetails" class="pagebox flexcolumn">
 		<i class="material-icons button collapse"></i>
 		<label>Feature details</label>
 		<table></table>
-	    </div> <!-- end featureDetails -->
+	    </div>
+	    <!-- Zoom view -->
 	    <div id="zoomView" class="pagebox flexcolumn">
+		<!-- Zoom controls -->
 		<div class="flexrow">
 		    <!-- menu -->
 		    <div class = "menu flexrow">
@@ -135,11 +148,9 @@
 		    </div>
 		</div>
 		<div class="flexrow">
-
 		    <!-- the SVG element for the zoom view panel -->
 		    <svg></svg>
-		<i class="material-icons button collapse" style="top:-35px"></i>
-
+		    <i class="material-icons button collapse" style="top:-35px"></i>
 		</div>
 	    </div>
 	</div>

@@ -137,6 +137,16 @@ line.chr {
     margin: 0px;
 }
 
+.refGenome label > i.material-icons::before {
+    content: "done";
+}
+.compGenomes label > i.material-icons::before {
+    content: "done_all";
+}
+.facet label > i.material-icons::before {
+    content: "label_outline";
+}
+
 #header {
     justify-content: space-between;
 }
@@ -260,6 +270,11 @@ label {
     font-size: 16px;
 }
 
+label > i.material-icons {
+    font-size: smaller;
+    margin: 2px;
+}
+
 #featureDetails > table {
     font-size: 10px;
     width: 100%;
@@ -287,7 +302,7 @@ label {
 }
 
 .leftcolumn {
-    min-width: 200px;
+    min-width: 220px;
 }
 .rightcolumn {
     min-width: 200px;

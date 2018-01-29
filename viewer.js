@@ -245,7 +245,7 @@ class FeatureManager {
     }
 
     //----------------------------------------------
-    // This is what the user calls. Returns (a promise for) the features in 
+    // This is what the user calls. Returns a promise for the features in 
     // the specified ranges of the specified genome.
     getFeatures (genome, ranges) {
 	return this._ensureFeatures(genome, ranges).then(function() {
