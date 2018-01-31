@@ -1,27 +1,24 @@
 (function () {
  
-const PREFIX = "org.jax.mgi.app.mgv"; // for unique-ification of localStorage names.
-
 // ---------------------------------------------
 // Interacts with localStorage.
 class StorageManager {
-    constructor (name) {
+    constructor (name, storage) {
 	this.name = name;
-	this.prefix = PREFIX;
-	this.storage = window.localStorage;
+	this.storage = storage;
 	this.myDataObj = null;
 	//
 	this._load();
     }
     _load () {
 	// loads myDataObj from storage
-        let s = this.storage.getItem(this.prefix + "." + this.name);
+        let s = this.storage.getItem(this.name);
 	this.myDataObj = s ? JSON.parse(s) : {};
     }
     _save () {
 	// writes myDataObj to storage
         let s = JSON.stringify(this.myDataObj);
-	this.storage.setItem(this.prefix + "." + this.name, s)
+	this.storage.setItem(this.name, s)
     }
     get (n) {
         return this.myDataObj[n];
@@ -29,6 +26,18 @@ class StorageManager {
     put (n, v) {
         this.myDataObj[n] = v;
 	this._save();
+    }
+}
+
+class SessionStorageManager extends StorageManager {
+    constructor (name) {
+        super(name, window.sessionStorage);
+    }
+}
+
+class LocalStorageManager extends StorageManager {
+    constructor (name) {
+        super(name, window.localStorage);
     }
 }
 
@@ -284,7 +293,7 @@ class AuxDataManager {
 	let format = 'jsonobjects';
 	let query = encodeURIComponent(q);
 	let url = `http://www.mousemine.org/mousemine/service/query/results?format=${format}&query=${query}`;
-	return d3json(url).then(data => data.results);
+	return d3json(url).then(data => data.results||[]);
     }
 
     //----------------------------------------------
@@ -297,34 +306,50 @@ class AuxDataManager {
 	return this.getAuxData(q);
     }
     //----------------------------------------------
-    featuresByOntologyTerm (qryString,termType) {
-        let q = `<query name="" model="genomic" view="SequenceFeature.primaryIdentifier SequenceFeature.symbol" longDescription="" sortOrder="SequenceFeature.symbol asc">
-	  <constraint path="SequenceFeature.ontologyAnnotations.ontologyTerm" type="${termType}"/>
-	  <constraint path="SequenceFeature.ontologyAnnotations.ontologyTerm.parents" type="${termType}"/>
-	  <constraint path="SequenceFeature.ontologyAnnotations.ontologyTerm.parents" code="A" op="LOOKUP" value="${qryString}"/>
-	  <constraint path="SequenceFeature.organism.taxonId" code="B" op="=" value="10090"/>
+    featuresByOntologyTerm (qryString, termType) {
+        let q = `<query name="" model="genomic" 
+	  view="SequenceFeature.primaryIdentifier SequenceFeature.symbol" longDescription="" sortOrder="SequenceFeature.symbol asc">
+	      <constraint path="SequenceFeature.ontologyAnnotations.ontologyTerm" type="${termType}"/>
+	      <constraint path="SequenceFeature.ontologyAnnotations.ontologyTerm.parents" type="${termType}"/>
+	      <constraint path="SequenceFeature.ontologyAnnotations.ontologyTerm.parents" code="A" op="LOOKUP" value="${qryString}"/>
+	      <constraint path="SequenceFeature.organism.taxonId" code="B" op="=" value="10090"/>
 	  </query>`
+	return this.getAuxData(q);
+    }
+    //----------------------------------------------
+    featuresByPathwayTerm (qryString) {
+        let q = `<query name="" model="genomic" 
+	  view="Pathway.genes.primaryIdentifier Pathway.genes.symbol" longDescription="" constraintLogic="A and B">
+	      <constraint path="Pathway" code="A" op="LOOKUP" value="${qryString}"/>
+	      <constraint path="Pathway.genes.organism.taxonId" code="B" op="=" value="10090"/>
+	  </query>`;
 	return this.getAuxData(q);
     }
     //----------------------------------------------
     featuresById        (qryString) { return this.featuresByLookup(qryString); }
     featuresByFunction  (qryString) { return this.featuresByOntologyTerm(qryString, "GOTerm"); }
+    featuresByPathway   (qryString) { return this.featuresByPathwayTerm(qryString); }
     featuresByPhenotype (qryString) { return this.featuresByOntologyTerm(qryString, "MPTerm"); }
     featuresByDisease   (qryString) { return this.featuresByOntologyTerm(qryString, "DOTerm"); }
     //----------------------------------------------
 }
 
 // ---------------------------------------------
-// Maintains lists of IDs
+// Maintains named lists of IDs. Lists may be temporary, lasting only for the session, or permanent,
+// lasting until the user clears the browser local storage area.
+//
+// Uses window.sessionStorage and window.localStorage to save lists
+// temporarily or permanently, resp.  FIXME: should be using window.indexedDB
+//
 class ListManager {
     constructor () {
 	this.name2list = null;
-	this._lists = new StorageManager("listManager.lists")
+	this._lists = new LocalStorageManager  ("listManager.lists")
 	//
 	this._load();
     }
     _load () {
-        this.name2list = this._lists.get("all");
+	this.name2list = this._lists.get("all");
 	if (!this.name2list){
 	    this.name2list = {};
 	    this._save();
@@ -333,53 +358,65 @@ class ListManager {
     _save () {
         this._lists.put("all", this.name2list);
     }
+    // returns the names of all the lists, sorted
     getNames () {
         let nms = Object.keys(this.name2list);
 	nms.sort();
 	return nms;
     }
+    // returns true iff a list exists with this name
     has (name) {
         return name in this.name2list;
     }
+    // returns the list with this name, or null if no such list
     get (name) {
-        return this.name2list[name];
+        let lst = this.name2list[name];
+	if (!lst) throw "No such list: " + name;
+	return lst;
     }
+    // returns all the lists, sorted by name
+    getAll () {
+        return this.getNames().map(n => this.get(n))
+    }
+    // 
+    createOrUpdate (name, ids) {
+        this.has(name) ? this.updateList(name,ids) : this.create(name, ids);
+    }
+    // creates a new temporary list with the given name and ids.
     create (name, ids) {
-	if (this.has(name)) return this.updateList(name,ids);
+	if (this.has(name)) throw "Create rejected because list exists: " + name;
 	//
-	this.name2list[name] = new List(name, ids);
+	let dt = new Date() + "";
+	this.name2list[name] = {
+	    name:     name,
+	    ids:      ids,
+	    created:  dt,
+	    modified: dt
+	};
 	this._save();
     }
-    updateList (name, ids) {
+    // updates the ids in the given list
+    updateList (name, newname, newids) {
 	let lst = this.get(name);
         if (! lst) throw "No such list: " + name;
-	lst.ids = ids;
+	if (newname) {
+	    if (this.has(newname) && newname !== name) throw "Name already exists: " + newname;
+	    lst.name = newname;
+	}
+	if (newids) lst.ids  = newids;
+	lst.modified = new Date() + "";
 	this._save();
     }
+    // deletes the specified list
+    deleteList (name) {
+        let lst = this.get(name);
+	delete this.name2list[name];
+	this._save();
+    }
+    // delete all lists
     purge () {
         this.name2list = {}
 	this._save();
-    }
-}
-class List {
-    constructor (name, ids) {
-	this.name = name;
-	this.ids = ids;
-	this.creationDate = new Date() + "";
-    }
-    _op_ (op, other, name) {
-        let newids = Array.from( (new Set(this.ids))[op](new Set(other.ids)) );
-	if (!name) name = `(${this.name} ${op} ${other.name})`;
-	return new List( name, newids );
-    }
-    union (other, name) {
-        return this._op_("union", other, name);
-    }
-    intersect (other, name) {
-        return this._op_("intersection", other, name);
-    }
-    subtract (other, name) {
-        return this._op_("difference", other, name);
     }
 }
 
@@ -1278,6 +1315,23 @@ class ZoomView extends SVGView {
 	let feats = fbs.selectAll(".feature")
 	    .data(d=>d.features.filter(filterDrawn), d=>d.mgpid);
 	feats.exit().remove();
+	let fClickHandler = function(f){
+	    d3.event.stopPropagation();
+	    let id = f.mgiid || f.mgpid;
+	    if (d3.event.shiftKey) {
+		if (self.hiFeats[id])
+		    delete self.hiFeats[id]
+		else
+		    self.hiFeats[id] = id;
+	    }
+	    else {
+		self.hiFeats = {};
+		self.hiFeats[id] = id;
+	    }
+
+	    self.highlight();
+	    self.app.callback();
+	};
 	let newFeats = feats.enter().append("rect")
 	    .attr("class", f => "feature" + (f.strand==="-" ? " minus" : " plus"))
 	    .attr("name", f => f.mgpid)
@@ -1288,17 +1342,8 @@ class ZoomView extends SVGView {
 	    .on("mouseout", function(f){
 		self.highlight();
 	    })
-	    .on("click", function(f){
-		d3.event.stopPropagation();
-	        let id = f.mgiid || f.mgpid;
-		if (self.hiFeats[id])
-		    delete self.hiFeats[id]
-		else
-		    self.hiFeats[id] = id;
-		self.app.listManager.updateList("selected", Object.keys(self.hiFeats));
-		self.highlight();
-		self.app.callback();
-	    });
+	    .on("click", fClickHandler)
+	    ;
 
 	// draw the rectangles
 	let fBlock = function (featElt) {
@@ -1594,7 +1639,7 @@ class MGVApp {
 	]);
 	//
 	this.listManager = new ListManager();
-	this.listManager.create("selected", []);
+	this.updateLists();
 	//
 	this.translator = new BTManager(this);
 	this.featureManager = new FeatureManager(this);
@@ -1611,11 +1656,6 @@ class MGVApp {
             icon: "clear",
 	    tooltip: "Unselects/unhighlights all current selections.",
             handler: ()=>this.setContext({highlight:[]}) 
-        },{
-            label: "Purge lists",
-            icon: "delete",
-	    tooltip: "Deletes all saved lists from local storage.",
-            handler: ()=>this.listManager.purge()
 	}]);
 	d3.select("#zoomView .menu > .button")
 	  .on("click", function () {
@@ -1638,6 +1678,15 @@ class MGVApp {
 		this.resize()
 	    });
 	
+	//
+	d3.select('.mylists .button[name="purge"]')
+	    .on("click", () => {
+	        if (window.confirm("Delete all lists. Are you sure?")) {
+		    this.listManager.purge();
+		    this.updateLists();
+		}
+	    });
+
 	// Facets
 	//
 	this.facetManager = new FacetManager(this);
@@ -1723,18 +1772,19 @@ class MGVApp {
 
 	// ------------------------------
 	// ------------------------------
-	// Query boxes (experimental)
-	let pfs = function(ffun, s, lstName) {
-	    self.auxDataManager[ffun](s)
+	// Query box
+	d3.select("#searchterm").on("change", function () {
+	    let term = this.value;
+	    this.value = "";
+	    let searchType  = d3.select("#searchtype")[0][0].value;
+	    let lstName = term;
+	    self.auxDataManager[searchType](term)
 	      .then(feats => {
 		  feats.forEach(f => self.zoomView.hiFeats[f.mgiid] = f.mgiid);
-		  self.listManager.create(lstName, feats.map(f => f.primaryIdentifier))
+		  self.listManager.createOrUpdate(lstName, feats.map(f => f.primaryIdentifier))
+		  self.updateLists();
 	      });
-	};
-	d3.select("#lookup")   .on("change", function () { pfs("featuresById",        this.value, `id=${this.value}` ) });
-	d3.select("#function") .on("change", function () { pfs("featuresByFunction",  this.value, `function=${this.value}` ) });
-	d3.select("#phenotype").on("change", function () { pfs("featuresByPhenotype", this.value, `phenotype=${this.value}` ) });
-	d3.select("#disease")  .on("change", function () { pfs("featuresByDisease",   this.value, `disease=${this.value}` ) });
+	})
 	// ------------------------------
 	// ------------------------------
 
@@ -1847,7 +1897,6 @@ class MGVApp {
     setHighlight (flist) {
 	if (!flist) return false;
 	this.zoomView.hiFeats = flist.reduce((a,v) => { a[v]=v; return a; }, {});
-	this.listManager.updateList("selected", Object.keys(this.zoomView.hiFeats));
 	return true;
     }
     //----------------------------------------------
@@ -2019,6 +2068,43 @@ class MGVApp {
 	.style("width", (d,i,j) => j === 0 ? `${d[1]}%` : null);
     }
 
+    //----------------------------------------------
+    updateLists () {
+	self = this;
+        let lists = this.listManager.getAll();
+	lists.sort( (b,a) => (new Date(a.modified)).getTime() - (new Date(b.modified)).getTime() );
+	let items = d3.select('.mylists [name="lists"]').selectAll(".listInfo")
+	    .data(lists);
+	let newitems = items.enter().append("div")
+	    .attr("class","listInfo flexrow");
+	newitems.append("span").attr("name","name").attr("contenteditable", "true");
+	newitems.append("span").attr("name","date");
+	newitems.append("span").attr("name","size");
+
+	newitems.append("i").attr("name","delete")
+	    .attr("class","material-icons button").text("delete_forever");
+
+	items
+	    .attr("name", lst=>lst.name)
+	items.select('span[name="name"]')
+	    .text(lst => lst.name)
+	    .on("blur", function (lst) {
+		self.listManager.updateList(lst.name, this.innerHTML);
+	        //console.log("Change name of list from ", lst.name, " to ", this.innerHTML);
+		self.updateLists();
+	    });
+	items.select('span[name="date"]').text(lst => {
+	    let md = new Date(lst.modified);
+	    let d = `${md.getFullYear()}-${md.getMonth()+1}-${md.getDate()} ` 
+	          + `:${md.getHours()}.${md.getMinutes()}.${md.getSeconds()}`;
+	    return d;
+	});
+	items.select('span[name="size"]').text(lst => lst.ids.length);
+	items.select('.button[name="delete"]')
+	    .on("click", lst => {this.listManager.deleteList(lst.name); this.updateLists();});
+	//
+	items.exit().remove();
+    }
 
     //----------------------------------------------
     sanitizeCoords(coords) {

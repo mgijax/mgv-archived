@@ -9,58 +9,70 @@
 </head>
 <body>
 <div id="container" class="flexcolumn">
+
     <!-- HEADER -->
     <div id="header" class="pagebox flexrow">
 	<i class="material-icons button gear" title="Show/hide left column.">settings</i>
         <label class="spacer1">Multi Genome Viewer</label>
     </div>
+
     <!-- APPLICATION MAIN -->
     <div id="mgv" class="flexrow" >
+
 	<!-- Left column. -->
 	<div class="leftcolumn flexcolumn">
+
 	    <!-- Reference strain. -->
 	    <div class="refGenome pagebox flexcolumn">
 		<i class="material-icons button collapse"></i>
-		<label><i class="material-icons"></i> Reference genome</label>
+		<label>Reference genome</label>
 		<select id="refGenome"></select>
 	    </div>
+
 	    <!-- Comparison strains. -->
 	    <div class="compGenomes pagebox flexcolumn">
 		<i class="material-icons button collapse"></i>
-		<label><i class="material-icons"></i> Comparison genomes</label>
+		<label>Comparison genomes</label>
 		<select id="compGenomes" size="20"></select>
 	    </div>
+
 	    <!-- Find genes (aka create lists). -->
 	    <div class="pagebox flexcolumn">
 		<i class="material-icons button collapse"></i>
-		<label><i class="material-icons">search</i> Find genes</label>
-		<div class="facet flexcolumn">
-		    <span>...by ID/symbol</span>
-		    <input id="lookup" size="30" type="text"></input>
+		<label>Find genes</label>
+		<div class="flexcolumn">
+		    <select id="searchtype">
+		        <option value="featuresById">...by ID/symbol</option>
+		        <option value="featuresByFunction">...by cellular function</option>
+		        <option value="featuresByPathway">...by pathway</option>
+		        <option value="featuresByPhenotype">...by mutant phenotype</option>
+		        <option value="featuresByDisease">...by disease association</option>
+		    </select>
+		    <input id="searchterm" size="30" type="text"></input>
 		</div>
-		<div class="facet flexcolumn">
-		    <span>...by cellular function</span>
-		    <input id="function" size="30" type="text"></input>
-		</div>
-		<div class="facet flexcolumn">
-		    <span>...by mutant phenotype</span>
-		    <input id="phenotype" size="30" type="text"></input>
-		</div>
-		<div class="facet flexcolumn">
-		    <span>...by disease association</span>
-		    <input id="disease" size="30" type="text"></input>
-		</div>
-		<span style="font-size: smaller">WARNING: this part is experimental!</span>
 	    </div>
+
+	    <!-- My lists -->
+	    <div class="mylists pagebox flexcolumn">
+		<i class="material-icons button collapse"></i>
+		<label>My lists</label>
+		<div name="lists" class="flexcolumn"></div>
+		<div name="tools" class="flexrow">
+		    <i name="add" class="material-icons button">playlist_add</i>
+		    <i name="purge" class="material-icons button" title="Purge all lists.">delete_sweep</i>
+		</div>
+	    </div>
+
 	    <!-- Facet: feature type -->
 	    <div class="colorKey facet pagebox flexcolumn">
 		<i class="material-icons button collapse"></i>
-		<label><i class="material-icons"></i> Feature types</label>
+		<label>Feature types</label>
 	    </div>
+
 	    <!-- Facet: has MGI id -->
 	    <div class="mgiFacet facet pagebox flexcolumn ">
 		<i class="material-icons button collapse"></i>
-		<label><i class="material-icons"></i> Has MGI ID?</label>
+		<label>Has MGI ID?</label>
 		<div class="flexrow">
 		    <input type="radio" name="mgiFacet" value="yes" />
 		    <span>Yes</span>
@@ -74,10 +86,11 @@
 		    <span>Don't care</span>
 		</div>
 	    </div>
+
 	    <!-- Facet: is highlighted -->
 	    <div class="hiFacet facet pagebox flexcolumn ">
 		<i class="material-icons button collapse"></i>
-		<label><i class="material-icons"></i> Is highlighted?</label>
+		<label>Is highlighted?</label>
 		<div class="flexrow">
 		    <input type="radio" name="hiFacet" value="yes" />
 		    <span>Yes</span>

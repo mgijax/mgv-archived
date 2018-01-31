@@ -46,8 +46,8 @@ a {
 .flexcolumn > .button.collapse,
 .flexrow > .button.collapse {
     position: absolute;
-    top: -5px;
-    right: 0px;
+    top: -3px;
+    right: -2px;
 }
 .flexcolumn > .button.collapse::after,
 .flexrow > .button.collapse::after {
@@ -121,6 +121,10 @@ line.chr {
     font-weight: bold;
     font-size: bigger;
 }
+.button:hover {
+    color: white;
+    background-color: #555;
+}
 
 .pagebox {
     background-color: #ccc;
@@ -129,7 +133,7 @@ line.chr {
     margin: 1px;
 }
 
-.facet * {
+.pagebox * {
     margin: 2px;
 }
 
@@ -137,14 +141,36 @@ line.chr {
     margin: 0px;
 }
 
-.refGenome label > i.material-icons::before {
-    content: "done";
+.mylists .listInfo {
+    justify-content: space-between;
+    margin: 0px;
 }
-.compGenomes label > i.material-icons::before {
-    content: "done_all";
+.mylists .listInfo:hover {
+    background-color: #ddd;
+    cursor: pointer;
 }
-.facet label > i.material-icons::before {
-    content: "label_outline";
+.mylists .listInfo [name="name"] {
+    width: 40%;
+}
+.mylists .listInfo [name="date"] {
+    font-size: 9px;
+    width: 30%;
+}
+.mylists .listInfo [name="size"] {
+    width: 20%;
+    text-align: right;
+}
+.mylists .listInfo [name="delete"] {
+    width: 10%;
+    color: red;
+    margin-left: 10px;
+}
+.mylists .button[name="purge"] {
+    color: red;
+}
+.mylists [name="tools"] {
+    border-top: thin solid #555;
+    justify-content: space-between;
 }
 
 #header {
