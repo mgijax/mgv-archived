@@ -1332,16 +1332,18 @@ class ZoomView extends SVGView {
 	    self.highlight();
 	    self.app.callback();
 	};
+	let fMouseOverHandler = function(f) {
+		self.highlight(this);
+	}
+	let fMouseOutHandler = function(f) {
+		self.highlight();
+	}
 	let newFeats = feats.enter().append("rect")
 	    .attr("class", f => "feature" + (f.strand==="-" ? " minus" : " plus"))
 	    .attr("name", f => f.mgpid)
 	    .style("fill", f => self.app.cscale(f.getMungedType()))
-	    .on("mouseover", function(f){
-		self.highlight(this);
-	    })
-	    .on("mouseout", function(f){
-		self.highlight();
-	    })
+	    .on("mouseover", fMouseOverHandler)
+	    .on("mouseout", fMouseOutHandler)
 	    .on("click", fClickHandler)
 	    ;
 
