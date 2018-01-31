@@ -380,9 +380,9 @@ class ListManager {
     }
     // 
     createOrUpdate (name, ids) {
-        this.has(name) ? this.updateList(name,ids) : this.create(name, ids);
+        this.has(name) ? this.updateList(name,null,ids) : this.create(name, ids);
     }
-    // creates a new temporary list with the given name and ids.
+    // creates a new list with the given name and ids.
     create (name, ids) {
 	if (this.has(name)) throw "Create rejected because list exists: " + name;
 	//
@@ -401,7 +401,9 @@ class ListManager {
         if (! lst) throw "No such list: " + name;
 	if (newname) {
 	    if (this.has(newname) && newname !== name) throw "Name already exists: " + newname;
+	    delete this.name2list[lst.name];
 	    lst.name = newname;
+	    this.name2list[lst.name] = lst;
 	}
 	if (newids) lst.ids  = newids;
 	lst.modified = new Date() + "";
@@ -1690,6 +1692,11 @@ class MGVApp {
 	    });
 	
 	//
+	d3.select('.mylists .button[name="newfromselection"]')
+	    .on("click", () => {
+		this.listManager.createOrUpdate("selected features", Object.keys(this.zoomView.hiFeats))
+		this.updateLists();
+	    });
 	d3.select('.mylists .button[name="purge"]')
 	    .on("click", () => {
 	        if (window.confirm("Delete all lists. Are you sure?")) {
@@ -2089,8 +2096,8 @@ class MGVApp {
 	let newitems = items.enter().append("div")
 	    .attr("class","listInfo flexrow");
 	newitems.append("span").attr("name","name").attr("contenteditable", "true");
-	newitems.append("span").attr("name","date");
 	newitems.append("span").attr("name","size");
+	newitems.append("span").attr("name","date");
 
 	newitems.append("i").attr("name","delete")
 	    .attr("class","material-icons button").text("delete_forever");
@@ -2099,10 +2106,20 @@ class MGVApp {
 	    .attr("name", lst=>lst.name)
 	items.select('span[name="name"]')
 	    .text(lst => lst.name)
+	    .on("focus", function (lst) {
+		var range = document.createRange();
+		range.setStart( this, 0 );
+		range.setEnd( this, 1 )
+		window.getSelection().removeAllRanges();
+		window.getSelection().addRange(range);
+	    })
 	    .on("blur", function (lst) {
-		self.listManager.updateList(lst.name, this.innerHTML);
-	        //console.log("Change name of list from ", lst.name, " to ", this.innerHTML);
-		self.updateLists();
+		// change the list's name 
+		let newname = this.innerHTML;
+		if (newname !== lst.name) {
+		    self.listManager.updateList(lst.name, newname);
+		    self.updateLists();
+		}
 	    });
 	items.select('span[name="date"]').text(lst => {
 	    let md = new Date(lst.modified);

@@ -141,6 +141,9 @@ line.chr {
     margin: 0px;
 }
 
+.mylists [name="lists"] {
+}
+
 .mylists .listInfo {
     justify-content: space-between;
     margin: 0px;
@@ -159,6 +162,7 @@ line.chr {
 .mylists .listInfo [name="size"] {
     width: 20%;
     text-align: right;
+    margin-right: 8px;
 }
 .mylists .listInfo [name="delete"] {
     width: 10%;
