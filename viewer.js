@@ -1169,6 +1169,7 @@ class ZoomView extends SVGView {
 		.attr("class", "zoomStrip")
 		.attr("name", d => d.genome.name)
 		.on("click", function (g) {
+		    d3.event.stopPropagation();
 		    self.highlightStrip(g.genome, this);
 		});
 	//
@@ -1220,7 +1221,8 @@ class ZoomView extends SVGView {
 	//
 	fids.exit().remove();
 	// rectangle for the whole block
-	newFids.append("rect").attr("class", "block");
+	newFids.append("rect").attr("class", "block")
+	    .on("click", ()=> d3.event.stopPropagation());
 	// the axis line
 	newFids.append("line").attr("class","axis") ;
 	// label
@@ -1641,7 +1643,7 @@ class MGVApp {
 	this.allGenomes = []; // list of all genome names
 	//
 	this.genomeView = new GenomeView("genomeView", 800, 250, this);
-	this.zoomView = new ZoomView  ("zoomView",   800, 250, this);
+	this.zoomView   = new ZoomView  ("zoomView",   800, 250, this);
 	this.cscale = d3.scale.category10().domain([
 	    "protein_coding_gene",
 	    "pseudogene",
@@ -1651,25 +1653,21 @@ class MGVApp {
 	    "other_feature_type"
 	]);
 	//
-	this.listManager = new ListManager();
+	this.listManager    = new ListManager();
 	this.updateLists();
 	//
-	this.translator = new BTManager(this);
+	this.translator     = new BTManager(this);
 	this.featureManager = new FeatureManager(this);
 	this.auxDataManager = new AuxDataManager(this);
 
-	// Context menu.
+	// Create context menu. Only one command so far...
 	this.initContextMenu([{
             label: "MGI SNPs", 
 	    icon: "open_in_new",
 	    tooltip: "Get SNPs from MGI for the current strains in the current region. (Some strains not available.)",
 	    handler: ()=> this.linkToMgiSnpReport()
-        },{
-            label: "Clear selections",
-            icon: "clear",
-	    tooltip: "Unselects/unhighlights all current selections.",
-            handler: ()=>this.setContext({highlight:[]}) 
 	}]);
+	// Button: Menu in zoom view
 	d3.select("#zoomView .menu > .button")
 	  .on("click", function () {
 	      // show context menu at mouse event coordinates
@@ -1680,25 +1678,50 @@ class MGVApp {
 	      let bb = d3.select(this)[0][0].getBoundingClientRect();
 	      self.showContextMenu(cx-bb.left,cy-bb.top);
 	  });
-	d3.select("#container")
-	  .on("click", () => this.hideContextMenu());
+	// Background click in zoom view = unselect all.
+	d3.select("#zoomView svg")
+	  .on("click", () => {
+	      d3.event.stopPropagation();
+	      this.hideContextMenu();
+	      this.zoomView.hiFeats = {};
+	      this.zoomView.highlight();
+	  });
 
-	// Gear icon to show/hide left column
+	// Button: Gear icon to show/hide left column
 	d3.select("#header > .gear.button")
 	    .on("click", () => {
+	        d3.event.stopPropagation();
 	        let lc = d3.select("#mgv > .leftcolumn");
 		lc.classed("closed", () => ! lc.classed("closed"));
 		this.resize()
 	    });
 	
-	//
+	// Button: create list from current selection
 	d3.select('.mylists .button[name="newfromselection"]')
 	    .on("click", () => {
-		this.listManager.createOrUpdate("selected features", Object.keys(this.zoomView.hiFeats))
+	        d3.event.stopPropagation();
+		let ids = Object.keys(this.zoomView.hiFeats);
+		if (ids.length === 0) {
+		    alert("Nothing selected.");
+		    return;
+		}
+		this.listManager.createOrUpdate("selected features", ids);
 		this.updateLists();
 	    });
+	// Button: create list by combining others
+	d3.selectAll('.mylists [name="newfromlistop"] i')
+	    .on("click", () => {
+	        d3.event.stopPropagation();
+		console.log("NEW LIST")
+	    });
+	//
 	d3.select('.mylists .button[name="purge"]')
 	    .on("click", () => {
+	        d3.event.stopPropagation();
+		if (this.listManager.getNames().length === 0) {
+		    alert("No lists.");
+		    return;
+		}
 	        if (window.confirm("Delete all lists. Are you sure?")) {
 		    this.listManager.purge();
 		    this.updateLists();
@@ -1774,16 +1797,16 @@ class MGVApp {
 	    .on("click.extra", () => this.updateFeatureDetails());
 
 	// zoom controls
-	d3.select("#zoomOut").on("click", () => this.zoom(this.defaultZoom));
-	d3.select("#zoomIn") .on("click", () => this.zoom(1/this.defaultZoom));
-	d3.select("#zoomOutMore").on("click", () => this.zoom(2*this.defaultZoom));
-	d3.select("#zoomInMore") .on("click", () => this.zoom(1/(2*this.defaultZoom)));
+	d3.select("#zoomOut").on("click",     () => { d3.event.stopPropagation(); this.zoom(this.defaultZoom) });
+	d3.select("#zoomIn") .on("click",     () => { d3.event.stopPropagation(); this.zoom(1/this.defaultZoom) });
+	d3.select("#zoomOutMore").on("click", () => { d3.event.stopPropagation(); this.zoom(2*this.defaultZoom) });
+	d3.select("#zoomInMore") .on("click", () => { d3.event.stopPropagation(); this.zoom(1/(2*this.defaultZoom)) });
 
 	// pan controls
-	d3.select("#panLeft") .on("click", () => this.pan(-this.defaultPan));
-	d3.select("#panRight").on("click", () => this.pan(+this.defaultPan));
-	d3.select("#panLeftMore") .on("click", () => this.pan(-5*this.defaultPan));
-	d3.select("#panRightMore").on("click", () => this.pan(+5*this.defaultPan));
+	d3.select("#panLeft") .on("click",     () => { d3.event.stopPropagation(); this.pan(-this.defaultPan) });
+	d3.select("#panRight").on("click",     () => { d3.event.stopPropagation(); this.pan(+this.defaultPan) });
+	d3.select("#panLeftMore") .on("click", () => { d3.event.stopPropagation(); this.pan(-5*this.defaultPan) });
+	d3.select("#panRightMore").on("click", () => { d3.event.stopPropagation(); this.pan(+5*this.defaultPan) });
 
 	// initial highlighted features 
 	(cfg.highlight || []).forEach(h => this.zoomView.hiFeats[h]=h);
@@ -1796,8 +1819,10 @@ class MGVApp {
 	    this.value = "";
 	    let searchType  = d3.select("#searchtype")[0][0].value;
 	    let lstName = term;
+	    d3.select("#findgenes").classed("busy",true);
 	    self.auxDataManager[searchType](term)
 	      .then(feats => {
+		  d3.select("#findgenes").classed("busy",false);
 		  feats.forEach(f => self.zoomView.hiFeats[f.mgiid] = f.mgiid);
 		  self.listManager.createOrUpdate(lstName, feats.map(f => f.primaryIdentifier))
 		  self.updateLists();
@@ -2100,7 +2125,9 @@ class MGVApp {
 	newitems.append("span").attr("name","date");
 
 	newitems.append("i").attr("name","delete")
-	    .attr("class","material-icons button").text("delete_forever");
+	    .attr("class","material-icons button")
+	    .attr("title","Delete this list.")
+	    .text("highlight_off");
 
 	items
 	    .attr("name", lst=>lst.name)
@@ -2129,7 +2156,7 @@ class MGVApp {
 	});
 	items.select('span[name="size"]').text(lst => lst.ids.length);
 	items.select('.button[name="delete"]')
-	    .on("click", lst => {this.listManager.deleteList(lst.name); this.updateLists();});
+	    .on("click", lst => { d3.event.stopPropagation(); this.listManager.deleteList(lst.name); this.updateLists();});
 	//
 	items.exit().remove();
     }
@@ -2206,6 +2233,7 @@ class MGVApp {
 	    .attr("name", c => c.lbl)
 	    .style("background-color", c => c.clr)
 	    .on("click", function () {
+		d3.event.sourceEvent.stopPropagation();
 		let t = d3.select(this);
 	        t.classed("checked", ! t.classed("checked"));
 		let swatches = d3.selectAll(".swatch.checked")[0];
@@ -2260,6 +2288,7 @@ class MGVApp {
 	news.append("label")
 	  .text(d => d.label)
 	  .on("click", d => {
+	      d3.event.sourceEvent.stopPropagation();
 	      d.handler();
 	      this.hideContextMenu();
 	  });

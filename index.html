@@ -37,7 +37,7 @@
 	    </div>
 
 	    <!-- Find genes (aka create lists). -->
-	    <div class="pagebox flexcolumn">
+	    <div id="findgenes" class="pagebox flexcolumn">
 		<i class="material-icons button collapse"></i>
 		<label>Find genes</label>
 		<div class="flexcolumn">
@@ -59,7 +59,13 @@
 		<div name="lists" class="flexcolumn"></div>
 		<div name="tools" class="flexrow">
 		    <i name="newfromselection" class="material-icons button" title="Create list from current selection.">playlist_add</i>
-		    <i name="purge" class="material-icons button" title="Purge all lists.">delete_sweep</i>
+
+		    <span name="newfromlistop">
+			<i class="material-icons" title="Create list by combining other lists.">radio_button_unchecked</i>
+			<i class="material-icons" title="Create list by combining other lists.">radio_button_unchecked</i>
+		    </span>
+
+		    <i name="purge" class="material-icons button" title="Delete all lists.">delete_sweep</i>
 		</div>
 	    </div>
 
@@ -123,7 +129,7 @@
 	    <!-- Zoom view -->
 	    <div id="zoomView" class="pagebox flexcolumn">
 		<!-- Zoom controls -->
-		<div class="flexrow">
+		<div name="zoomcontrols" class="flexrow">
 		    <!-- menu -->
 		    <div class = "menu flexrow">
 			<i class="material-icons button" title="More functions...">menu</i>
