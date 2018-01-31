@@ -1315,10 +1315,10 @@ class ZoomView extends SVGView {
 	let feats = fbs.selectAll(".feature")
 	    .data(d=>d.features.filter(filterDrawn), d=>d.mgpid);
 	feats.exit().remove();
-	let fClickHandler = function(f){
-	    d3.event.stopPropagation();
+	//
+	let fSelect = function (f, shift) {
 	    let id = f.mgiid || f.mgpid;
-	    if (d3.event.shiftKey) {
+	    if (shift) {
 		if (self.hiFeats[id])
 		    delete self.hiFeats[id]
 		else
@@ -1328,12 +1328,21 @@ class ZoomView extends SVGView {
 		self.hiFeats = {};
 		self.hiFeats[id] = id;
 	    }
-
+	};
+	//
+	let fClickHandler = function(f){
+	    d3.event.stopPropagation();
+	    fSelect(f, d3.event.shiftKey);
 	    self.highlight();
 	    self.app.callback();
 	};
+	//
 	let fMouseOverHandler = function(f) {
+		if (d3.event.altKey) fSelect(f, d3.event.shiftKey);
 		self.highlight(this);
+
+		if (self.timeout) window.clearTimeout(self.timeout);
+		self.timeout = window.setTimeout(function(){ self.app.callback(); }, 1000);
 	}
 	let fMouseOutHandler = function(f) {
 		self.highlight();
