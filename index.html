@@ -23,22 +23,19 @@
 	<div class="leftcolumn flexcolumn">
 
 	    <!-- Reference strain. -->
-	    <div class="refGenome pagebox flexcolumn">
-		<i class="material-icons button collapse"></i>
+	    <div class="refGenome pagebox flexcolumn collapsible">
 		<label>Reference genome</label>
 		<select id="refGenome"></select>
 	    </div>
 
 	    <!-- Comparison strains. -->
-	    <div class="compGenomes pagebox flexcolumn">
-		<i class="material-icons button collapse"></i>
+	    <div class="compGenomes pagebox flexcolumn collapsible">
 		<label>Comparison genomes</label>
 		<select id="compGenomes" size="20"></select>
 	    </div>
 
 	    <!-- Find genes (aka create lists). -->
-	    <div id="findgenes" class="pagebox flexcolumn">
-		<i class="material-icons button collapse"></i>
+	    <div id="findgenes" class="pagebox flexcolumn collapsible">
 		<label>Find genes</label>
 		<div class="flexcolumn">
 		    <select id="searchtype">
@@ -53,8 +50,7 @@
 	    </div>
 
 	    <!-- My lists -->
-	    <div class="mylists pagebox flexcolumn">
-		<i class="material-icons button collapse"></i>
+	    <div class="mylists pagebox flexcolumn collapsible">
 		<label>My lists</label>
 		<div name="lists" class="flexcolumn"></div>
 		<div name="tools" class="flexrow">
@@ -70,14 +66,12 @@
 	    </div>
 
 	    <!-- Facet: feature type -->
-	    <div class="colorKey facet pagebox flexcolumn">
-		<i class="material-icons button collapse"></i>
+	    <div class="colorKey facet pagebox flexcolumn collapsible">
 		<label>Feature types</label>
 	    </div>
 
 	    <!-- Facet: has MGI id -->
-	    <div class="mgiFacet facet pagebox flexcolumn ">
-		<i class="material-icons button collapse"></i>
+	    <div class="mgiFacet facet pagebox flexcolumn collapsible">
 		<label>Has MGI ID?</label>
 		<div class="flexrow">
 		    <input type="radio" name="mgiFacet" value="yes" />
@@ -94,8 +88,7 @@
 	    </div>
 
 	    <!-- Facet: is highlighted -->
-	    <div class="hiFacet facet pagebox flexcolumn ">
-		<i class="material-icons button collapse"></i>
+	    <div class="hiFacet facet pagebox flexcolumn collapsible">
 		<label>Is highlighted?</label>
 		<div class="flexrow">
 		    <input type="radio" name="hiFacet" value="yes" />
@@ -115,14 +108,12 @@
 	<!-- Middle column -->
 	<div class="middlecolumn flexcolumn spacer1">
 	    <!-- Genome view -->
-	    <div id="genomeView" class="pagebox flexcolumn">
+	    <div id="genomeView" class="pagebox flexcolumn collapsible">
 		<label>Genome View</label>
-		<i class="material-icons button collapse"></i>
 		<svg></svg>
 	    </div>
 	    <!-- Feature details -->
-	    <div id="featureDetails" class="pagebox flexcolumn">
-		<i class="material-icons button collapse"></i>
+	    <div id="featureDetails" class="pagebox flexcolumn collapsible">
 		<label>Feature details</label>
 		<table></table>
 	    </div>
@@ -166,10 +157,9 @@
 			<i id="panRightMore" class="material-icons button more" title="Pan right more." >chevron_right</i>
 		    </div>
 		</div>
-		<div class="flexrow">
+		<div class="svgcontainer flexrow collapsible">
 		    <!-- the SVG element for the zoom view panel -->
 		    <svg></svg>
-		    <i class="material-icons button collapse" style="top:-35px"></i>
 		</div>
 	    </div>
 	</div>

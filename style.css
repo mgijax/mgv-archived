@@ -30,34 +30,45 @@ a {
     flex-wrap: nowrap;
 }
 
-.flexcolumn.closed > *,
-.flexrow.closed > * {
-    display: none;
-}
-
-.flexcolumn.closed > label,
-.flexcolumn.closed > .button.collapse,
-.flexrow.closed > label,
-.flexrow.closed > .button.collapse
-{
-    display: inherit;
-}
-
-.flexcolumn > .button.collapse,
-.flexrow > .button.collapse {
+.collapsible > .button.collapse {
     position: absolute;
     top: -3px;
     right: -2px;
 }
-.flexcolumn > .button.collapse::after,
-.flexrow > .button.collapse::after {
+.collapsible > .button.collapse::after {
     content: "arrow_drop_up"
 }
-.flexcolumn.closed > .button.collapse::after,
-.flexrow .closed > .button.collapse::after {
+.collapsible .closed > .button.collapse::after {
     content: "arrow_drop_down"
 }
+.collapsible.closed > * {
+    display: none;
+}
+.collapsible.closed > label,
+.collapsible.closed > .button.collapse {
+    display: inherit;
+}
 
+#zoomView .svgcontainer > i.collapse {
+    top: -45px;
+}
+
+.pagebox > i.busy::before {
+    content: "settings";
+}
+.pagebox > i.busy {
+    display: none;
+    position: absolute;
+    left: 40%;
+    top: 40%;
+}
+.pagebox.busy {
+    opacity: 0.6;
+}
+.pagebox.busy > i.busy {
+    display: inherit;
+    opacity: 1;
+}
 
 line.chr {
     stroke: black;

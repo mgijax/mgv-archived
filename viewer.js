@@ -1788,13 +1788,22 @@ class MGVApp {
 		}
 	    });
 	//
-	d3.selectAll(".button.collapse")
+	d3.selectAll(".collapsible")
+	    .append("i")
+	    .attr("class","material-icons button collapse")
 	    .on("click.default", function () {
 		let p = d3.select(this.parentNode);
 		p.classed("closed", ! p.classed("closed"));
 	    });
+	//
 	d3.select("#featureDetails .button.collapse")
 	    .on("click.extra", () => this.updateFeatureDetails());
+
+	// 
+	d3.selectAll(".pagebox")
+	    .append("i")
+	    .attr("class","material-icons busy rotating")
+	    ;
 
 	// zoom controls
 	d3.select("#zoomOut").on("click",     () => { d3.event.stopPropagation(); this.zoom(this.defaultZoom) });
@@ -1818,7 +1827,7 @@ class MGVApp {
 	    let term = this.value;
 	    this.value = "";
 	    let searchType  = d3.select("#searchtype")[0][0].value;
-	    let lstName = term;
+	    let lstName = searchType.replace(/featuresBy/,"").toLowerCase() + "=" + term;
 	    d3.select("#findgenes").classed("busy",true);
 	    self.auxDataManager[searchType](term)
 	      .then(feats => {
