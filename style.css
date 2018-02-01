@@ -176,13 +176,11 @@ line.chr {
 }
 .mylists .listInfo [name="delete"] {
     width: 10%;
-    color: red;
     margin-left: 10px;
     font-size: 14px;
 }
 .mylists .listInfo [name="delete"]:hover {
-    color: white;
-    background-color: red;
+    color: red;
     font-weight: bold;
 }
 .mylists [name="newfromlistop"]:hover {
@@ -200,15 +198,38 @@ line.chr {
     left: -10px;
 }
 .mylists .button[name="purge"] {
-    color: red;
 }
 .mylists .button[name="purge"]:hover {
-    color: white;
-    background-color: red;
+    color: red;
+    background-color: white;
 }
 .mylists [name="tools"] {
     border-top: thin solid #555;
     justify-content: space-between;
+}
+
+.mylists [name="listexpr"] {
+    display: none;
+    border-top: thin solid black;
+    padding-top: 6px;
+}
+.mylists.editing [name="listexpr"] {
+    display: inherit;
+}
+.mylists [name="listexpr"] .flexrow {
+    justify-content: space-around;
+}
+.mylists [name="listexpr"] input {
+    flex-grow: 1;
+}
+.mylists.editing.closed [name="listexpr"] {
+    display: none;
+}
+.mylists [name="listexpr"] .button[name="()"] {
+    font-size: 16px;
+}
+.mylists [name="listexpr"] .button[name="*"] {
+    font-size: 20px;
 }
 
 #header {

@@ -380,7 +380,7 @@ class ListManager {
     }
     // 
     createOrUpdate (name, ids) {
-        this.has(name) ? this.updateList(name,null,ids) : this.create(name, ids);
+        return this.has(name) ? this.updateList(name,null,ids) : this.create(name, ids);
     }
     // creates a new list with the given name and ids.
     create (name, ids) {
@@ -394,6 +394,7 @@ class ListManager {
 	    modified: dt
 	};
 	this._save();
+	return this.name2list[name];
     }
     // updates the ids in the given list
     updateList (name, newname, newids) {
@@ -408,12 +409,14 @@ class ListManager {
 	if (newids) lst.ids  = newids;
 	lst.modified = new Date() + "";
 	this._save();
+	return lst;
     }
     // deletes the specified list
     deleteList (name) {
         let lst = this.get(name);
 	delete this.name2list[name];
 	this._save();
+	return lst;
     }
     // delete all lists
     purge () {
@@ -916,10 +919,10 @@ class GenomeView extends SVGView {
 	// feature tick marks
 	let tickLength = 10;
 	if (!data) {
-	    this.svgMain.selectAll("line.feature").remove();
+	    this.svgMain.selectAll(".feature").remove();
 	    return;
 	}
-        let feats = this.svgMain.selectAll("line.feature")
+        let feats = this.svgMain.selectAll(".feature")
 	    .data(data||[], d => d.mgiid);
 	let nfs = feats.enter()
 	    .append("line")
@@ -1468,7 +1471,8 @@ class ZoomView extends SVGView {
     //   currFeat : current (mouseover) feature (if any)
     //
     drawFiducials (data, currFeat) {
-
+	let self = this;
+	//
 	// put fiducial marks in their own group 
 	let fGrp = this.svgMain.select("g.fiducials")
 	    .classed("hidden", false);
@@ -1550,6 +1554,12 @@ class ZoomView extends SVGView {
 	    let s = `${x1},${y1+h1} ${x2},${y2} ${x2+w2},${y2} ${x1+w1},${y1+h1}`
 	    //
 	    return s;
+	})
+	.on("mouseover", (p) => {
+	    this.highlight(p[0]);
+	})
+	.on("mouseout",  (p) => {
+	    this.highlight();
 	});
 
     }
@@ -1705,16 +1715,38 @@ class MGVApp {
 		    alert("Nothing selected.");
 		    return;
 		}
-		this.listManager.createOrUpdate("selected features", ids);
-		this.updateLists();
+		let newlist = this.listManager.createOrUpdate("selected features", ids);
+		this.updateLists(newlist);
 	    });
 	// Button: create list by combining others
+	// NOTE: there are two <i> icons combining to look like one button.
+	// So we need to selectAll.
 	d3.selectAll('.mylists [name="newfromlistop"] i')
-	    .on("click", () => {
+	    .on("click", function () {
 	        d3.event.stopPropagation();
-		console.log("NEW LIST")
+		// flip the editing state of the box
+		let listbox = d3.select(".mylists");
+		let isediting = ! listbox.classed("editing");
+		listbox.classed("editing", isediting);
+		// if editing, clear the input area and give focus
+		if (isediting) {
+		    let inp = d3.select('.mylists [name="listexpr"] input');
+		    inp[0][0].value = "";
+		    inp[0][0].focus();
+		}
+		
 	    });
-	//
+	// Buttons: the list operator buttons (union, intersection, etc.)
+	d3.selectAll('.mylists [name="listexpr"] .button')
+	    .on("click", function () {
+	        d3.event.stopPropagation();
+		let inelt = d3.select('.mylists [name="listexpr"] input')[0][0];
+		let op = d3.select(this).attr("name");
+		inelt.value += op + ' ';
+		inelt.focus();
+		op === "()" && setCaretPosition(inelt, inelt.value.length - 2);
+	    });
+	// Button: delete all lists (get confirmation first).
 	d3.select('.mylists .button[name="purge"]')
 	    .on("click", () => {
 	        d3.event.stopPropagation();
@@ -1806,16 +1838,24 @@ class MGVApp {
 	    ;
 
 	// zoom controls
-	d3.select("#zoomOut").on("click",     () => { d3.event.stopPropagation(); this.zoom(this.defaultZoom) });
-	d3.select("#zoomIn") .on("click",     () => { d3.event.stopPropagation(); this.zoom(1/this.defaultZoom) });
-	d3.select("#zoomOutMore").on("click", () => { d3.event.stopPropagation(); this.zoom(2*this.defaultZoom) });
-	d3.select("#zoomInMore") .on("click", () => { d3.event.stopPropagation(); this.zoom(1/(2*this.defaultZoom)) });
+	d3.select("#zoomOut").on("click",
+	    () => { d3.event.stopPropagation(); this.zoom(this.defaultZoom) });
+	d3.select("#zoomIn") .on("click",
+	    () => { d3.event.stopPropagation(); this.zoom(1/this.defaultZoom) });
+	d3.select("#zoomOutMore").on("click",
+	    () => { d3.event.stopPropagation(); this.zoom(2*this.defaultZoom) });
+	d3.select("#zoomInMore") .on("click",
+	    () => { d3.event.stopPropagation(); this.zoom(1/(2*this.defaultZoom)) });
 
 	// pan controls
-	d3.select("#panLeft") .on("click",     () => { d3.event.stopPropagation(); this.pan(-this.defaultPan) });
-	d3.select("#panRight").on("click",     () => { d3.event.stopPropagation(); this.pan(+this.defaultPan) });
-	d3.select("#panLeftMore") .on("click", () => { d3.event.stopPropagation(); this.pan(-5*this.defaultPan) });
-	d3.select("#panRightMore").on("click", () => { d3.event.stopPropagation(); this.pan(+5*this.defaultPan) });
+	d3.select("#panLeft") .on("click",
+	    () => { d3.event.stopPropagation(); this.pan(-this.defaultPan) });
+	d3.select("#panRight").on("click",
+	    () => { d3.event.stopPropagation(); this.pan(+this.defaultPan) });
+	d3.select("#panLeftMore") .on("click",
+	    () => { d3.event.stopPropagation(); this.pan(-5*this.defaultPan) });
+	d3.select("#panRightMore").on("click",
+	    () => { d3.event.stopPropagation(); this.pan(+5*this.defaultPan) });
 
 	// initial highlighted features 
 	(cfg.highlight || []).forEach(h => this.zoomView.hiFeats[h]=h);
@@ -1827,14 +1867,18 @@ class MGVApp {
 	    let term = this.value;
 	    this.value = "";
 	    let searchType  = d3.select("#searchtype")[0][0].value;
-	    let lstName = searchType.replace(/featuresBy/,"").toLowerCase() + "=" + term;
+	    let lstName = searchType.replace(/featuresBy/,"").toLowerCase() + "= " + term;
 	    d3.select("#findgenes").classed("busy",true);
 	    self.auxDataManager[searchType](term)
 	      .then(feats => {
-		  d3.select("#findgenes").classed("busy",false);
-		  feats.forEach(f => self.zoomView.hiFeats[f.mgiid] = f.mgiid);
 		  self.listManager.createOrUpdate(lstName, feats.map(f => f.primaryIdentifier))
 		  self.updateLists();
+		  //
+		  self.zoomView.hiFeats = {};
+		  feats.forEach(f => self.zoomView.hiFeats[f.mgiid] = f.mgiid);
+		  self.zoomView.highlight();
+		  //
+		  d3.select("#findgenes").classed("busy",false);
 	      });
 	})
 	// ------------------------------
@@ -2121,7 +2165,11 @@ class MGVApp {
     }
 
     //----------------------------------------------
-    updateLists () {
+    // Updates the "My lists" box with the currently available lists.
+    // Args:
+    //   newlist (List) optional. If specified, we just created that list, and its name is
+    //   	a generated default. Place focus there so user can type new name.
+    updateLists (newlist) {
 	self = this;
         let lists = this.listManager.getAll();
 	lists.sort( (b,a) => (new Date(a.modified)).getTime() - (new Date(b.modified)).getTime() );
@@ -2140,9 +2188,25 @@ class MGVApp {
 
 	items
 	    .attr("name", lst=>lst.name)
+	    .on("click", (lst) => {
+	        let isediting = d3.select(".mylists").classed("editing");
+		if (isediting) {
+		    // add list's name to the expression input value
+		    let inp = d3.select('.mylists [name="listexpr"] input')[0][0];
+		    let s = lst.name;
+		    let re = /[ =()+*-]/;
+		    if (s.search(re) >= 0) s = '"' + s + '"';
+		    inp.value += s + ' ';
+		    inp.focus();
+		}
+		else {
+		}
+
+	    });
 	items.select('span[name="name"]')
 	    .text(lst => lst.name)
 	    .on("focus", function (lst) {
+		// select the name text on focus
 		var range = document.createRange();
 		range.setStart( this, 0 );
 		range.setEnd( this, 1 )
@@ -2150,8 +2214,8 @@ class MGVApp {
 		window.getSelection().addRange(range);
 	    })
 	    .on("blur", function (lst) {
-		// change the list's name 
-		let newname = this.innerHTML;
+		// change the list's name on blur
+		let newname = this.innerText.trim();
 		if (newname !== lst.name) {
 		    self.listManager.updateList(lst.name, newname);
 		    self.updateLists();
@@ -2168,6 +2232,12 @@ class MGVApp {
 	    .on("click", lst => { d3.event.stopPropagation(); this.listManager.deleteList(lst.name); this.updateLists();});
 	//
 	items.exit().remove();
+	//
+	if (newlist) {
+	    let nameelt = 
+	        d3.select(`.mylists [name="lists"] [name="${newlist.name}"] [name="name"]`)[0][0];
+            nameelt.focus();
+	}
     }
 
     //----------------------------------------------
@@ -2242,7 +2312,7 @@ class MGVApp {
 	    .attr("name", c => c.lbl)
 	    .style("background-color", c => c.clr)
 	    .on("click", function () {
-		d3.event.sourceEvent.stopPropagation();
+		d3.event.stopPropagation();
 		let t = d3.select(this);
 	        t.classed("checked", ! t.classed("checked"));
 		let swatches = d3.selectAll(".swatch.checked")[0];
@@ -2523,6 +2593,26 @@ Set.prototype.difference = function(setB) {
         difference.delete(elem);
     }
     return difference;
+}
+// ---------------------------------------------
+// Sets the keyboard caret position in the given element.
+// Source: https://stackoverflow.com/questions/512528/set-keyboard-caret-position-in-html-textbox
+// Slightly adapted - pass the element itself rather than its id (which it may not have).
+// 
+function setCaretPosition(elem, caretPos) {
+    if(elem.createTextRange) {
+	var range = elem.createTextRange();
+	range.move('character', caretPos);
+	range.select();
+    }
+    else {
+	if(elem.selectionStart) {
+	    elem.focus();
+	    elem.setSelectionRange(caretPos, caretPos);
+	}
+	else
+	    elem.focus();
+    }
 }
 // ---------------------------------------------
 // ---------------------------------------------

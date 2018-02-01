@@ -53,10 +53,23 @@
 	    <div class="mylists pagebox flexcolumn collapsible">
 		<label>My lists</label>
 		<div name="lists" class="flexcolumn"></div>
+		<div name="listexpr" class="listexpr flexcolumn">
+		    <div class="flexrow">
+			<input />
+		        <button>OK</button>
+		    </div>
+		    <div class="flexrow">
+		       <i name="+" title="union" class="material-icons button">add</i>
+		       <i name="*" title="intersection" class="material-icons button">close</i>
+		       <i name="-" title="difference" class="material-icons button">remove</i>
+		       <span name="()" title="group" class="button">()</i>
+		    </div>
+		</div>
 		<div name="tools" class="flexrow">
 		    <i name="newfromselection" class="material-icons button" title="Create list from current selection.">playlist_add</i>
 
 		    <span name="newfromlistop">
+			<!-- two circle icons, positioned so they overlap -->
 			<i class="material-icons" title="Create list by combining other lists.">radio_button_unchecked</i>
 			<i class="material-icons" title="Create list by combining other lists.">radio_button_unchecked</i>
 		    </span>
