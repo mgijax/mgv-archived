@@ -184,10 +184,15 @@ line.chr {
     font-weight: bold;
 }
 .mylists [name="newfromlistop"]:hover {
-    color: white;
-    cursor: pointer;
+    color: white !important;
+}
+.mylists.editing [name="newfromlistop"] {
+    color: #0f0;
+    background-color: black;
+    
 }
 .mylists [name="newfromlistop"] i {
+    cursor: pointer;
     position: relative;
     font-size: 16px;
 }
@@ -201,7 +206,6 @@ line.chr {
 }
 .mylists .button[name="purge"]:hover {
     color: red;
-    background-color: white;
 }
 .mylists [name="tools"] {
     border-top: thin solid #555;
@@ -224,6 +228,11 @@ line.chr {
 }
 .mylists.editing.closed [name="listexpr"] {
     display: none;
+}
+.mylists [name="listexpr"] .button[name="OK"]:hover {
+    background-color: black;
+    color: #0f0;
+    border-radius: 4px;
 }
 .mylists [name="listexpr"] .button[name="()"] {
     font-size: 16px;

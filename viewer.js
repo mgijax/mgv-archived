@@ -384,7 +384,7 @@ class ListManager {
     }
     // creates a new list with the given name and ids.
     create (name, ids) {
-	if (this.has(name)) throw "Create rejected because list exists: " + name;
+	if (name !== "_" && this.has(name)) throw "Create rejected because list exists: " + name;
 	//
 	let dt = new Date() + "";
 	this.name2list[name] = {
@@ -395,6 +395,26 @@ class ListManager {
 	};
 	this._save();
 	return this.name2list[name];
+    }
+    // create list by combining others
+    // Args:
+    //   name (string) name for the list
+    //   expr (string) Expression involving list names and operators, e.g. "(a+b)*c - d"
+    createFromCombo (name, expr) {
+        let ast = (new ListExprParser()).parse(expr);
+	let reach = (n) => {
+	    if (typeof(n) === "string") {
+	        let lst = this.get(n);
+		return new Set(lst.ids);
+	    }
+	    else {
+	        let l = reach(n.left);
+		let r = reach(n.right);
+		return l[n.op](r);
+	    }
+	}
+	let ids = reach(ast);
+	return this.create(name, Array.from(ids));
     }
     // updates the ids in the given list
     updateList (name, newname, newids) {
@@ -425,6 +445,79 @@ class ListManager {
     }
 }
 
+// ---------------------------------------------
+// Parses a list operator expression, eg "(a + b)*c - d"
+// Returns an abstract syntax tree. Leaf nodes are the names.
+// Interior nodes look like {left, op, right}
+// 
+class ListExprParser {
+    constructor () {
+	this.re = /([()+*-]|"[^"]+"|[a-zA-Z_][a-zA-Z0-9_]*)/g
+	this.op = /[+-]/;
+	this.op2 = /[*]/;
+	this._init("");
+    }
+    _init (s) {
+        this.expr = s;
+	this.tokens = this.expr.match(this.re) || [];
+	this.i = 0;
+    }
+    _peekToken() {
+	return this.tokens[this.i];
+    }
+    _nextToken () {
+	let t;
+        if (this.i < this.tokens.length) {
+	    t = this.tokens[this.i];
+	    this.i += 1;
+	}
+	return t;
+    }
+    _expr () {
+        let node = this._term();
+	let op = this._peekToken();
+	if (op === "+" || op === "-") {
+	    this._nextToken();
+	    node = { left:node, op:op==="+"?"union":"difference", right: this._expr() }
+        }               
+	return node;
+    }
+    _term () {
+        let node = this._factor();
+	let op = this._peekToken();
+	if (op === "*") {
+	    this._nextToken();
+	    node = { left:node, op:"intersection", right: this._factor() }
+	}
+	return node;
+    }
+    _factor () {
+        let t = this._nextToken();
+	if (t === "("){
+	    let node = this._expr();
+	    let nt = this._nextToken();
+	    if (nt !== ")") this._error("')'", nt);
+	    return node;
+	}
+	else if (t && (t.startsWith('"'))) {
+	    return t.substring(1, t.length-1);
+	}
+	else if (t && t.match(/[a-zA-Z_]/)) {
+	    return t;
+	}
+	else
+	    this._error("EXPR or IDENT", t||"EOF");
+	return t;
+	    
+    }
+    _error (expected, saw) {
+        throw `Parse error: expected ${expected} but saw ${saw}.`;
+    }
+    parse (s) {
+	this._init(s);
+	return this._expr();
+    }
+}
 // ---------------------------------------------
 // Something that knows how to translate coordinates between two genomes.
 //
@@ -1718,7 +1811,7 @@ class MGVApp {
 		let newlist = this.listManager.createOrUpdate("selected features", ids);
 		this.updateLists(newlist);
 	    });
-	// Button: create list by combining others
+	// Button: open the list operation box
 	// NOTE: there are two <i> icons combining to look like one button.
 	// So we need to selectAll.
 	d3.selectAll('.mylists [name="newfromlistop"] i')
@@ -1736,6 +1829,15 @@ class MGVApp {
 		}
 		
 	    });
+	// Button: "OK" button for creating a list from a list op expression
+	d3.select('.mylists [name="listexpr"] button[name="OK"]')
+            .on("click", () => {
+                let expr = d3.select('.mylists [name="listexpr"] input')[0][0].value.trim();
+		expr && this.listManager.createFromCombo("_", expr);
+		this.updateLists();
+		d3.select(".mylists").classed("editing", false);
+	    });
+
 	// Buttons: the list operator buttons (union, intersection, etc.)
 	d3.selectAll('.mylists [name="listexpr"] .button')
 	    .on("click", function () {
@@ -2199,9 +2301,6 @@ class MGVApp {
 		    inp.value += s + ' ';
 		    inp.focus();
 		}
-		else {
-		}
-
 	    });
 	items.select('span[name="name"]')
 	    .text(lst => lst.name)
@@ -2568,7 +2667,7 @@ function same (alst,blst) {
 
 //---------------------------------------------
 // Add basic set ops to Set prototype.
-// Stolen from: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set
+// Lifted from: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set
 Set.prototype.union = function(setB) {
     var union = new Set(this);
     for (var elem of setB) {
@@ -2614,6 +2713,7 @@ function setCaretPosition(elem, caretPos) {
 	    elem.focus();
     }
 }
+
 // ---------------------------------------------
 // ---------------------------------------------
 function pqstring (qstring) {
