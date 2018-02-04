@@ -215,14 +215,12 @@ def lookup(ff, ix, chr, start, end):
     return answer
 
 
-# Returns features by MGI id.
+# Returns features by id from a single genome. Ids may be MGP and/or MGI ids.
 # Args:
-#    ff (open file) the gff file 
-#    ids (list of strings) one or more ids to lookup
+#    ff (open file) the gff file of the genome
+#    ids (list of strings) List of ids to look up.
 # Returns:
-#    list of [id, feature] pairs. The elements of the returned list map 1:1
-#    with the elements in the ids input. If an id was not found, the feature 
-#    is null. Duplicate ids (or aliases) will returns the same feature multiple times.
+#    list of [id, [matching features]]. These correspond 1:1 to the input ids.
 #    
 def idlookup(ff, ids):
     # make a set for fast lookup
@@ -230,8 +228,10 @@ def idlookup(ff, ids):
     # 
     results = {}
     for f in iterFeatFile(ff):
-        if f["mgiid"] in idset:
-	    results[f["mgiid"]] = f
+        if f["id"] in idset:
+	    results.setdefault(f["id"], []).append(f)
+	if f["mgiid"] in idset:
+	    results.setdefault(f["mgiid"], []).append(f)
     #
     answer = [(i,results.get(i,[])) for i in ids]
     return answer
