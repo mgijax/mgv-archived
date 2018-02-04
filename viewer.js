@@ -323,24 +323,27 @@ class AuxDataManager {
     //----------------------------------------------
     // do a LOOKUP query for SequenceFeatures from MouseMine
     featuresByLookup (qryString) {
-	let q = `<query name="" model="genomic" view="SequenceFeature.primaryIdentifier SequenceFeature.symbol" longDescription="" constraintLogic="A and B">
-	    <constraint path="SequenceFeature" code="A" op="LOOKUP" value="${qryString}"/>
-	    <constraint path="SequenceFeature.organism.taxonId" code="B" op="=" value="10090"/>
+	let q = `<query name="" model="genomic" view="SequenceFeature.primaryIdentifier SequenceFeature.symbol" longDescription="" constraintLogic="A and B and C">
+	    <constraint code="A" path="SequenceFeature" op="LOOKUP" value="${qryString}"/>
+	    <constraint code="B" path="SequenceFeature.organism.taxonId" op="=" value="10090"/>
+	    <constraint code="C" path="SequenceFeature.sequenceOntologyTerm.name" op="!=" value="transgene"/>
 	    </query>`;
 	return this.getAuxData(q);
     }
     //----------------------------------------------
     featuresByOntologyTerm (qryString, termType) {
         let q = `<query name="" model="genomic" 
-	  view="SequenceFeature.primaryIdentifier SequenceFeature.symbol" longDescription="" sortOrder="SequenceFeature.symbol asc">
+	  view="SequenceFeature.primaryIdentifier SequenceFeature.symbol" longDescription="" sortOrder="SequenceFeature.symbol asc" constraintLogic="A and B and C">
 	      <constraint path="SequenceFeature.ontologyAnnotations.ontologyTerm" type="${termType}"/>
 	      <constraint path="SequenceFeature.ontologyAnnotations.ontologyTerm.parents" type="${termType}"/>
-	      <constraint path="SequenceFeature.ontologyAnnotations.ontologyTerm.parents" code="A" op="LOOKUP" value="${qryString}"/>
-	      <constraint path="SequenceFeature.organism.taxonId" code="B" op="=" value="10090"/>
+	      <constraint code="A" path="SequenceFeature.ontologyAnnotations.ontologyTerm.parents" op="LOOKUP" value="${qryString}"/>
+	      <constraint code="B" path="SequenceFeature.organism.taxonId" op="=" value="10090"/>
+	      <constraint code="C" path="SequenceFeature.sequenceOntologyTerm.name" op="!=" value="transgene"/>
 	  </query>`
 	return this.getAuxData(q);
     }
     //----------------------------------------------
+    // (not currently in use...)
     featuresByPathwayTerm (qryString) {
         let q = `<query name="" model="genomic" 
 	  view="Pathway.genes.primaryIdentifier Pathway.genes.symbol" longDescription="" constraintLogic="A and B">
@@ -1862,6 +1865,10 @@ class MGVApp {
 		this.resize()
 	    });
 	
+	// -------------------------------------------------------------------
+	// My lists
+	// -------------------------------------------------------------------
+	//
 	// Button: create list from current selection
 	d3.select('.mylists .button[name="newfromselection"]')
 	    .on("click", () => {
@@ -1893,22 +1900,6 @@ class MGVApp {
 		}
 		
 	    });
-	// Button: "OK" button for creating a list from a list op expression
-	d3.select('.mylists [name="listexpr"] button[name="OK"]')
-            .on("click", () => {
-		let inp = d3.select('.mylists [name="listexpr"] input')[0][0];
-                let expr = inp.value.trim();
-		if (expr) {
-		    let lst = this.listManager.createFromCombo("_", expr);
-		    if (lst) {
-		        this.updateLists();
-			d3.select(".mylists").classed("editing", false);
-		    }
-		    else {
-		        inp.focus();
-		    }
-		}
-	    });
 	// Input box: list expression: validate on any input
 	d3.select('.mylists [name="listexpr"] input')
 	    .on("input", () => this.validateExpr())
@@ -1923,6 +1914,28 @@ class MGVApp {
 		self.addToListExpr(op);
 		self.validateExpr();
 	    });
+
+	// Button: "OK" button for creating a list from a list op expression
+	d3.select('.mylists [name="listexpr"] button[name="OK"]')
+            .on("click", () => {
+		let inp = d3.select('.mylists [name="listexpr"] input')[0][0];
+                let expr = inp.value.trim();
+		if (expr) {
+		    let name = "_";
+		    let lst = this.listManager.createFromCombo(name, expr);
+		    if (lst) {
+		        this.updateLists();
+			d3.select(".mylists").classed("editing", false);
+			d3.select(`.mylists .listInfo[name="${name}"] [name="name"]`)
+			    .attr('contenteditable','true')[0][0].focus();
+
+		    }
+		    else {
+		        inp.focus();
+		    }
+		}
+	    });
+
 	// Button: delete all lists (get confirmation first).
 	d3.select('.mylists .button[name="purge"]')
 	    .on("click", () => {
@@ -1937,7 +1950,10 @@ class MGVApp {
 		}
 	    });
 
+	//
+	// -------------------------------------------------------------------
 	// Facets
+	// -------------------------------------------------------------------
 	//
 	this.facetManager = new FacetManager(this);
 
