@@ -296,9 +296,10 @@ line.chr {
     stroke: #aaa;
 }
 #genomeView .sblock.inversion {
+    transform: translateX(-3px);
 }
 #genomeView .sblock.translocation {
-    fill: #f7cd97;
+    fill: #f1a541;
     stroke: #f1a541;
 }
 #genomeView svg .title {

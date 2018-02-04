@@ -1497,7 +1497,7 @@ class ZoomView extends SVGView {
 		    fSelect(f, d3.event.shiftKey, true);
 		    if (self.timeout) window.clearTimeout(self.timeout);
 		    self.timeout = window.setTimeout(function(){ self.app.callback(); }, 1000);
-		    this.highlight();
+		    self.highlight();
 		}
 		else
 		    self.highlight(this);
@@ -1510,9 +1510,10 @@ class ZoomView extends SVGView {
 	    .attr("class", f => "feature" + (f.strand==="-" ? " minus" : " plus"))
 	    .attr("name", f => f.mgpid)
 	    .style("fill", f => self.app.cscale(f.getMungedType()))
-	    //.on("mouseover", fMouseOverHandler)
-	    //.on("mouseout", fMouseOutHandler)
-	    //.on("click", fClickHandler)
+	    // FIXME Please please PLEASE move these handlers to a higher level!!! Thank you.
+	    .on("mouseover", fMouseOverHandler)
+	    .on("mouseout", fMouseOutHandler)
+	    .on("click", fClickHandler)
 	    ;
 
 	// draw the rectangles
@@ -1841,9 +1842,16 @@ class MGVApp {
 	// Background click in zoom view = unselect all.
 	d3.select("#zoomView svg")
 	  .on("click", () => {
-	      this.hideContextMenu();
-	      this.zoomView.hiFeats = {};
-	      this.zoomView.highlight();
+	      let tgt = d3.select(d3.event.target);
+	      if (tgt.data()[0] instanceof Feature) {
+	      }
+	      else {
+		  this.hideContextMenu();
+		  if (!d3.event.shiftKey) {
+		      this.zoomView.hiFeats = {};
+		      this.zoomView.highlight();
+		  }
+	      }
 	  });
 
 	// Button: Gear icon to show/hide left column
