@@ -1094,13 +1094,13 @@ class ZoomView extends SVGView {
       super(id,width,height, app);
       //
       this.minSvgHeight = 250;
-      this.stripHeight = 36;
       this.blockHeight = 40;
       this.topOffset = 45;
       this.featHeight = 6;	// height of a rectangle representing a feature
       this.laneGap = 2;	        // space between swim lanes
       this.laneHeight = this.featHeight + this.laneGap;
       this.stripHeight = 70;    // height per genome in the zoom view
+      this.stripGap = 20;	// space between strips
       //
       this.coords = null;	// curr zoom view coords { chr, start, end }
       this.hiFeats = {};	// IDs of Features we're highlighting. May be mgpid  or mgiId
@@ -1337,11 +1337,12 @@ class ZoomView extends SVGView {
         let zrTop      = zrs.select(".layer2");	// overlay (axes, brushes)
 
 	// reset the svg size based on number of strips
+	let totalHeight = (this.stripHeight+this.stripGap)*(data.length+1)
 	d3.select(this.selector)
-	    .attr("height", Math.max(this.minSvgHeight, this.stripHeight*(data.length+1)));
+	    .attr("height", Math.max(this.minSvgHeight, totalHeight));
 
 	// y-coords for each genome in the zoom view
-	data.forEach( (d,i) => d.genome.zoomY = this.topOffset + (i * this.stripHeight) );
+	data.forEach( (d,i) => d.genome.zoomY = this.topOffset + (i * (this.stripHeight+this.stripGap)) );
 	//
 	// genome labels. Put them in the view's fiducial layer
 	let gLabels = this.svgMain.select("g.fiducials")
