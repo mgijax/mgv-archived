@@ -875,7 +875,6 @@ class GenomeView extends SVGView {
     //----------------------------------------------
     brushstart (chr){
 	this.clearBrushes(chr.brush);
-	d3.event.sourceEvent.stopPropagation();
 	this.brushChr = chr;
     }
 
@@ -1078,10 +1077,11 @@ class GenomeView extends SVGView {
 	let nfs = feats.enter()
 	    .append("line")
 	    .attr("class","feature");
-	feats.attr("x1", d => gdata.xscale(d.chr) + (d.strand === "-1" ? 0 : tickLength))
-	feats.attr("y1", d => gdata.yscale(d.start))
-	feats.attr("x2", d => gdata.xscale(d.chr)+ (d.strand === "-1" ? 0 : tickLength) + tickLength)
-	feats.attr("y2", d => gdata.yscale(d.start))
+	let xAdj = f => (f.strand === "+" ? tickLength : -tickLength) + 5;
+	feats.attr("x1", f => gdata.xscale(f.chr) + xAdj(f))
+	feats.attr("y1", f => gdata.yscale(f.start))
+	feats.attr("x2", f => gdata.xscale(f.chr) + xAdj(f) + tickLength)
+	feats.attr("y2", f => gdata.yscale(f.start))
 	//
 	feats.exit().remove()
     }
@@ -1322,7 +1322,6 @@ class ZoomView extends SVGView {
 		.attr("class", "zoomStrip")
 		.attr("name", d => d.genome.name)
 		.on("click", function (g) {
-		    d3.event.stopPropagation();
 		    self.highlightStrip(g.genome, this);
 		});
 	//
@@ -1375,8 +1374,7 @@ class ZoomView extends SVGView {
 	//
 	fids.exit().remove();
 	// rectangle for the whole block
-	newFids.append("rect").attr("class", "block")
-	    .on("click", ()=> d3.event.stopPropagation());
+	newFids.append("rect").attr("class", "block");
 	// the axis line
 	newFids.append("line").attr("class","axis") ;
 	// label
@@ -1489,7 +1487,6 @@ class ZoomView extends SVGView {
 	};
 	//
 	let fClickHandler = function(f){
-	    d3.event.stopPropagation();
 	    fSelect(f, d3.event.shiftKey);
 	    self.highlight();
 	    self.app.callback();
@@ -1513,9 +1510,9 @@ class ZoomView extends SVGView {
 	    .attr("class", f => "feature" + (f.strand==="-" ? " minus" : " plus"))
 	    .attr("name", f => f.mgpid)
 	    .style("fill", f => self.app.cscale(f.getMungedType()))
-	    .on("mouseover", fMouseOverHandler)
-	    .on("mouseout", fMouseOutHandler)
-	    .on("click", fClickHandler)
+	    //.on("mouseover", fMouseOverHandler)
+	    //.on("mouseout", fMouseOutHandler)
+	    //.on("click", fClickHandler)
 	    ;
 
 	// draw the rectangles
@@ -1836,8 +1833,6 @@ class MGVApp {
 	d3.select("#zoomView .menu > .button")
 	  .on("click", function () {
 	      // show context menu at mouse event coordinates
-	      d3.event.stopPropagation();
-	      d3.event.preventDefault();
 	      let cx = d3.event.clientX;
 	      let cy = d3.event.clientY;
 	      let bb = d3.select(this)[0][0].getBoundingClientRect();
@@ -1846,7 +1841,6 @@ class MGVApp {
 	// Background click in zoom view = unselect all.
 	d3.select("#zoomView svg")
 	  .on("click", () => {
-	      d3.event.stopPropagation();
 	      this.hideContextMenu();
 	      this.zoomView.hiFeats = {};
 	      this.zoomView.highlight();
@@ -1855,7 +1849,6 @@ class MGVApp {
 	// Button: Gear icon to show/hide left column
 	d3.select("#header > .gear.button")
 	    .on("click", () => {
-	        d3.event.stopPropagation();
 	        let lc = d3.select("#mgv > .leftcolumn");
 		lc.classed("closed", () => ! lc.classed("closed"));
 		this.resize()
@@ -1868,7 +1861,6 @@ class MGVApp {
 	// Button: create list from current selection
 	d3.select('.mylists .button[name="newfromselection"]')
 	    .on("click", () => {
-	        d3.event.stopPropagation();
 		let ids = Object.keys(this.zoomView.hiFeats);
 		if (ids.length === 0) {
 		    alert("Nothing selected.");
@@ -1882,7 +1874,6 @@ class MGVApp {
 	// So we need to selectAll.
 	d3.selectAll('.mylists [name="newfromlistop"] i')
 	    .on("click", function () {
-	        d3.event.stopPropagation();
 		// flip the editing state of the box
 		let listbox = d3.select(".mylists");
 		let isediting = ! listbox.classed("editing");
@@ -1904,7 +1895,6 @@ class MGVApp {
 	d3.selectAll('.mylists [name="listexpr"] .button')
 	    .on("click", function () {
 		// add my symbol to the formula
-	        d3.event.stopPropagation();
 		let inelt = d3.select('.mylists [name="listexpr"] input')[0][0];
 		let op = d3.select(this).attr("name");
 		self.addToListExpr(op);
@@ -1936,7 +1926,6 @@ class MGVApp {
 	// Button: delete all lists (get confirmation first).
 	d3.select('.mylists .button[name="purge"]')
 	    .on("click", () => {
-	        d3.event.stopPropagation();
 		if (this.listManager.getNames().length === 0) {
 		    alert("No lists.");
 		    return;
@@ -2029,23 +2018,23 @@ class MGVApp {
 
 	// zoom controls
 	d3.select("#zoomOut").on("click",
-	    () => { d3.event.stopPropagation(); this.zoom(this.defaultZoom) });
+	    () => { this.zoom(this.defaultZoom) });
 	d3.select("#zoomIn") .on("click",
-	    () => { d3.event.stopPropagation(); this.zoom(1/this.defaultZoom) });
+	    () => { this.zoom(1/this.defaultZoom) });
 	d3.select("#zoomOutMore").on("click",
-	    () => { d3.event.stopPropagation(); this.zoom(2*this.defaultZoom) });
+	    () => { this.zoom(2*this.defaultZoom) });
 	d3.select("#zoomInMore") .on("click",
-	    () => { d3.event.stopPropagation(); this.zoom(1/(2*this.defaultZoom)) });
+	    () => { this.zoom(1/(2*this.defaultZoom)) });
 
 	// pan controls
 	d3.select("#panLeft") .on("click",
-	    () => { d3.event.stopPropagation(); this.pan(-this.defaultPan) });
+	    () => { this.pan(-this.defaultPan) });
 	d3.select("#panRight").on("click",
-	    () => { d3.event.stopPropagation(); this.pan(+this.defaultPan) });
+	    () => { this.pan(+this.defaultPan) });
 	d3.select("#panLeftMore") .on("click",
-	    () => { d3.event.stopPropagation(); this.pan(-5*this.defaultPan) });
+	    () => { this.pan(-5*this.defaultPan) });
 	d3.select("#panRightMore").on("click",
-	    () => { d3.event.stopPropagation(); this.pan(+5*this.defaultPan) });
+	    () => { this.pan(+5*this.defaultPan) });
 
 	// initial highlighted features 
 	(cfg.highlight || []).forEach(h => this.zoomView.hiFeats[h]=h);
@@ -2499,7 +2488,7 @@ class MGVApp {
 	});
 	items.select('span[name="size"]').text(lst => lst.ids.length);
 	items.select('.button[name="delete"]')
-	    .on("click", lst => { d3.event.stopPropagation(); this.listManager.deleteList(lst.name); this.updateLists();});
+	    .on("click", lst => { this.listManager.deleteList(lst.name); this.updateLists();});
 	//
 	items.exit().remove();
 	//
@@ -2582,7 +2571,6 @@ class MGVApp {
 	    .attr("name", c => c.lbl)
 	    .style("background-color", c => c.clr)
 	    .on("click", function () {
-		d3.event.stopPropagation();
 		let t = d3.select(this);
 	        t.classed("checked", ! t.classed("checked"));
 		let swatches = d3.selectAll(".swatch.checked")[0];
@@ -2637,7 +2625,6 @@ class MGVApp {
 	news.append("label")
 	  .text(d => d.label)
 	  .on("click", d => {
-	      d3.event.sourceEvent.stopPropagation();
 	      d.handler();
 	      this.hideContextMenu();
 	  });
