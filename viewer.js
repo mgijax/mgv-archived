@@ -854,10 +854,18 @@ class GenomeView extends SVGView {
 	this.bwidth = this.cwidth/2;  // block width
 	this.currBlocks = null;
 	this.currTicks = null;
+	//
+	this.gSticks  = this.svgMain.append('g').attr("name", "backbones");
+	this.gBlocks  = this.svgMain.append('g').attr("name", "synBlocks");
+	this.gTicks   = this.svgMain.append('g').attr("name", "ticks");
+	this.gLabels  = this.svgMain.append('g').attr("name", "labels");
+	this.gBrushes = this.svgMain.append('g').attr("name", "brushes");
+	this.title    = this.svgMain.append('text').attr("class", "title");
+	this.subTitle   = this.title.append('tspan').attr("class","subtitle");
     }
     setBrushCoords (coords) {
 	this.clearBrushes();
-	this.svg
+	this.gBrushes
 	  .select(`g.brush[name="${ coords.chr }"]`)
 	  .each(function(chr){
 	    chr.brush.extent([coords.start,coords.end]);
@@ -888,7 +896,7 @@ class GenomeView extends SVGView {
 
     //----------------------------------------------
     clearBrushes (except){
-	this.svgMain.selectAll('.brush').each(function(chr){
+	this.gBrushes.selectAll('.brush').each(function(chr){
 	    if (chr.brush !== except) {
 		chr.brush.clear();
 		chr.brush(d3.select(this));
@@ -940,19 +948,9 @@ class GenomeView extends SVGView {
 	       .on("brushend", () => this.brushend());
 	  }, this);
 
-	// Group to hold synteny blocks. Want this first so everything else overlays it.
-	let sygp = this.svgMain.selectAll('g[name="synBlocks"]').data([0]);
-	sygp.enter().append("g").attr("name","synBlocks");
-	sygp.exit().remove();
-
 	// Chromosome backbones (lines)
-	// group to hold em
-	let bbgp = this.svgMain.selectAll('g[name="backbones"]').data([0]);
-	bbgp.enter().append("g").attr("name","backbones");
-	bbgp.exit().remove();
-        // now the lines
 	let xf = function(d){return self.bwidth+gdata.xscale(d.name);};
-	let ccels = bbgp.selectAll('line.chr')
+	let ccels = this.gSticks.selectAll('line.chr')
 	  .data(gdata.chromosomes, function(x){return x.name;});
 	ccels.exit().transition().duration(this.app.dur)
 	  .attr("y1", this.height)
@@ -974,11 +972,7 @@ class GenomeView extends SVGView {
 	    ;
 
 	// Chromosome labels
-	let clgp = this.svgMain.selectAll('g[name="labels"]').data([0]);
-	clgp.enter().append("g").attr("name","labels");
-	clgp.exit().remove();
-	//
-	let labels = clgp.selectAll('.chrlabel')
+	let labels = this.gLabels.selectAll('.chrlabel')
 	  .data(gdata.chromosomes, function(x){return x.name;});
 	labels.exit().transition().duration(this.app.dur)
 	  .attr('y', this.height)
@@ -995,12 +989,8 @@ class GenomeView extends SVGView {
 	  .attr('x', xf)
 	  .attr('y', -2) ;
 
-	// Brushes
-	let brgp = this.svgMain.selectAll('g[name="brushes"]').data([0]);
-	brgp.enter().append("g").attr("name","brushes");
-	brgp.exit().remove();
-	//
-	let brushes = brgp.selectAll("g.brush")
+	// Brushes last so they overlay everything
+	let brushes = this.gBrushes.selectAll("g.brush")
 	    .data(gdata.chromosomes, function(x){return x.name;});
 	brushes.exit().remove();
 	brushes.enter().append('g')
@@ -1023,18 +1013,12 @@ class GenomeView extends SVGView {
     //    subtitle (string) optional subtitle.
     drawTitle (title, subtitle) {
 	// Ref genome label
-	let ttl = this.svgMain.selectAll("text.title")
-	    .data([this.app.rGenome]);
-	ttl.enter().append("text").attr("class","title");
-	ttl.text(s => title || s.label)
+	let tsp1 = `<tspan class="title">${title || this.app.rGenome.label}</tspan>`;
+	let tsp2 = `<tspan class="subtitle"> ${subtitle || ""}</tspan>`;
+	let html = `${tsp1}${tsp2}`;
+	this.title.html(html)
 	    .attr("x", this.width/2)
 	    .attr("y", this.height - 20);
-	let sttl = ttl.selectAll("tspan.subtitle")
-	    .data([" " + (subtitle || "")]);
-	sttl.enter().append("tspan")
-	    .attr("class","subtitle");
-	sttl.exit().remove();
-	sttl.text( t => t )
     }
 
     // ---------------------------------------------
@@ -1067,7 +1051,7 @@ class GenomeView extends SVGView {
 	//
 	let bwidth = 10;
 	rects
-	    .attr("x", b => this.getX(b.fromChr) + (b.ori === "+" ? bwidth : 0))
+	    .attr("x", b => this.getX(b.fromChr) + bwidth/2 )
 	    .attr("y", b => this.getY(b.fromStart))
 	    .attr("width", bwidth)
 	    .attr("height", b => this.getY(b.fromEnd - b.fromStart + 1))
@@ -1086,10 +1070,10 @@ class GenomeView extends SVGView {
 	// feature tick marks
 	let tickLength = 10;
 	if (!features || features.length === 0) {
-	    this.svgMain.selectAll(".feature").remove();
+	    this.gTicks.selectAll(".feature").remove();
 	    return;
 	}
-        let feats = this.svgMain.selectAll(".feature")
+        let feats = this.gTicks.selectAll(".feature")
 	    .data(features, d => d.mgpid);
 	let nfs = feats.enter()
 	    .append("line")
@@ -1191,7 +1175,6 @@ class ZoomView extends SVGView {
 	 // coordinates to ref genome
 	 let rs = this.app.translator.translate(blk.genome, r.chr, r.start, r.end, rg);
 	 if (rs.length === 0) return;
-	 if (rs.length > 1) throw "Internal error."
 	 r = rs[0];
       }
       else {
