@@ -288,8 +288,12 @@ line.chr {
     height: 250px;
     transition: height 0.5s;
 }
-#genomeView svg line.feature {
+#genomeView svg [name="ticks"] line.feature {
     stroke: black;
+}
+#genomeView svg [name="ticks"] circle.feature {
+    fill: red;
+    fill-opacity: 0.3;
 }
 #genomeView .sblock {
     fill: #bbb;

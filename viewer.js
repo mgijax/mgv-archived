@@ -1072,16 +1072,28 @@ class GenomeView extends SVGView {
 	    this.gTicks.selectAll(".feature").remove();
 	    return;
 	}
+	// the tick elements
         let feats = this.gTicks.selectAll(".feature")
 	    .data(features, d => d.mgpid);
+	//
+	let xAdj = f => (f.strand === "+" ? tickLength : -tickLength);
+	//
+	let shape = "circle";  // "circle" or "line"
+	//
 	let nfs = feats.enter()
-	    .append("line")
+	    .append(shape)
 	    .attr("class","feature");
-	let xAdj = f => (f.strand === "+" ? tickLength : -tickLength) + 5;
-	feats.attr("x1", f => gdata.xscale(f.chr) + xAdj(f))
-	feats.attr("y1", f => gdata.yscale(f.start))
-	feats.attr("x2", f => gdata.xscale(f.chr) + xAdj(f) + tickLength)
-	feats.attr("y2", f => gdata.yscale(f.start))
+	if (shape === "line") {
+	    feats.attr("x1", f => gdata.xscale(f.chr) + xAdj(f) + 5)
+	    feats.attr("y1", f => gdata.yscale(f.start))
+	    feats.attr("x2", f => gdata.xscale(f.chr) + xAdj(f) + tickLength + 5)
+	    feats.attr("y2", f => gdata.yscale(f.start))
+	}
+	else {
+	    feats.attr("cx", f => gdata.xscale(f.chr) + xAdj(f) + 10)
+	    feats.attr("cy", f => gdata.yscale(f.start))
+	    feats.attr("r",  tickLength / 2);
+	}
 	//
 	feats.exit().remove()
     }
