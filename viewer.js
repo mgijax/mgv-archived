@@ -1472,48 +1472,10 @@ class ZoomView extends SVGView {
 	    .data(d=>d.features.filter(filterDrawn), d=>d.mgpid);
 	feats.exit().remove();
 	//
-	let fSelect = function (f, shift, preserve) {
-	    let id = f.mgiid || f.mgpid;
-	    if (shift) {
-		if (self.hiFeats[id])
-		    delete self.hiFeats[id]
-		else
-		    self.hiFeats[id] = id;
-	    }
-	    else {
-		if (!preserve) self.hiFeats = {};
-		self.hiFeats[id] = id;
-	    }
-	};
-	//
-	let fClickHandler = function(f){
-	    fSelect(f, d3.event.shiftKey);
-	    self.highlight();
-	    self.app.callback();
-	};
-	//
-	let fMouseOverHandler = function(f) {
-		if (d3.event.altKey) {
-		    fSelect(f, d3.event.shiftKey, true);
-		    if (self.timeout) window.clearTimeout(self.timeout);
-		    self.timeout = window.setTimeout(function(){ self.app.callback(); }, 1000);
-		    self.highlight();
-		}
-		else
-		    self.highlight(this);
-
-	}
-	let fMouseOutHandler = function(f) {
-		self.highlight();
-	}
 	let newFeats = feats.enter().append("rect")
 	    .attr("class", f => "feature" + (f.strand==="-" ? " minus" : " plus"))
 	    .attr("name", f => f.mgpid)
 	    .style("fill", f => self.app.cscale(f.getMungedType()))
-	    // FIXME Please please PLEASE move these handlers to a higher level!!! Thank you.
-	    .on("mouseover", fMouseOverHandler)
-	    .on("mouseout", fMouseOutHandler)
-	    .on("click", fClickHandler)
 	    ;
 
 	// draw the rectangles
@@ -1839,11 +1801,46 @@ class MGVApp {
 	      let bb = d3.select(this)[0][0].getBoundingClientRect();
 	      self.showContextMenu(cx-bb.left,cy-bb.top);
 	  });
+	//
+	let fSelect = function (f, shift, preserve) {
+	    let id = f.mgiid || f.mgpid;
+	    let zv = this.zoomView;
+	    if (shift) {
+		if (zv.hiFeats[id])
+		    delete zv.hiFeats[id]
+		else
+		    zv.hiFeats[id] = id;
+	    }
+	    else {
+		if (!preserve) zv.hiFeats = {};
+		zv.hiFeats[id] = id;
+	    }
+	}.bind(this);
+	//
+	let fMouseOverHandler = function(f) {
+		if (d3.event.altKey) {
+		    fSelect(f, d3.event.shiftKey, true);
+		    if (this.timeout) window.clearTimeout(this.timeout);
+		    this.timeout = window.setTimeout(function(){ this.callback(); }.bind(this), 1000);
+		    this.zoomView.highlight();
+		}
+		else
+		    this.zoomView.highlight(f);
+
+	}.bind(this);
+	//
+	let fMouseOutHandler = function(f) {
+		this.zoomView.highlight();
+	}.bind(this);
 	// Background click in zoom view = unselect all.
 	d3.select("#zoomView svg")
 	  .on("click", () => {
 	      let tgt = d3.select(d3.event.target);
-	      if (tgt.data()[0] instanceof Feature) {
+	      let f = tgt.data()[0];
+	      if (f instanceof Feature) {
+		  fSelect(f, d3.event.shiftKey);
+		  this.zoomView.highlight();
+	          this.callback();
 	      }
 	      else {
 		  this.hideContextMenu();
@@ -1851,6 +1848,20 @@ class MGVApp {
 		      this.zoomView.hiFeats = {};
 		      this.zoomView.highlight();
 		  }
+	      }
+	  })
+	  .on("mouseover", () => {
+	      let tgt = d3.select(d3.event.target);
+	      let f = tgt.data()[0];
+	      if (f instanceof Feature) {
+		  fMouseOverHandler(f);
+	      }
+	  })
+	  .on("mouseout", () => {
+	      let tgt = d3.select(d3.event.target);
+	      let f = tgt.data()[0];
+	      if (f instanceof Feature) {
+		  fMouseOutHandler(f);
 	      }
 	  });
 
