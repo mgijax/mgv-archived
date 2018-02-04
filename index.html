@@ -31,7 +31,7 @@
 	    <!-- Comparison strains. -->
 	    <div class="compGenomes pagebox flexcolumn collapsible">
 		<label>Comparison genomes</label>
-		<select id="compGenomes" size="20"></select>
+		<select id="compGenomes" size="10"></select>
 	    </div>
 
 	    <!-- Find genes (aka create lists). -->
@@ -49,7 +49,7 @@
 	    </div>
 
 	    <!-- My lists -->
-	    <div class="mylists pagebox flexcolumn collapsible">
+	    <div id="mylists" class="mylists pagebox flexcolumn collapsible">
 		<label>My lists</label>
 		<div name="lists" class="flexcolumn"></div>
 		<div name="listexpr" class="listexpr flexcolumn">
@@ -58,10 +58,10 @@
 		        <button name="OK">OK</button>
 		    </div>
 		    <div class="flexrow">
-		       <i name="+" title="union" class="material-icons button">add</i>
-		       <i name="*" title="intersection" class="material-icons button">close</i>
-		       <i name="-" title="difference" class="material-icons button">remove</i>
-		       <span name="()" title="group" class="button">()</i>
+		       <span name="+" title="union" class="button listop">&cup;</span>
+		       <span name="*" title="intersection" class="button listop">&cap;</span>
+		       <span name="-" title="difference" class="button listop">&mdash;</span>
+		       <span name="()" title="group" class="button listop">()</i>
 		    </div>
 		</div>
 		<div name="tools" class="flexrow">

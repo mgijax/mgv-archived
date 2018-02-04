@@ -110,7 +110,9 @@ class Feature {
     }
 }
 //----------------------------------------------
-// Provides a get-features-in-range interface.
+// How the app loads feature data. Provides two calls:
+//   - get features in range
+//   - get features by id
 // Requests features from the server and registers them in a cache.
 // Interacts with the back end to load features; tries not to request
 // the same region twice.
@@ -220,7 +222,9 @@ class FeatureManager {
     }
 
     //----------------------------------------------
-    _ensureFeatures (genome, ranges) {
+    // Ensures that all features in the specified range(s) in the specified genome
+    // are in the cache. Returns a promise that resolves to true when the condition is met.
+    _ensureFeaturesByRange (genome, ranges) {
 	let newranges = this._subtractRanges(genome, ranges);
 	if (newranges.length === 0) 
 	    return Promise.resolve();
@@ -230,9 +234,28 @@ class FeatureManager {
 	let self = this;
 	//console.log("Requesting:", genome.name, newranges);
 	return d3json(url).then(function(blocks){
-	    //console.log("Transferred:", genome.name, blocks);
 	    blocks.forEach( b => self._registerBlock(genome, b) );
+	    return true;
 	});
+    }
+    //----------------------------------------------
+    // Ensures that all features with the given IDs in the specified genome
+    // are in the cache. Returns a promise that resolves to true when the condition is met.
+    _ensureFeaturesById (genome, ids) {
+	// subtract ids of features already in the cache
+	let needids = ids.filter(i => !(i in this.featCache || i in this.mgiCache));
+	let dataString = `genome=${genome.name}&ids=${needids.join("+")}`;
+	let url = "./bin/getFeatures.cgi?" + dataString;
+	let self = this;
+	console.log("Requesting IDs:", genome.name, needids);
+	return d3json(url).then(function(data){
+	    data.forEach((item) => {
+	        let id = item[0];
+		let feats = item[1];
+		this.processFeatures(feats, genome);
+	    });
+	    return true;
+	}.bind(this));
     }
 
     //----------------------------------------------
@@ -257,7 +280,7 @@ class FeatureManager {
     // This is what the user calls. Returns a promise for the features in 
     // the specified ranges of the specified genome.
     getFeatures (genome, ranges) {
-	return this._ensureFeatures(genome, ranges).then(function() {
+	return this._ensureFeaturesByRange(genome, ranges).then(function() {
             ranges.forEach( r => {
 	        r.features = this._getCachedFeatures(genome, r) 
 		r.genome = genome;
@@ -266,15 +289,16 @@ class FeatureManager {
 	}.bind(this));
     }
     //----------------------------------------------
+    // Returns a promise for the features having the specified ids from the specified genome.
+    // Fulfillment data = 
     getFeaturesById (genome, ids) {
-	// subtract ids of features already in the cache
-	let needids = ids.filter(i => !(i in this.featCache || i in this.mgiCache));
-	let dataString = `genome=${genome.name}&ids=${needids.join("+")}`;
-	let url = "./bin/getFeatures.cgi?" + dataString;
-	let self = this;
-	console.log("Requesting IDs:", genome.name, needids);
-	return d3json(url).then(function(data){
-	    console.log("Transferred IDs:", genome.name, feats);
+        return this._ensureFeaturesById(genome, ids).then( () => {
+	    let feats = [];
+	    for (let i of ids){
+	        let f = this.mgiCache[i] || this.featCache[i];
+		f && feats.push(f);
+	    }
+	    return feats;
 	});
     }
 
@@ -396,25 +420,56 @@ class ListManager {
 	this._save();
 	return this.name2list[name];
     }
+    //
+    isValid (expr) {
+	try {
+	    // first check syntax
+	    let ast = (new ListExprParser()).parse(expr);
+	    // now check list names
+	    let reach = (n) => {
+		if (typeof(n) === "string") {
+		    let lst = this.get(n);
+		    if (!lst) throw "Unknown list: " + n
+		}
+		else {
+		    reach(n.left);
+		    reach(n.right);
+		}
+		}
+	    reach(ast);
+
+	    // Thumbs up!
+	    return true;
+	}
+	catch (e) {
+	    return false;
+	}
+    }
     // create list by combining others
     // Args:
     //   name (string) name for the list
     //   expr (string) Expression involving list names and operators, e.g. "(a+b)*c - d"
     createFromCombo (name, expr) {
-        let ast = (new ListExprParser()).parse(expr);
-	let reach = (n) => {
-	    if (typeof(n) === "string") {
-	        let lst = this.get(n);
-		return new Set(lst.ids);
+	try {
+	    let ast = (new ListExprParser()).parse(expr);
+	    let reach = (n) => {
+		if (typeof(n) === "string") {
+		    let lst = this.get(n);
+		    return new Set(lst.ids);
+		}
+		else {
+		    let l = reach(n.left);
+		    let r = reach(n.right);
+		    return l[n.op](r);
+		}
 	    }
-	    else {
-	        let l = reach(n.left);
-		let r = reach(n.right);
-		return l[n.op](r);
-	    }
+	    let ids = reach(ast);
+	    return this.create(name, Array.from(ids));
 	}
-	let ids = reach(ast);
-	return this.create(name, Array.from(ids));
+	catch (e) {
+	    alert("I'm terribly sorry, but there appears to be a problem with your list expression: " + e);
+	    return null;
+	}
     }
     // updates the ids in the given list
     updateList (name, newname, newids) {
@@ -479,8 +534,12 @@ class ListExprParser {
 	if (op === "+" || op === "-") {
 	    this._nextToken();
 	    node = { left:node, op:op==="+"?"union":"difference", right: this._expr() }
+	    return node;
         }               
-	return node;
+	else if (op === ")" || op === undefined || op === null)
+	    return node;
+	else
+	    this._error("UNION or INTERSECTION or ) or NULL", op);
     }
     _term () {
         let node = this._factor();
@@ -506,7 +565,7 @@ class ListExprParser {
 	    return t;
 	}
 	else
-	    this._error("EXPR or IDENT", t||"EOF");
+	    this._error("EXPR or IDENT", t||"NULL");
 	return t;
 	    
     }
@@ -1416,7 +1475,7 @@ class ZoomView extends SVGView {
 	    .data(d=>d.features.filter(filterDrawn), d=>d.mgpid);
 	feats.exit().remove();
 	//
-	let fSelect = function (f, shift) {
+	let fSelect = function (f, shift, preserve) {
 	    let id = f.mgiid || f.mgpid;
 	    if (shift) {
 		if (self.hiFeats[id])
@@ -1425,7 +1484,7 @@ class ZoomView extends SVGView {
 		    self.hiFeats[id] = id;
 	    }
 	    else {
-		self.hiFeats = {};
+		if (!preserve) self.hiFeats = {};
 		self.hiFeats[id] = id;
 	    }
 	};
@@ -1438,11 +1497,15 @@ class ZoomView extends SVGView {
 	};
 	//
 	let fMouseOverHandler = function(f) {
-		if (d3.event.altKey) fSelect(f, d3.event.shiftKey);
-		self.highlight(this);
+		if (d3.event.altKey) {
+		    fSelect(f, d3.event.shiftKey, true);
+		    if (self.timeout) window.clearTimeout(self.timeout);
+		    self.timeout = window.setTimeout(function(){ self.app.callback(); }, 1000);
+		    this.highlight();
+		}
+		else
+		    self.highlight(this);
 
-		if (self.timeout) window.clearTimeout(self.timeout);
-		self.timeout = window.setTimeout(function(){ self.app.callback(); }, 1000);
 	}
 	let fMouseOutHandler = function(f) {
 		self.highlight();
@@ -1826,27 +1889,39 @@ class MGVApp {
 		    let inp = d3.select('.mylists [name="listexpr"] input');
 		    inp[0][0].value = "";
 		    inp[0][0].focus();
+		    inp.classed("valid", false).classed("invalid", false);
 		}
 		
 	    });
 	// Button: "OK" button for creating a list from a list op expression
 	d3.select('.mylists [name="listexpr"] button[name="OK"]')
             .on("click", () => {
-                let expr = d3.select('.mylists [name="listexpr"] input')[0][0].value.trim();
-		expr && this.listManager.createFromCombo("_", expr);
-		this.updateLists();
-		d3.select(".mylists").classed("editing", false);
+		let inp = d3.select('.mylists [name="listexpr"] input')[0][0];
+                let expr = inp.value.trim();
+		if (expr) {
+		    let lst = this.listManager.createFromCombo("_", expr);
+		    if (lst) {
+		        this.updateLists();
+			d3.select(".mylists").classed("editing", false);
+		    }
+		    else {
+		        inp.focus();
+		    }
+		}
 	    });
+	// Input box: list expression: validate on any input
+	d3.select('.mylists [name="listexpr"] input')
+	    .on("input", () => this.validateExpr())
 
 	// Buttons: the list operator buttons (union, intersection, etc.)
 	d3.selectAll('.mylists [name="listexpr"] .button')
 	    .on("click", function () {
+		// add my symbol to the formula
 	        d3.event.stopPropagation();
 		let inelt = d3.select('.mylists [name="listexpr"] input')[0][0];
 		let op = d3.select(this).attr("name");
-		inelt.value += op + ' ';
-		inelt.focus();
-		op === "()" && setCaretPosition(inelt, inelt.value.length - 2);
+		self.addToListExpr(op);
+		self.validateExpr();
 	    });
 	// Button: delete all lists (get confirmation first).
 	d3.select('.mylists .button[name="purge"]')
@@ -1965,12 +2040,27 @@ class MGVApp {
 	// ------------------------------
 	// ------------------------------
 	// Query box
+	//
+	let searchTypes = [{
+	    method: "featuresById",
+	    label: "...by ID/symbol",
+	    template: "",
+	    placeholder: "Comma-separated IDs/symbols"
+	}];
+	// When user changes the query type (selector), change the placeholder text.
+	d3.select("#searchtype")
+	    .on("change", function () {
+	        let stype = this.value;
+
+	    });
+	// When user enters a search term, run a query
 	d3.select("#searchterm").on("change", function () {
 	    let term = this.value;
 	    this.value = "";
 	    let searchType  = d3.select("#searchtype")[0][0].value;
-	    let lstName = searchType.replace(/featuresBy/,"").toLowerCase() + "= " + term;
-	    d3.select("#findgenes").classed("busy",true);
+	    //let lstName = searchType.replace(/featuresBy/,"").toLowerCase() + "= " + term;
+	    let lstName = term;
+	    d3.select("#mylists").classed("busy",true);
 	    self.auxDataManager[searchType](term)
 	      .then(feats => {
 		  self.listManager.createOrUpdate(lstName, feats.map(f => f.primaryIdentifier))
@@ -1980,7 +2070,7 @@ class MGVApp {
 		  feats.forEach(f => self.zoomView.hiFeats[f.mgiid] = f.mgiid);
 		  self.zoomView.highlight();
 		  //
-		  d3.select("#findgenes").classed("busy",false);
+		  d3.select("#mylists").classed("busy",false);
 	      });
 	})
 	// ------------------------------
@@ -2267,6 +2357,47 @@ class MGVApp {
     }
 
     //----------------------------------------------
+    // Checks the current expression and sets the valid/invalid class.
+    validateExpr  () {
+	let inp = d3.select('.mylists [name="listexpr"] input');
+	let expr = inp[0][0].value.trim();
+	if (!expr) {
+	    inp.classed("valid",false).classed("invalid",false);
+	}
+	else {
+	    let isValid = self.listManager.isValid(expr);
+	    inp.classed("valid", isValid).classed("invalid", !isValid);
+	}
+    }
+    //----------------------------------------------
+    addToListExpr (text) {
+	let inp = d3.select('.mylists [name="listexpr"] input');
+	let ielt = inp[0][0];
+	let v = ielt.value;
+	let splice = function (e,t){
+	    let v = e.value;
+	    let r = getCaretRange(e);
+	    e.value = v.slice(0,r[0]) + t + v.slice(r[1]);
+	    setCaretPosition(e, r[0]+t.length);
+	    e.focus();
+	}
+	let range = getCaretRange(ielt);
+	if (range[0] === range[1]) {
+	    // no current selection
+	    splice(ielt, text);
+	    if (text === "()") 
+		moveCaretPosition(ielt, -1);
+	}
+	else {
+	    // there is a current selection
+	    if (text === "()")
+		// surround current selection with parens, then move caret after
+		text = '(' + v.slice(range[0],range[1]) + ')';
+	    splice(ielt, text)
+	}
+    }
+
+    //----------------------------------------------
     // Updates the "My lists" box with the currently available lists.
     // Args:
     //   newlist (List) optional. If specified, we just created that list, and its name is
@@ -2279,28 +2410,51 @@ class MGVApp {
 	    .data(lists);
 	let newitems = items.enter().append("div")
 	    .attr("class","listInfo flexrow");
-	newitems.append("span").attr("name","name").attr("contenteditable", "true");
+
+	newitems.append("i").attr("class","material-icons button")
+	    .attr("name","edit")
+	    .text("mode_edit")
+	    .attr("title","Edit list name.");
+
+	newitems.append("span").attr("name","name");
+
 	newitems.append("span").attr("name","size");
 	newitems.append("span").attr("name","date");
 
-	newitems.append("i").attr("name","delete")
-	    .attr("class","material-icons button")
-	    .attr("title","Delete this list.")
-	    .text("highlight_off");
+	newitems.append("i").attr("class","material-icons button")
+	    .attr("name","delete")
+	    .text("highlight_off")
+	    .attr("title","Delete this list.");
 
 	items
 	    .attr("name", lst=>lst.name)
 	    .on("click", (lst) => {
+		// if user clicks on a list entry while editing a list op expression,
+		// add this list's name to the expression at the current cursor position.
 	        let isediting = d3.select(".mylists").classed("editing");
 		if (isediting) {
-		    // add list's name to the expression input value
-		    let inp = d3.select('.mylists [name="listexpr"] input')[0][0];
 		    let s = lst.name;
 		    let re = /[ =()+*-]/;
-		    if (s.search(re) >= 0) s = '"' + s + '"';
-		    inp.value += s + ' ';
-		    inp.focus();
+		    if (s.search(re) >= 0)
+		        s = '"' + s + '"';
+		    //
+		    this.addToListExpr(s+' ');
+		    this.validateExpr();
 		}
+		// otherwise, show this list as tick marks in the genome view
+		else {
+		    this.zoomView.hiFeats = lst.ids.reduce((a,v) => { a[v]=v; return a; }, {})
+		    this.zoomView.highlight();
+		    this.featureManager.getFeaturesById(this.rGenome, lst.ids)
+		        .then( feats => console.log("FEATS", feats) );
+		}
+	    });
+	items.select('.button[name="edit"]')
+	    // edit: click makes the name element editable and gives it focus
+	    .on("click", function(lst) {
+		let name = d3.select(this.parentNode).select('[name="name"]');
+		name.attr("contenteditable", "true");
+		name[0][0].focus();
 	    });
 	items.select('span[name="name"]')
 	    .text(lst => lst.name)
@@ -2319,6 +2473,7 @@ class MGVApp {
 		    self.listManager.updateList(lst.name, newname);
 		    self.updateLists();
 		}
+		d3.select(this).attr("contenteditable", null);
 	    });
 	items.select('span[name="date"]').text(lst => {
 	    let md = new Date(lst.modified);
@@ -2694,26 +2849,26 @@ Set.prototype.difference = function(setB) {
     return difference;
 }
 // ---------------------------------------------
-// Sets the keyboard caret position in the given element.
-// Source: https://stackoverflow.com/questions/512528/set-keyboard-caret-position-in-html-textbox
-// Slightly adapted - pass the element itself rather than its id (which it may not have).
-// 
-function setCaretPosition(elem, caretPos) {
-    if(elem.createTextRange) {
-	var range = elem.createTextRange();
-	range.move('character', caretPos);
-	range.select();
-    }
-    else {
-	if(elem.selectionStart) {
-	    elem.focus();
-	    elem.setSelectionRange(caretPos, caretPos);
-	}
-	else
-	    elem.focus();
-    }
+function getCaretRange (elt) {
+    // FIXME: does not work for IE
+    return [elt.selectionStart, elt.selectionEnd];
 }
-
+function setCaretRange (elt, range) {
+    // FIXME: does not work for IE
+    elt.selectionStart = range[0];
+    elt.selectionEnd   = range[1];
+}
+function setCaretPosition (elt, pos) {
+    setCaretRange(elt, [pos,pos]);
+}
+function moveCaretPosition (elt, delta) {
+    setCaretPosition(elt, getCaretPosition(elt) + delta);
+}
+function getCaretPosition (elt) {
+    let r = getCaretRange(elt);
+    return r[1];
+}
+//
 // ---------------------------------------------
 // ---------------------------------------------
 function pqstring (qstring) {

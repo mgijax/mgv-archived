@@ -152,11 +152,17 @@ line.chr {
 }
 
 .mylists [name="lists"] {
+    max-height: 200px;
+    overflow: scroll;
 }
 
 .mylists .listInfo {
     justify-content: space-between;
     margin: 0px;
+    flex: 0 0;
+}
+.mylists [name="lists"] {
+    border-top: thin solid black;
 }
 .mylists .listInfo:hover {
     background-color: #ddd;
@@ -173,6 +179,9 @@ line.chr {
     width: 20%;
     text-align: right;
     margin-right: 8px;
+}
+.mylists .listInfo [name="edit"] {
+    font-size: 14px;
 }
 .mylists .listInfo [name="delete"] {
     width: 10%;
@@ -226,6 +235,12 @@ line.chr {
 .mylists [name="listexpr"] input {
     flex-grow: 1;
 }
+.mylists [name="listexpr"] input.valid {
+    outline-color: green;
+}
+.mylists [name="listexpr"] input.invalid {
+    outline-color: red;
+}
 .mylists.editing.closed [name="listexpr"] {
     display: none;
 }
@@ -234,11 +249,11 @@ line.chr {
     color: #0f0;
     border-radius: 4px;
 }
-.mylists [name="listexpr"] .button[name="()"] {
-    font-size: 16px;
+.mylists [name="listexpr"] .button.listop {
+    font-size: 24px;
 }
-.mylists [name="listexpr"] .button[name="*"] {
-    font-size: 20px;
+.mylists [name="listexpr"] .button.listop[name="()"] {
+    font-size: 18px;
 }
 
 #header {
