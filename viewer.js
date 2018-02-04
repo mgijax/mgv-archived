@@ -294,9 +294,21 @@ class FeatureManager {
     getFeaturesById (genome, ids) {
         return this._ensureFeaturesById(genome, ids).then( () => {
 	    let feats = [];
+	    let seen = new Set();
+	    let addf = (f) => {
+		if (seen.has(f.id)) return;
+		seen.add(f.id);
+		feats.push(f);
+	    };
+	    let add = (f) => {
+		if (Array.isArray(f)) 
+		    f.forEach(ff => addf(ff));
+		else
+		    addf(f);
+	    };
 	    for (let i of ids){
-	        let f = this.mgiCache[i] || this.featCache[i];
-		f && feats.push(f);
+		let f = this.mgiCache[i] || this.featCache[i];
+		f && add(f);
 	    }
 	    return feats;
 	});
@@ -1068,17 +1080,17 @@ class GenomeView extends SVGView {
     }
 
     // ---------------------------------------------
-    drawTicks (data) {
-	this.currTicks = data;
+    drawTicks (features) {
+	this.currTicks = features;
 	let gdata = this.app.rGenome;
 	// feature tick marks
 	let tickLength = 10;
-	if (!data) {
+	if (!features || features.length === 0) {
 	    this.svgMain.selectAll(".feature").remove();
 	    return;
 	}
         let feats = this.svgMain.selectAll(".feature")
-	    .data(data||[], d => d.mgiid);
+	    .data(features, d => d.mgpid);
 	let nfs = feats.enter()
 	    .append("line")
 	    .attr("class","feature");
@@ -1926,9 +1938,10 @@ class MGVApp {
 		    if (lst) {
 		        this.updateLists();
 			d3.select(".mylists").classed("editing", false);
-			d3.select(`.mylists .listInfo[name="${name}"] [name="name"]`)
-			    .attr('contenteditable','true')[0][0].focus();
-
+			// let user edit the default name
+			let n = d3.select(`.mylists .listInfo[name="${name}"] [name="name"]`)
+			    .attr('contenteditable','true');
+			n[0][0].focus();
 		    }
 		    else {
 		        inp.focus();
@@ -2462,7 +2475,10 @@ class MGVApp {
 		    this.zoomView.hiFeats = lst.ids.reduce((a,v) => { a[v]=v; return a; }, {})
 		    this.zoomView.highlight();
 		    this.featureManager.getFeaturesById(this.rGenome, lst.ids)
-		        .then( feats => console.log("FEATS", feats) );
+		        .then( feats => {
+			    console.log("FEATS", feats);
+			    this.genomeView.drawTicks(feats);
+			});
 		}
 	    });
 	items.select('.button[name="edit"]')
