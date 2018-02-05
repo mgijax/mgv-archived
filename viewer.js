@@ -247,7 +247,7 @@ class FeatureManager {
 	let dataString = `genome=${genome.name}&ids=${needids.join("+")}`;
 	let url = "./bin/getFeatures.cgi?" + dataString;
 	let self = this;
-	console.log("Requesting IDs:", genome.name, needids);
+	//console.log("Requesting IDs:", genome.name, needids);
 	return d3json(url).then(function(data){
 	    data.forEach((item) => {
 	        let id = item[0];
@@ -1080,9 +1080,11 @@ class GenomeView extends SVGView {
 	//
 	let shape = "circle";  // "circle" or "line"
 	//
-	let nfs = feats.enter()
+	feats.enter()
 	    .append(shape)
-	    .attr("class","feature");
+	    .attr("class","feature")
+	    .append("title")
+	    .text(f=>f.symbol || f.id);
 	if (shape === "line") {
 	    feats.attr("x1", f => gdata.xscale(f.chr) + xAdj(f) + 5)
 	    feats.attr("y1", f => gdata.yscale(f.start))
@@ -1120,11 +1122,10 @@ class ZoomView extends SVGView {
         .attr("class","fiducials");
       this.svgMain.append("g")
         .attr("class","strips");
-      // so user can go back
     }
     //----------------------------------------------
     update (coords) {
-	let c = this.coords = coords;
+	let c = this.coords = (coords || this.coords);
 	d3.select("#zoomCoords")[0][0].value = formatCoords(c.chr, c.start, c.end);
 	d3.select("#zoomWSize")[0][0].value = Math.round(c.end - c.start + 1)
 	//
@@ -1266,17 +1267,13 @@ class ZoomView extends SVGView {
     //----------------------------------------------
     highlightStrip (g, elt) {
 	if (g === this.currentHLG) return;
+	this.currentHLG = g;
 	//
 	this.svgMain.selectAll('.zoomStrip')
 	    .classed("highlighted", d => d.genome === g);
 	this.svgMain.selectAll('.zoomStripShadow')
 	    .classed("highlighted", d => d.genome === g);
-	//
-	let ref = this.app.rGenome;
-	let blks = g === ref ? [] : this.app.translator.getBlocks(ref, g);
-	//
-	this.currentHLG = g;
-	this.app.genomeView.drawBlocks({ ref: ref, comp: g, blocks:blks });
+	this.app.showBlocks(g);
     }
 
     //----------------------------------------------
@@ -1848,15 +1845,14 @@ class MGVApp {
 	d3.select("#zoomView svg")
 	  .on("click", () => {
 	      let tgt = d3.select(d3.event.target);
-	      let f = tgt.data()[0];
-	      if (f instanceof Feature) {
-		  fSelect(f, d3.event.shiftKey);
+	      let t = tgt[0][0];
+	      if (t.tagName == "rect" && t.classList.contains("feature")) {
+		  fSelect(t.__data__, d3.event.shiftKey);
 		  this.zoomView.highlight();
 	          this.callback();
 	      }
 	      else {
-		  this.hideContextMenu();
-		  if (!d3.event.shiftKey) {
+		  if (t.tagName == "rect" && t.classList.contains("block") && !d3.event.shiftKey) {
 		      this.zoomView.hiFeats = {};
 		      this.zoomView.highlight();
 		  }
@@ -2143,7 +2139,11 @@ class MGVApp {
 		initCompGenomesList();
 	        this.draw();
 	    });
-	    d3.select("#compGenomes").on("change", () => this.draw());
+	    d3.select("#compGenomes").on("change", () => {
+	        this.draw(); 
+		if (this.cGenomes.length === 1)
+		    this.showBlocks(this.cGenomes[0]);
+	    });
 	    //
 	    // Preload all the chromosome files for all the genomes
 	    let cdps = this.allGenomes.map(g => d3tsv(`./data/genomedata/${g.name}-chromosomes.tsv`));
@@ -2160,6 +2160,16 @@ class MGVApp {
 	    this.resize( cfg.width, cfg.height );
 
 	}.bind(this));
+    }
+    //----------------------------------------------
+    showBlocks (comp) {
+	let ref = this.rGenome;
+	if (! comp) comp = this.cGenomes[0];
+	if (! comp) return;
+	this.translator.ready().then( () => {
+	    let blocks = comp === ref ? [] : this.translator.getBlocks(ref, comp);
+	    this.genomeView.drawBlocks({ ref, comp, blocks });
+	});
     }
     //----------------------------------------------
     showBusy (isBusy) {
@@ -2474,13 +2484,15 @@ class MGVApp {
 		    this.addToListExpr(s+' ');
 		    this.validateExpr();
 		}
-		// otherwise, show this list as tick marks in the genome view
+		// otherwise, 
+		//    - show this list as tick marks in the genome view
+		//    - make this list the current selection in the zoom view
 		else {
 		    this.zoomView.hiFeats = lst.ids.reduce((a,v) => { a[v]=v; return a; }, {})
-		    this.zoomView.highlight();
+		    this.zoomView.update();
 		    this.featureManager.getFeaturesById(this.rGenome, lst.ids)
 		        .then( feats => {
-			    console.log("FEATS", feats);
+			    //console.log("FEATS", feats);
 			    this.genomeView.drawTicks(feats);
 			});
 		}
