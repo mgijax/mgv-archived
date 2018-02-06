@@ -1855,6 +1855,7 @@ class MGVApp {
 		  if (t.tagName == "rect" && t.classList.contains("block") && !d3.event.shiftKey) {
 		      this.zoomView.hiFeats = {};
 		      this.zoomView.highlight();
+		      this.callback();
 		  }
 	      }
 	  })
@@ -1885,8 +1886,33 @@ class MGVApp {
 	// My lists
 	// -------------------------------------------------------------------
 	//
+	d3.select('#mylists [name="listform"]')
+	    .on("click", () => {
+	        let t = d3.event.target;
+		let f = t.form;
+		if ("button" === t.tagName.toLowerCase()){
+		    d3.event.preventDefault();
+		    let ids = f.ids.value.replace(/[,;|]/g, ' ').trim().split(/\s+/);
+		    if (t.name === "save") {
+			if (!this.currList) return;
+			this.listManager.updateList(this.currList.name, f.name.value, ids);
+			this.updateLists();
+		    }
+		    else if (t.name === "toMgi") {
+		        let frm = d3.select('#mylists [name="mgibatchform"]')[0][0];
+			frm.ids.value = ids.join(" ");
+			frm.submit()
+		    }
+		    else if (t.name === "toMouseMine") {
+		        let frm = d3.select('#mylists [name="mousemineform"]')[0][0];
+			frm.externalids.value = ids.join(",");
+			frm.submit()
+		    }
+		}
+	    });
+
 	// Button: create list from current selection
-	d3.select('.mylists .button[name="newfromselection"]')
+	d3.select('#mylists .button[name="newfromselection"]')
 	    .on("click", () => {
 		let ids = Object.keys(this.zoomView.hiFeats);
 		if (ids.length === 0) {
@@ -1899,15 +1925,15 @@ class MGVApp {
 	// Button: open the list operation box
 	// NOTE: there are two <i> icons combining to look like one button.
 	// So we need to selectAll.
-	d3.selectAll('.mylists [name="newfromlistop"] i')
+	d3.selectAll('#mylists [name="newfromlistop"] i')
 	    .on("click", function () {
 		// flip the editing state of the box
-		let listbox = d3.select(".mylists");
+		let listbox = d3.select("#mylists");
 		let isediting = ! listbox.classed("editing");
 		listbox.classed("editing", isediting);
 		// if editing, clear the input area and give focus
 		if (isediting) {
-		    let inp = d3.select('.mylists [name="listexpr"] input');
+		    let inp = d3.select('#mylists [name="listexpr"] input');
 		    inp[0][0].value = "";
 		    inp[0][0].focus();
 		    inp.classed("valid", false).classed("invalid", false);
@@ -1915,32 +1941,32 @@ class MGVApp {
 		
 	    });
 	// Input box: list expression: validate on any input
-	d3.select('.mylists [name="listexpr"] input')
+	d3.select('#mylists [name="listexpr"] input')
 	    .on("input", () => this.validateExpr())
 
 	// Buttons: the list operator buttons (union, intersection, etc.)
-	d3.selectAll('.mylists [name="listexpr"] .button')
+	d3.selectAll('#mylists [name="listexpr"] .button')
 	    .on("click", function () {
 		// add my symbol to the formula
-		let inelt = d3.select('.mylists [name="listexpr"] input')[0][0];
+		let inelt = d3.select('#mylists [name="listexpr"] input')[0][0];
 		let op = d3.select(this).attr("name");
 		self.addToListExpr(op);
 		self.validateExpr();
 	    });
 
 	// Button: "OK" button for creating a list from a list op expression
-	d3.select('.mylists [name="listexpr"] button[name="OK"]')
+	d3.select('#mylists [name="listexpr"] button[name="OK"]')
             .on("click", () => {
-		let inp = d3.select('.mylists [name="listexpr"] input')[0][0];
+		let inp = d3.select('#mylists [name="listexpr"] input')[0][0];
                 let expr = inp.value.trim();
 		if (expr) {
 		    let name = "_";
 		    let lst = this.listManager.createFromCombo(name, expr);
 		    if (lst) {
 		        this.updateLists();
-			d3.select(".mylists").classed("editing", false);
+			d3.select("#mylists").classed("editing", false);
 			// let user edit the default name
-			let n = d3.select(`.mylists .listInfo[name="${name}"] [name="name"]`)
+			let n = d3.select(`#mylists .listInfo[name="${name}"] [name="name"]`)
 			    .attr('contenteditable','true');
 			n[0][0].focus();
 		    }
@@ -1951,7 +1977,7 @@ class MGVApp {
 	    });
 
 	// Button: delete all lists (get confirmation first).
-	d3.select('.mylists .button[name="purge"]')
+	d3.select('#mylists .button[name="purge"]')
 	    .on("click", () => {
 		if (this.listManager.getNames().length === 0) {
 		    alert("No lists.");
@@ -2402,7 +2428,7 @@ class MGVApp {
     //----------------------------------------------
     // Checks the current expression and sets the valid/invalid class.
     validateExpr  () {
-	let inp = d3.select('.mylists [name="listexpr"] input');
+	let inp = d3.select('#mylists [name="listexpr"] input');
 	let expr = inp[0][0].value.trim();
 	if (!expr) {
 	    inp.classed("valid",false).classed("invalid",false);
@@ -2414,7 +2440,7 @@ class MGVApp {
     }
     //----------------------------------------------
     addToListExpr (text) {
-	let inp = d3.select('.mylists [name="listexpr"] input');
+	let inp = d3.select('#mylists [name="listexpr"] input');
 	let ielt = inp[0][0];
 	let v = ielt.value;
 	let splice = function (e,t){
@@ -2441,6 +2467,38 @@ class MGVApp {
     }
 
     //----------------------------------------------
+    setCurrentList (lst) {
+    	//
+	let lists = d3.select('#mylists').selectAll('.listInfo');
+	let form  = d3.select('#mylists form')[0][0];
+
+	lists.classed("current", d => d === lst);
+	this.currList = lst;
+
+	if (!lst) {
+	    form.name.value = '';
+	    form.ids.value = '';
+	}
+	else {
+	    form.name.value = lst.name;
+	    form.ids.value = lst.ids.join('\n');
+	}
+
+	// make this list the current selection in the zoom view
+	this.zoomView.hiFeats = lst.ids.reduce((a,v) => { a[v]=v; return a; }, {})
+	this.zoomView.update();
+	// show this list as tick marks in the genome view
+	this.featureManager.getFeaturesById(this.rGenome, lst.ids)
+	    .then( feats => {
+		//console.log("FEATS", feats);
+		this.genomeView.drawTicks(feats);
+	    });
+    }
+    clearCurrentList () {
+        this.setCurrentList(null);
+    }
+
+    //----------------------------------------------
     // Updates the "My lists" box with the currently available lists.
     // Args:
     //   newlist (List) optional. If specified, we just created that list, and its name is
@@ -2448,8 +2506,10 @@ class MGVApp {
     updateLists (newlist) {
 	self = this;
         let lists = this.listManager.getAll();
-	lists.sort( (b,a) => (new Date(a.modified)).getTime() - (new Date(b.modified)).getTime() );
-	let items = d3.select('.mylists [name="lists"]').selectAll(".listInfo")
+	let byName = (a,b) => (a.name < b.name ? -1 : a.name > b.name ? +1 : 0);
+	let byDate = (a,b) => ((new Date(b.modified)).getTime() - (new Date(a.modified)).getTime());
+	lists.sort(byName);
+	let items = d3.select('#mylists [name="lists"]').selectAll(".listInfo")
 	    .data(lists);
 	let newitems = items.enter().append("div")
 	    .attr("class","listInfo flexrow");
@@ -2471,31 +2531,23 @@ class MGVApp {
 
 	items
 	    .attr("name", lst=>lst.name)
-	    .on("click", (lst) => {
+	    .on("click", function (lst) {
 		// if user clicks on a list entry while editing a list op expression,
 		// add this list's name to the expression at the current cursor position.
-	        let isediting = d3.select(".mylists").classed("editing");
+		let mls = d3.select("#mylists");
+	        let isediting = mls.classed("editing");
 		if (isediting) {
 		    let s = lst.name;
 		    let re = /[ =()+*-]/;
 		    if (s.search(re) >= 0)
 		        s = '"' + s + '"';
 		    //
-		    this.addToListExpr(s+' ');
-		    this.validateExpr();
+		    self.addToListExpr(s+' ');
+		    self.validateExpr();
 		}
-		// otherwise, 
-		//    - show this list as tick marks in the genome view
-		//    - make this list the current selection in the zoom view
-		else {
-		    this.zoomView.hiFeats = lst.ids.reduce((a,v) => { a[v]=v; return a; }, {})
-		    this.zoomView.update();
-		    this.featureManager.getFeaturesById(this.rGenome, lst.ids)
-		        .then( feats => {
-			    //console.log("FEATS", feats);
-			    this.genomeView.drawTicks(feats);
-			});
-		}
+		// otherwise, make this list the "current list"
+		else 
+		    self.setCurrentList(lst);
 	    });
 	items.select('.button[name="edit"]')
 	    // edit: click makes the name element editable and gives it focus
@@ -2537,7 +2589,7 @@ class MGVApp {
 	//
 	if (newlist) {
 	    let nameelt = 
-	        d3.select(`.mylists [name="lists"] [name="${newlist.name}"] [name="name"]`)[0][0];
+	        d3.select(`#mylists [name="lists"] [name="${newlist.name}"] [name="name"]`)[0][0];
             nameelt.focus();
 	}
     }

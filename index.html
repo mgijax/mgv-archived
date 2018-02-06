@@ -49,9 +49,44 @@
 	    </div>
 
 	    <!-- My lists -->
-	    <div id="mylists" class="mylists pagebox flexcolumn collapsible">
+	    <div id="mylists" class="pagebox flexcolumn collapsible">
 		<label>My lists</label>
+
+		<!-- All my lists -->
 		<div name="lists" class="flexcolumn"></div>
+
+		<!-- Form to display/edit/manipulate current list -->
+		<form name="listform" class="flexcolumn">
+		    <div name="title" class="flexrow">
+		        <label>List name:</label>
+			<input name="name"></input>
+		    </div>
+		    <div class="flexrow">
+		        <label>IDs:</label>
+			<textarea name="ids"></textarea>
+		    </div>
+		    <button class="button" name="save">Update list</button>
+		    <button class="button" name="new">Create new list</button>
+		    <button class="button" name="clear">Clear form</button>
+		    <button class="button" name="toMgi">Forward to MGI</button>
+		    <button class="button" name="toMouseMine">Forward to MouseMine</button>
+		</form>
+		<!-- Hidden form for submitting IDs to MGI batch query -->
+		<form name="mgibatchform"
+		  method="POST" enctype="multipart/form-data"
+		  action="http://www.informatics.jax.org/batch/summary"
+		  target="_blank">
+		    <input type="hidden" name="idType" value="MGI" />
+		    <input type="hidden" name="ids" value="" />
+		</form>
+		<!-- Hidden form for submitting IDs to MouseMine -->
+		<form name="mousemineform"
+		  method="POST" 
+		  action="http://www.mousemine.org/mousemine/portal.do"
+		  target="_blank">
+		    <input type="hidden" name="class" value="SequenceFeature" />
+		    <input type="hidden" name="externalids" value="" />
+		</form>
 		<div name="listexpr" class="listexpr flexcolumn">
 		    <div class="flexrow">
 			<input />
