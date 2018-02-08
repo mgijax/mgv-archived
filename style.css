@@ -8,6 +8,11 @@ body {
     font-size: 12px;
 }
 
+::placeholder {
+    color: #aaa;
+    font-style: italic;
+}
+
 a {
     text-decoration: none;
 }
@@ -32,6 +37,8 @@ a {
 }
 .button:hover {
     color: white;
+    background-color: rgb(31, 119, 180);
+    border-radius: 4px;
 }
 
 line.chr {
@@ -109,13 +116,15 @@ label > i.material-icons {
  */
 .collapsible > .button.collapse {
     position: absolute;
-    top: -3px;
-    right: -2px;
+    top: -1px;
+    right: -1px;
+    border-radius: 10px;
+    font-size: 18px;
 }
 .collapsible > .button.collapse::after {
     content: "arrow_drop_up"
 }
-.collapsible .closed > .button.collapse::after {
+.collapsible.closed > .button.collapse::after {
     content: "arrow_drop_down"
 }
 .collapsible.closed > * {
@@ -132,9 +141,12 @@ label > i.material-icons {
  */
 .pagebox {
     background-color: #ccc;
-    border: thin solid #777;
     padding: 6px;
-    margin: 1px;
+    margin: 3px;
+}
+
+.pagebox:hover {
+    outline: thin solid black;
 }
 
 .pagebox * {
@@ -206,25 +218,9 @@ label > i.material-icons {
  */
 #mylists [name="lists"] {
     max-height: 200px;
-    overflow: scroll;
-}
-#mylists [name="listform"] label {
-    font-size: 12px;
+    overflow: auto;
 }
 
-#mylists [name="listform"] {
-    border-top: thin solid black;
-}
-
-#mylists [name="listform"] .button:hover {
-    background-color: #2076b4;
-    border-radius: 4px;
-}
-#mylists [name="listform"] textarea {
-    max-width: 190px;
-    height: 50px;
-    flex-grow: 1;
-}
 #mylists .listInfo {
     justify-content: space-between;
     margin: 0px;
@@ -266,25 +262,6 @@ label > i.material-icons {
     color: red;
     font-weight: bold;
 }
-#mylists [name="newfromlistop"]:hover {
-    color: white !important;
-}
-#mylists.editing [name="newfromlistop"] {
-    color: #0f0;
-    background-color: black;
-    
-}
-#mylists [name="newfromlistop"] i {
-    cursor: pointer;
-    position: relative;
-    font-size: 16px;
-}
-#mylists [name="newfromlistop"] i:nth-child(1) {
-    left: 10px;
-}
-#mylists [name="newfromlistop"] i:nth-child(2) {
-    left: -10px;
-}
 #mylists .button[name="purge"] {
 }
 #mylists .button[name="purge"]:hover {
@@ -295,41 +272,66 @@ label > i.material-icons {
     justify-content: space-between;
 }
 
-#mylists [name="listexpr"] {
-    display: none;
-    border-top: thin solid black;
-    padding-top: 6px;
+
+/* -----------------------------------------
+ * List editor.
+ * -----------------------------------------
+ */
+#listeditor {
 }
-#mylists.editing [name="listexpr"] {
-    display: inherit;
+#listeditor [name="editform"] {
+    margin-top: 4px;
 }
-#mylists [name="listexpr"] .flexrow {
-    justify-content: space-around;
+#listeditor [name="editform"] label {
+    font-size: 12px !important;
 }
-#mylists [name="listexpr"] input {
-    flex-grow: 1;
-}
-#mylists [name="listexpr"] input.valid {
-    outline-color: green;
-}
-#mylists [name="listexpr"] input.invalid {
-    outline-color: red;
-}
-#mylists.editing.closed [name="listexpr"] {
-    display: none;
-}
-#mylists [name="listexpr"] .button[name="OK"]:hover {
-    background-color: black;
-    color: #0f0;
+#listeditor [name="editform"] .button:hover {
+    background-color: #2076b4;
     border-radius: 4px;
 }
-#mylists [name="listexpr"] .button.listop {
-    font-size: 24px;
+#listeditor [name="editform"] textarea {
+    max-width: 190px;
+    height: 50px;
+    flex-grow: 1;
 }
-#mylists [name="listexpr"] .button.listop[name="()"] {
-    font-size: 18px;
+#listeditor [name="listexpr"] {
+    margin: 0px;
+    display: none;
 }
-
+#listeditor.showformula [name="listexpr"] {
+    display: block;
+}
+#listeditor [name="listexpr"] textarea {
+    height: 40px;
+}
+#listeditor [name="listexpr"] [name="formulaheader"] {
+    justify-content: space-between;
+}
+#listeditor [name="listexpr"] * {
+    margin-top: 0px;
+    margin-bottom: 0px;
+}
+#listeditor [name="listactions"] {
+    margin-top: 18px;
+}
+#listeditor [name="idsection"] .button {
+    font-size: 14px;
+}
+#listeditor [name="idsection"] > .flexrow {
+    justify-content: space-between;
+}
+#listeditor [name="listexpr"] [name="formula"].valid {
+    outline-color: green;
+}
+#listeditor [name="listexpr"] [name="formula"].invalid {
+    outline-color: red;
+}
+#listeditor [name="listexpr"] .button {
+    font-size: 14px;
+}
+#listeditor [name="listexpr"] .button.listop:not([name="()"]) {
+    font-size: 16px;
+}
 /* -----------------------------------------
  * -----------------------------------------
  */
@@ -447,7 +449,6 @@ rect.feature.highlight {
     outline-style: solid;
     outline-width: 2px;
     outline-color: #34ff9a;
-    stroke: #34ff9a;
 }
 rect.feature.highlight.extra {
     outline-width: 6px;

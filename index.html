@@ -55,22 +55,6 @@
 		<!-- All my lists -->
 		<div name="lists" class="flexcolumn"></div>
 
-		<!-- Form to display/edit/manipulate current list -->
-		<form name="listform" class="flexcolumn">
-		    <div name="title" class="flexrow">
-		        <label>List name:</label>
-			<input name="name"></input>
-		    </div>
-		    <div class="flexrow">
-		        <label>IDs:</label>
-			<textarea name="ids"></textarea>
-		    </div>
-		    <button class="button" name="save">Update list</button>
-		    <button class="button" name="new">Create new list</button>
-		    <button class="button" name="clear">Clear form</button>
-		    <button class="button" name="toMgi">Forward to MGI</button>
-		    <button class="button" name="toMouseMine">Forward to MouseMine</button>
-		</form>
 		<!-- Hidden form for submitting IDs to MGI batch query -->
 		<form name="mgibatchform"
 		  method="POST" enctype="multipart/form-data"
@@ -87,29 +71,58 @@
 		    <input type="hidden" name="class" value="SequenceFeature" />
 		    <input type="hidden" name="externalids" value="" />
 		</form>
-		<div name="listexpr" class="listexpr flexcolumn">
-		    <div class="flexrow">
-			<input />
-		        <button name="OK">OK</button>
-		    </div>
-		    <div class="flexrow">
-		       <span name="+" title="union" class="button listop">&cup;</span>
-		       <span name="*" title="intersection" class="button listop">&cap;</span>
-		       <span name="-" title="difference" class="button listop">&mdash;</span>
-		       <span name="()" title="group" class="button listop">()</i>
-		    </div>
-		</div>
 		<div name="tools" class="flexrow">
 		    <i name="newfromselection" class="material-icons button" title="Create list from current selection.">playlist_add</i>
-
-		    <span name="newfromlistop">
-			<!-- two circle icons, positioned so they overlap -->
-			<i class="material-icons" title="Create list by combining other lists.">radio_button_unchecked</i>
-			<i class="material-icons" title="Create list by combining other lists.">radio_button_unchecked</i>
-		    </span>
-
 		    <i name="purge" class="material-icons button" title="Delete all lists.">delete_sweep</i>
 		</div>
+	    </div>
+
+	    <!-- MyLists: List Editor  -->
+	    <div id="listeditor" class="pagebox flexcolumn collapsible closed">
+		<label>List editor</label>
+		<form name="editform" class="flexcolumn">
+		    <!-- Name -->
+		    <div name="title" class="flexcolumn">
+		        <label>List:</label>
+			<input name="name" placeholder="Name"></input>
+		    </div>
+		    <!-- Formula editor -->
+		    <div name="listexpr" class="listexpr flexcolumn">
+			<div class="flexcolumn">
+			    <!-- Formula -->
+			    <div name="formulaheader" class="flexrow">
+			        <label>Formula:</label>
+			        <div name="opbuttons" class="flexrow">
+				    <!-- Operator buttons -->
+				    <span name="+" title="union" class="button listop">&cup;</span>
+				    <span name="*" title="intersection" class="button listop">&cap;</span>
+				    <span name="-" title="difference" class="button listop">&mdash;</span>
+				    <span name="()" title="group" class="button listop">()</i>
+				 </div>
+				 <i name="saveformula" title="Save formula" class="material-icons button">save</i>
+			    </div>
+			    <textarea name="formula"
+			      placeholder="List names combined with set operations (union, intersection, difference)."
+			      ></textarea>
+			</div>
+		    </div>
+		    <!-- The list of IDs -->
+		    <div name="idsection" class="flexcolumn">
+			<div class="flexrow">
+			    <label>IDs:</label>
+			    <i name="editformula" class="material-icons button">build</i>
+			</div>
+			<textarea name="ids" placeholder="MGI and/or MGP IDs, delimited by whitespace/commas/pipes."></textarea>
+		    </div>
+		    <!-- List action buttons -->
+		    <div name="listactions" class="flexcolumn">
+			<button class="button" name="save">Update list</button>
+			<button class="button" name="new">Create new list</button>
+			<button class="button" name="clear">Clear form</button>
+			<button class="button" name="toMgi">Forward to MGI</button>
+			<button class="button" name="toMouseMine">Forward to MouseMine</button>
+	            </div>
+		</form>
 	    </div>
 
 	    <!-- Facet: feature type -->
