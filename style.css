@@ -174,7 +174,7 @@ label > i.material-icons {
  * Context menu
  * -----------------------------------------
  */
-#cxtMenu {
+[name="cxtMenu"] {
     position: absolute;
     border: thin solid #8c8c8c;
     border-radius: 4px;
@@ -184,7 +184,7 @@ label > i.material-icons {
     z-index: 100;
     white-space: nowrap;
 }
-#cxtMenu.showing {
+[name="cxtMenu"].showing {
     display: inherit;
 }
 .menuItem {
@@ -294,20 +294,20 @@ label > i.material-icons {
     height: 50px;
     flex-grow: 1;
 }
-#listeditor [name="listexpr"] {
+#listeditor [name="formulaeditor"] {
     margin: 0px;
     display: none;
 }
-#listeditor.showformula [name="listexpr"] {
+#listeditor.editingformula [name="formulaeditor"] {
     display: block;
 }
-#listeditor [name="listexpr"] textarea {
+#listeditor [name="formulaeditor"] textarea {
     height: 40px;
 }
-#listeditor [name="listexpr"] [name="formulaheader"] {
+#listeditor [name="formulaeditor"] [name="formulaheader"] {
     justify-content: space-between;
 }
-#listeditor [name="listexpr"] * {
+#listeditor [name="formulaeditor"] * {
     margin-top: 0px;
     margin-bottom: 0px;
 }
@@ -317,19 +317,26 @@ label > i.material-icons {
 #listeditor [name="idsection"] .button {
     font-size: 14px;
 }
+#listeditor [name="idsection"] [name="ids"]:disabled {
+    background-color: transparent;
+}
 #listeditor [name="idsection"] > .flexrow {
     justify-content: space-between;
 }
-#listeditor [name="listexpr"] [name="formula"].valid {
+#listeditor [name="formulaeditor"] [name="formula"].valid {
     outline-color: green;
 }
-#listeditor [name="listexpr"] [name="formula"].invalid {
+#listeditor [name="formulaeditor"] [name="formula"].invalid {
     outline-color: red;
 }
-#listeditor [name="listexpr"] .button {
+#listeditor [name="formulaeditor"] .button {
     font-size: 14px;
+    width: 16px;
+    height: 16px;
+    text-align: center;
+    border-radius: 8px;
 }
-#listeditor [name="listexpr"] .button.listop:not([name="()"]) {
+#listeditor [name="formulaeditor"] .button.listop:not([name="()"]) {
     font-size: 16px;
 }
 /* -----------------------------------------

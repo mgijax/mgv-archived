@@ -87,7 +87,7 @@
 			<input name="name" placeholder="Name"></input>
 		    </div>
 		    <!-- Formula editor -->
-		    <div name="listexpr" class="listexpr flexcolumn">
+		    <div name="formulaeditor" class="formulaeditor flexcolumn">
 			<div class="flexcolumn">
 			    <!-- Formula -->
 			    <div name="formulaheader" class="flexrow">
@@ -99,7 +99,10 @@
 				    <span name="-" title="difference" class="button listop">&mdash;</span>
 				    <span name="()" title="group" class="button listop">()</i>
 				 </div>
-				 <i name="saveformula" title="Save formula" class="material-icons button">save</i>
+				 <div class="flexrow">
+				     <i name="saveformula" title="" class="material-icons button">save</i>
+				     <i name="close" title="close" class="material-icons button">cancel</i>
+				 </div>
 			    </div>
 			    <textarea name="formula"
 			      placeholder="List names combined with set operations (union, intersection, difference)."
@@ -110,17 +113,17 @@
 		    <div name="idsection" class="flexcolumn">
 			<div class="flexrow">
 			    <label>IDs:</label>
-			    <i name="editformula" class="material-icons button">build</i>
+			    <span name="editformula" title="Open/close formula editor." class="button">&sum;</span>
 			</div>
 			<textarea name="ids" placeholder="MGI and/or MGP IDs, delimited by whitespace/commas/pipes."></textarea>
 		    </div>
 		    <!-- List action buttons -->
 		    <div name="listactions" class="flexcolumn">
-			<button class="button" name="save">Update list</button>
-			<button class="button" name="new">Create new list</button>
+			<button class="button" name="new">New list</button>
+			<button class="button" name="save" disabled>Save updates</button>
 			<button class="button" name="clear">Clear form</button>
-			<button class="button" name="toMgi">Forward to MGI</button>
-			<button class="button" name="toMouseMine">Forward to MouseMine</button>
+			<button class="button" name="toMgi" disabled>Forward to MGI</button>
+			<button class="button" name="toMouseMine" disabled>Forward to MouseMine</button>
 	            </div>
 		</form>
 	    </div>
@@ -184,7 +187,7 @@
 		    <!-- menu -->
 		    <div class = "menu flexrow">
 			<i class="material-icons button" title="More functions...">menu</i>
-			<div id="cxtMenu" class="flexcolumn">
+			<div name="cxtMenu" class="flexcolumn">
 			    <div class="menuItem flexrow">
 			    </div>
 			</div>

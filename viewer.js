@@ -374,18 +374,65 @@ class AuxDataManager {
 }
 
 // ---------------------------------------------
+class Component {
+    // app - the owning app object
+    // elt may be a string (selector), a DOM node, or a d3 selection of 1 node.
+    constructor (app, elt) {
+	this.app = app
+	if (typeof(elt) === "string")
+	    // elt is a CSS selector
+	    this.root = d3.select(elt);
+	else if (typeof(elt.selectAll) === "function")
+	    // elt is a d3 selection
+	    this.root = elt;
+	else if (typeof(elt.getElementsByTagName) === "function")
+	    // elt is a DOM node
+	    this.root = d3.select(elt);
+    }
+    initDom () {
+        // override me
+    }
+}
+// ---------------------------------------------
 // Maintains named lists of IDs. Lists may be temporary, lasting only for the session, or permanent,
 // lasting until the user clears the browser local storage area.
 //
 // Uses window.sessionStorage and window.localStorage to save lists
 // temporarily or permanently, resp.  FIXME: should be using window.indexedDB
 //
-class ListManager {
-    constructor () {
+class ListManager extends Component {
+    constructor (app, elt) {
+        super(app, elt);
 	this.name2list = null;
 	this._lists = new LocalStorageManager  ("listManager.lists")
-	//
 	this._load();
+	this.initDom();
+    }
+    initDom () {
+	// Button: create list from current selection
+	this.root.select('.button[name="newfromselection"]')
+	    .on("click", () => {
+		let ids = Object.keys(this.app.zoomView.hiFeats); // FIXME - reachover
+		if (ids.length === 0) {
+		    alert("Nothing selected.");
+		    return;
+		}
+		let newlist = this.createOrUpdate("selected features", ids);
+		this.update(newlist);
+	    });
+
+	// Button: delete all lists (get confirmation first).
+	this.root.select('.button[name="purge"]')
+	    .on("click", () => {
+		if (this.getNames().length === 0) {
+		    alert("No lists.");
+		    return;
+		}
+	        if (window.confirm("Delete all lists. Are you sure?")) {
+		    this.purge();
+		    this.update();
+		}
+	    });
     }
     _load () {
 	this.name2list = this._lists.get("all");
@@ -397,6 +444,7 @@ class ListManager {
     _save () {
         this._lists.put("all", this.name2list);
     }
+    //
     // returns the names of all the lists, sorted
     getNames () {
         let nms = Object.keys(this.name2list);
@@ -406,6 +454,20 @@ class ListManager {
     // returns true iff a list exists with this name
     has (name) {
         return name in this.name2list;
+    }
+    // If no list with the given name exists, return the name.
+    // Otherwise, return a modified version of name that is unique.
+    // Unique names are created by appending a counter.
+    // E.g., uniquify("foo") -> "foo.1" or "foo.2" or whatever.
+    //
+    uniquify (name) {
+	if (!this.has(name)) 
+	    return name;
+	for (let i = 0; ; i += 1) {
+	    let nn = `${name}.${i}`;
+	    if (!this.has(nn))
+	        return nn;
+	}
     }
     // returns the list with this name, or null if no such list
     get (name) {
@@ -419,47 +481,23 @@ class ListManager {
     }
     // 
     createOrUpdate (name, ids) {
-        return this.has(name) ? this.updateList(name,null,ids) : this.create(name, ids);
+        return this.has(name) ? this.updateList(name,null,ids) : this.createList(name, ids);
     }
     // creates a new list with the given name and ids.
-    create (name, ids, formula) {
-	if (name !== "_" && this.has(name)) throw "Create rejected because list exists: " + name;
+    createList (name, ids, formula) {
+	if (name !== "_")
+	    name = this.uniquify(name);
 	//
 	let dt = new Date() + "";
 	this.name2list[name] = {
 	    name:     name,
 	    ids:      ids,
-	    formula:  formula || null,
+	    formula:  formula || "",
 	    created:  dt,
 	    modified: dt
 	};
 	this._save();
 	return this.name2list[name];
-    }
-    //
-    isValid (expr) {
-	try {
-	    // first check syntax
-	    let ast = (new ListExprParser()).parse(expr);
-	    // now check list names
-	    let reach = (n) => {
-		if (typeof(n) === "string") {
-		    let lst = this.get(n);
-		    if (!lst) throw "Unknown list: " + n
-		}
-		else {
-		    reach(n.left);
-		    reach(n.right);
-		}
-		}
-	    reach(ast);
-
-	    // Thumbs up!
-	    return true;
-	}
-	catch (e) {
-	    return false;
-	}
     }
     // create list by combining others
     // Args:
@@ -480,15 +518,15 @@ class ListManager {
 		}
 	    }
 	    let ids = reach(ast);
-	    return this.create(name, Array.from(ids), expr);
+	    return this.createList(name, Array.from(ids), expr);
 	}
 	catch (e) {
-	    alert("I'm terribly sorry, but there appears to be a problem with your list expression: " + e);
+	    alert("I'm terribly sorry, but there appears to be a problem with your list formula: " + e);
 	    return null;
 	}
     }
     // updates the ids in the given list
-    updateList (name, newname, newids) {
+    updateList (name, newname, newids, newformula) {
 	let lst = this.get(name);
         if (! lst) throw "No such list: " + name;
 	if (newname) {
@@ -498,6 +536,7 @@ class ListManager {
 	    this.name2list[lst.name] = lst;
 	}
 	if (newids) lst.ids  = newids;
+	if (newformula || newformula==="") lst.formula = newformula;
 	lst.modified = new Date() + "";
 	this._save();
 	return lst;
@@ -514,12 +553,373 @@ class ListManager {
         this.name2list = {}
 	this._save();
     }
+    // Returns true iff expr is valid, which means it is both syntactically correct 
+    // and all mentioned lists exist.
+    isValid (expr) {
+	try {
+	    // first check syntax
+	    let ast = (new ListExprParser()).parse(expr);
+	    // now check list names
+	    (function reach(n) {
+		if (typeof(n) === "string") {
+		    let lst = this.get(n);
+		    if (!lst) throw "Unknown list: " + n
+		}
+		else {
+		    reach(n.left);
+		    reach(n.right);
+		}
+	    })(ast);
+
+	    // Thumbs up!
+	    return true;
+	}
+	catch (e) {
+	    // syntax error or unknown list name
+	    return false;
+	}
+    }
+    //----------------------------------------------
+    // Updates the "My lists" box with the currently available lists.
+    // Args:
+    //   newlist (List) optional. If specified, we just created that list, and its name is
+    //   	a generated default. Place focus there so user can type new name.
+    update (newlist) {
+	let self = this;
+        let lists = this.getAll();
+	let byName = (a,b) => {
+	    let an = a.name.toLowerCase();
+	    let bn = b.name.toLowerCase();
+	    return (an < bn ? -1 : an > bn ? +1 : 0);
+	};
+	let byDate = (a,b) => ((new Date(b.modified)).getTime() - (new Date(a.modified)).getTime());
+	lists.sort(byName);
+	let items = this.root.select('[name="lists"]').selectAll(".listInfo")
+	    .data(lists);
+	let newitems = items.enter().append("div")
+	    .attr("class","listInfo flexrow");
+
+	newitems.append("i").attr("class","material-icons button")
+	    .attr("name","edit")
+	    .text("mode_edit")
+	    .attr("title","Edit this list.");
+
+	newitems.append("span").attr("name","name");
+
+	newitems.append("span").attr("name","size");
+	newitems.append("span").attr("name","date");
+
+	newitems.append("i").attr("class","material-icons button")
+	    .attr("name","delete")
+	    .text("highlight_off")
+	    .attr("title","Delete this list.");
+
+	items
+	    .attr("name", lst=>lst.name)
+	    .on("click", function (lst) {
+		// if user clicks on a list entry while editing a list op expression,
+		// add this list's name to the expression at the current cursor position.
+		let le = self.app.listEditor; // FIXME reachover
+		if (le.isEditingFormula) {
+		    let s = lst.name;
+		    let re = /[ =()+*-]/;
+		    if (s.search(re) >= 0)
+		        s = '"' + s + '"';
+		    //
+		    le.addToListExpr(s+' ');
+		}
+		// otherwise, toggle this as the current list
+		else 
+		    self.app.currentList = lst; // FIXME reachup
+	    });
+	items.select('.button[name="edit"]')
+	    // edit: click 
+	    .on("click", function(lst) {
+	        self.app.listEditor.open(lst);
+	    });
+	items.select('span[name="name"]')
+	    .text(lst => lst.name);
+	items.select('span[name="date"]').text(lst => {
+	    let md = new Date(lst.modified);
+	    let d = `${md.getFullYear()}-${md.getMonth()+1}-${md.getDate()} ` 
+	          + `:${md.getHours()}.${md.getMinutes()}.${md.getSeconds()}`;
+	    return d;
+	});
+	items.select('span[name="size"]').text(lst => lst.ids.length);
+	items.select('.button[name="delete"]')
+	    .on("click", lst => {
+	        this.deleteList(lst.name);
+		this.update();
+	    });
+	//
+	items.exit().remove();
+	//
+	if (newlist) {
+	    // FIXME
+	    let nameelt = 
+	        d3.select(`#mylists [name="lists"] [name="${newlist.name}"] [name="name"]`)[0][0];
+            nameelt.focus();
+	}
+    }
+
+} // end class ListManager
+
+// ---------------------------------------------
+class ListEditor extends Component {
+    constructor (app, elt) {
+	super(app, elt);
+	this.parser = new ListExprParser();
+	this.form = null;
+	this.initDom();
+	this.isEditingFormula = false;
+	//
+	this.list = null;
+    }
+    initDom () {
+	let self = this;
+	this.form = this.root.select("form")[0][0];
+	if (!this.form) throw "Could not init ListEditor. No form element.";
+	d3.select(this.form)
+	    .on("click", () => {
+	        let t = d3.event.target;
+		if ("button" === t.tagName.toLowerCase()){
+		    d3.event.preventDefault();
+		    let f = this.form;
+		    let ids = f.ids.value.replace(/[,|]/g, ' ').trim().split(/\s+/);
+		    // save list
+		    if (t.name === "save") {
+			if (!this.list) return;
+			this.list = this.app.listManager.updateList(this.list.name, f.name.value, ids, f.formula.value);
+			this.app.listManager.update();
+		    }
+		    // create new list
+		    else if (t.name === "new") {
+			let n = f.name.value.trim();
+			if 
+		        this.list = this.app.listManager.createList(n, ids, f.formula.value);
+			this.app.listManager.update();
+		    }
+		    // clear form
+		    else if (t.name === "clear") {
+		        this.list = null;
+			this.closeFormulaEditor();
+		    }
+		    // forward to MGI
+		    else if (t.name === "toMgi") {
+		        let frm = this.root.select('[name="mgibatchform"]')[0][0];
+			frm.ids.value = ids.join(" ");
+			frm.submit()
+		    }
+		    // forward to MouseMine
+		    else if (t.name === "toMouseMine") {
+		        let frm = this.root.select('[name="mousemineform"]')[0][0];
+			frm.externalids.value = ids.join(",");
+			frm.submit()
+		    }
+		}
+	    });
+
+	// Button: show/hide formula editor
+	this.root.select('[name="idsection"] .button[name="editformula"]')
+	    .on("click", () => this.toggleFormulaEditor());
+	    
+	// Input box: formula: validate on any input
+	this.root.select('[name="formulaeditor"] [name="formula"]')
+	    .on("input", () => {
+	        this.validateExpr();
+	    });
+
+	// Forward -> MGI/MouseMine: disable buttons if no ids
+	this.root.select('[name="ids"]')
+	    .on("input", () => {
+	        let empty = this.form.ids.value.trim().length === 0;
+		this.form.toMgi.disabled = this.form.toMouseMine.disabled = empty;
+	    });
+
+	// Buttons: the list operator buttons (union, intersection, etc.)
+	this.root.selectAll('[name="formulaeditor"] .button.listop')
+	    .on("click", function () {
+		// add my symbol to the formula
+		let inelt = self.form.formula;
+		let op = d3.select(this).attr("name");
+		self.addToListExpr(op);
+		self.validateExpr();
+	    });
+
+	// Button: "OK" button for creating a list from a list op expression
+	this.root.select('[name="formulaeditor"] .button[name="saveformula"]')
+            .on("click", () => {
+	        // FIXME
+	    });
+
+	// Button: close formula editor
+	this.root.select('[name="formulaeditor"] .button[name="close"]')
+            .on("click", () => this.closeFormulaEditor() );
+    }
+    parseIds (s) {
+	return s.replace(/[,|]/g, ' ').trim().split(/\s+/);
+    }
+    get list () {
+        return this._list;
+    }
+    set list (lst) {
+        this._list = lst;
+	this._syncDisplay();
+    }
+    _syncDisplay () {
+	let lst = this._list;
+	if (!lst) {
+	    this.form.name.value = '';
+	    this.form.ids.value = '';
+	    this.form.formula.value = '';
+	    this.form.save.disabled = true;
+	    this.form.toMgi.disabled = true;
+	    this.form.toMouseMine.disabled = true;
+	}
+	else {
+	    this.form.name.value = lst.name;
+	    this.form.ids.value = lst.ids.join('\n');
+	    this.form.formula.value = lst.formula || "";
+	    this.form.ids.disabled = this.form.formula.value.trim().length > 0;
+	    this.form.save.disabled = false;
+	    this.form.toMgi.disabled 
+	      = this.form.toMouseMine.disabled 
+	        = (this.form.ids.value.trim().length === 0);
+	}
+    }
+    clear () {
+        this.list = null;
+    }
+    open (lst) {
+        this.list = lst;
+	this.root.classed("closed", false);
+    }
+    close () {
+        this.list = null;
+	this.root.classed("closed", true);
+    }
+    openFormulaEditor () {
+	this.root.classed("editingformula", true);
+	this.isEditingFormula = true;
+    }
+    closeFormulaEditor () {
+	this.root.classed("editingformula", false);
+	this.isEditingFormula = false;
+    }
+    toggleFormulaEditor () {
+	let showing = this.root.classed("editingformula");
+	showing ? this.closeFormulaEditor() : this.openFormulaEditor();
+    }
+    //----------------------------------------------
+    // Checks the current expression and sets the valid/invalid class.
+    validateExpr  () {
+	let inp = this.root.select('[name="formulaeditor"] [name="formula"]');
+	let expr = inp[0][0].value.trim();
+	if (!expr) {
+	    inp.classed("valid",false).classed("invalid",false);
+ 	    this.form.ids.disabled = false;
+	}
+	else {
+	    let isValid = this.app.listFormulaEval.isValid(expr);
+	    inp.classed("valid", isValid).classed("invalid", !isValid);
+ 	    this.form.ids.disabled = true;
+	}
+    }
+    //----------------------------------------------
+    addToListExpr (text) {
+	let inp = this.root.select('[name="formulaeditor"] [name="formula"]');
+	let ielt = inp[0][0];
+	let v = ielt.value;
+	let splice = function (e,t){
+	    let v = e.value;
+	    let r = getCaretRange(e);
+	    e.value = v.slice(0,r[0]) + t + v.slice(r[1]);
+	    setCaretPosition(e, r[0]+t.length);
+	    e.focus();
+	}
+	let range = getCaretRange(ielt);
+	if (range[0] === range[1]) {
+	    // no current selection
+	    splice(ielt, text);
+	    if (text === "()") 
+		moveCaretPosition(ielt, -1);
+	}
+	else {
+	    // there is a current selection
+	    if (text === "()")
+		// surround current selection with parens, then move caret after
+		text = '(' + v.slice(range[0],range[1]) + ')';
+	    splice(ielt, text)
+	}
+	this.validateExpr();
+    }
+} // end class ListEditor
+
+// ---------------------------------------------
+// Knows how to parse and evaluate a list formula (aka list expression).
+class ListFormulaEvaluator {
+    constructor (app) {
+	this.app = app;
+        this.parser = new ListExprParser();
+    }
+    // Evaluates the expression and returns a list.
+    // Throws an exception if there's an error.
+    eval (expr) {
+	try {
+	    let ast = this.parser.parse(expr);
+	    let lm = this.app.listManager;
+	    let reach = (n) => {
+		if (typeof(n) === "string") {
+		    let lst = lm.get(n);
+		    return new Set(lst.ids);
+		}
+		else {
+		    let l = reach(n.left);
+		    let r = reach(n.right);
+		    return l[n.op](r);
+		}
+	    }
+	    let ids = reach(ast);
+	    return Array.from(ids);
+	}
+	catch (e) {
+	    alert("I'm terribly sorry, but there appears to be a problem with your list expression: " + e);
+	    throw e;
+	}
+    }
+    // Checks the current expression and sets the valid/invalid class.
+    isValid  (expr) {
+	try {
+	    // first check syntax
+	    let ast = this.parser.parse(expr);
+	    let lm  = this.app.listManager;  // FIXME - reachover
+	    // now check list names
+	    (function reach(n) {
+		if (typeof(n) === "string") {
+		    let lst = lm.get(n);
+		    if (!lst) throw "Unknown list: " + n
+		}
+		else {
+		    reach(n.left);
+		    reach(n.right);
+		}
+	    })(ast);
+
+	    // Thumbs up!
+	    return true;
+	}
+	catch (e) {
+	    // syntax error or unknown list name
+	    return false;
+	}
+    }
 }
 
 // ---------------------------------------------
 // Parses a list operator expression, eg "(a + b)*c - d"
-// Returns an abstract syntax tree. Leaf nodes are the names.
-// Interior nodes look like {left, op, right}
+// Returns an abstract syntax tree.
+//     Leaf nodes = list names. They are simple strings.
+//     Interior nodes = operations. They look like: {left:node, op:string, right:node}
 // 
 class ListExprParser {
     constructor () {
@@ -592,9 +992,21 @@ class ListExprParser {
     _error (expected, saw) {
         throw `Parse error: expected ${expected} but saw ${saw}.`;
     }
+    // Parses the string and returns the abstract syntax tree.
+    // Throws an exception if there is a syntax error.
     parse (s) {
 	this._init(s);
 	return this._expr();
+    }
+    // returns true iff string is syntactically valid
+    isValid (s) {
+        try {
+	    this.parse(s);
+	    return true;
+	}
+	catch (e) {
+	    return false;
+	}
     }
 }
 // ---------------------------------------------
@@ -816,13 +1228,10 @@ class BTManager {
 } // end class BTManager
 
 // ---------------------------------------------
-class SVGView {
-  constructor (id, width, height, app) {
-    this.app = app;
-    this.id = id;
-    this.container = d3.select(`#${this.id}`);
-    this.selector = `#${this.id} svg`;
-    this.svg = d3.select(this.selector);
+class SVGView extends Component {
+  constructor (app, elt, width, height) {
+    super(app, elt);
+    this.svg = this.root.select("svg");
     this.svgMain = this.svg
           .append("g")    // the margin-translated group
           .append("g");	  // main group for the drawing
@@ -852,8 +1261,8 @@ class SVGView {
 
 // ---------------------------------------------
 class GenomeView extends SVGView {
-    constructor (id, width, height, app) {
-        super(id, width, height, app);
+    constructor (app, elt, width, height) {
+        super(app, elt, width, height);
 	this.cwidth = 20;        // chromosome width
 	this.brushChr = null;	 // which chr has the current brush
 	this.bwidth = this.cwidth/2;  // block width
@@ -1109,8 +1518,9 @@ class GenomeView extends SVGView {
 
 // ---------------------------------------------
 class ZoomView extends SVGView {
-    constructor (id, width, height, app) {
-      super(id,width,height, app);
+    //
+    constructor (app, elt, width, height) {
+      super(app, elt, width, height);
       //
       this.minSvgHeight = 250;
       this.blockHeight = 40;
@@ -1127,9 +1537,144 @@ class ZoomView extends SVGView {
         .attr("class","fiducials");
       this.svgMain.append("g")
         .attr("class","strips");
+      this.cxtMenu = this.root.select('[name="cxtMenu"]');
+      this.initDom();
+    }
+    //
+    initDom () {
+        let self = this;
+	let r = this.root;
+	let a = this.app;
+	// zoom controls
+	r.select("#zoomOut").on("click",
+	    () => { a.zoom(a.defaultZoom) });
+	r.select("#zoomIn") .on("click",
+	    () => { a.zoom(1/a.defaultZoom) });
+	r.select("#zoomOutMore").on("click",
+	    () => { a.zoom(2*a.defaultZoom) });
+	r.select("#zoomInMore") .on("click",
+	    () => { a.zoom(1/(2*a.defaultZoom)) });
+
+	// pan controls
+	r.select("#panLeft") .on("click",
+	    () => { a.pan(-a.defaultPan) });
+	r.select("#panRight").on("click",
+	    () => { a.pan(+a.defaultPan) });
+	r.select("#panLeftMore") .on("click",
+	    () => { a.pan(-5*a.defaultPan) });
+	r.select("#panRightMore").on("click",
+	    () => { a.pan(+5*a.defaultPan) });
+
+	//
+	let fSelect = function (f, shift, preserve) {
+	    let id = f.mgiid || f.mgpid;
+	    if (shift) {
+		if (this.hiFeats[id])
+		    delete this.hiFeats[id]
+		else
+		    this.hiFeats[id] = id;
+	    }
+	    else {
+		if (!preserve) this.hiFeats = {};
+		this.hiFeats[id] = id;
+	    }
+	}.bind(this);
+	//
+	let fMouseOverHandler = function(f) {
+		if (d3.event.altKey) {
+		    fSelect(f, d3.event.shiftKey, true);
+		    if (this.timeout) window.clearTimeout(this.timeout);
+		    this.timeout = window.setTimeout(function(){ this.app.callback(); }.bind(this), 1000);
+		    this.highlight();
+		}
+		else
+		    this.highlight(f);
+	}.bind(this);
+	//
+	let fMouseOutHandler = function(f) {
+		this.highlight();
+	}.bind(this);
+	// Background click in zoom view = unselect all.
+	this.svg
+	  .on("click", () => {
+	      let tgt = d3.select(d3.event.target);
+	      let t = tgt[0][0];
+	      if (t.tagName == "rect" && t.classList.contains("feature")) {
+		  fSelect(t.__data__, d3.event.shiftKey);
+		  this.highlight();
+	          this.app.callback();
+	      }
+	      else {
+		  if (t.tagName == "rect" && t.classList.contains("block") && !d3.event.shiftKey) {
+		      this.hiFeats = {};
+		      this.highlight();
+		      this.app.callback();
+		  }
+	      }
+	  })
+	  .on("mouseover", () => {
+	      let tgt = d3.select(d3.event.target);
+	      let f = tgt.data()[0];
+	      if (f instanceof Feature) {
+		  fMouseOverHandler(f);
+	      }
+	  })
+	  .on("mouseout", () => {
+	      let tgt = d3.select(d3.event.target);
+	      let f = tgt.data()[0];
+	      if (f instanceof Feature) {
+		  fMouseOutHandler(f);
+	      }
+	  });
+
+	// Button: Menu in zoom view
+	this.root.select(".menu > .button")
+	  .on("click", function () {
+	      // show context menu at mouse event coordinates
+	      let cx = d3.event.clientX;
+	      let cy = d3.event.clientY;
+	      let bb = d3.select(this)[0][0].getBoundingClientRect();
+	      self.showContextMenu(cx-bb.left,cy-bb.top);
+	  });
     }
     //----------------------------------------------
+    // Args:
+    //     data (list of menuItem configs) Each config looks like {label:string, handler: function}
+    initContextMenu (data) {
+	this.cxtMenu.selectAll(".menuItem").remove(); // in case of re-init
+        let mitems = this.cxtMenu
+	  .selectAll(".menuItem")
+	  .data(data);
+	let news = mitems.enter()
+	  .append("div")
+	  .attr("class", "menuItem flexrow")
+	  .attr("title", d => d.tooltip || null );
+	news.append("label")
+	  .text(d => d.label)
+	  .on("click", d => {
+	      d.handler();
+	      this.hideContextMenu();
+	  });
+	news.append("i")
+	  .attr("class", "material-icons")
+	  .text( d=>d.icon );
+    }
+    //----------------------------------------------
+    showContextMenu (x,y) {
+        this.cxtMenu
+	    .classed("showing", true)
+	    .style("left", `${x}px`)
+	    .style("top", `${y}px`)
+	    ;
+    }
+    //----------------------------------------------
+    hideContextMenu () {
+        this.cxtMenu.classed("showing", false);
+    }
+
+    //----------------------------------------------
     update (coords) {
+	let self = this;
 	let c = this.coords = (coords || this.coords);
 	d3.select("#zoomCoords")[0][0].value = formatCoords(c.chr, c.start, c.end);
 	d3.select("#zoomWSize")[0][0].value = Math.round(c.end - c.start + 1)
@@ -1165,7 +1710,7 @@ class ZoomView extends SVGView {
 	    });
 	    // when everything is ready, call the draw function
 	    Promise.all(promises).then( data => {
-	        mgv.zoomView.draw(data);
+	        self.draw(data);
 		mgv.showBusy(false);
             });
 	});
@@ -1174,7 +1719,7 @@ class ZoomView extends SVGView {
 
     //----------------------------------------------
     clearBrushes () {
-	d3.select("#zoomView").selectAll("g.brush")
+	this.root.selectAll("g.brush")
 	    .each( function (b) {
 	        b.brush.clear();
 		d3.select(this).call(b.brush);
@@ -1351,7 +1896,7 @@ class ZoomView extends SVGView {
 
 	// reset the svg size based on number of strips
 	let totalHeight = (this.stripHeight+this.stripGap)*(data.length+1)
-	d3.select(this.selector)
+	this.svg
 	    .attr("height", Math.max(this.minSvgHeight, totalHeight));
 
 	// y-coords for each genome in the zoom view
@@ -1781,8 +2326,8 @@ class MGVApp {
 	//
 	this.allGenomes = []; // list of all genome names
 	//
-	this.genomeView = new GenomeView("genomeView", 800, 250, this);
-	this.zoomView   = new ZoomView  ("zoomView",   800, 250, this);
+	this.genomeView = new GenomeView(this, "#genomeView", 800, 250, this);
+	this.zoomView   = new ZoomView  (this, "#zoomView", 800, 250, this);
 	this.cscale = d3.scale.category10().domain([
 	    "protein_coding_gene",
 	    "pseudogene",
@@ -1792,92 +2337,15 @@ class MGVApp {
 	    "other_feature_type"
 	]);
 	//
-	this.listManager    = new ListManager();
-	this.updateLists();
+	this.listManager    = new ListManager(this, "#mylists");
+	this.listManager.update();
+	//
+	this.listEditor = new ListEditor(this, '#listeditor');
+	this.listFormulaEval = new ListFormulaEvaluator(this);
 	//
 	this.translator     = new BTManager(this);
 	this.featureManager = new FeatureManager(this);
 	this.auxDataManager = new AuxDataManager(this);
-
-	// Create context menu. Only one command so far...
-	this.initContextMenu([{
-            label: "MGI SNPs", 
-	    icon: "open_in_new",
-	    tooltip: "Get SNPs from MGI for the current strains in the current region. (Some strains not available.)",
-	    handler: ()=> this.linkToMgiSnpReport()
-	}]);
-	// Button: Menu in zoom view
-	d3.select("#zoomView .menu > .button")
-	  .on("click", function () {
-	      // show context menu at mouse event coordinates
-	      let cx = d3.event.clientX;
-	      let cy = d3.event.clientY;
-	      let bb = d3.select(this)[0][0].getBoundingClientRect();
-	      self.showContextMenu(cx-bb.left,cy-bb.top);
-	  });
-	//
-	let fSelect = function (f, shift, preserve) {
-	    let id = f.mgiid || f.mgpid;
-	    let zv = this.zoomView;
-	    if (shift) {
-		if (zv.hiFeats[id])
-		    delete zv.hiFeats[id]
-		else
-		    zv.hiFeats[id] = id;
-	    }
-	    else {
-		if (!preserve) zv.hiFeats = {};
-		zv.hiFeats[id] = id;
-	    }
-	}.bind(this);
-	//
-	let fMouseOverHandler = function(f) {
-		if (d3.event.altKey) {
-		    fSelect(f, d3.event.shiftKey, true);
-		    if (this.timeout) window.clearTimeout(this.timeout);
-		    this.timeout = window.setTimeout(function(){ this.callback(); }.bind(this), 1000);
-		    this.zoomView.highlight();
-		}
-		else
-		    this.zoomView.highlight(f);
-
-	}.bind(this);
-	//
-	let fMouseOutHandler = function(f) {
-		this.zoomView.highlight();
-	}.bind(this);
-	// Background click in zoom view = unselect all.
-	d3.select("#zoomView svg")
-	  .on("click", () => {
-	      let tgt = d3.select(d3.event.target);
-	      let t = tgt[0][0];
-	      if (t.tagName == "rect" && t.classList.contains("feature")) {
-		  fSelect(t.__data__, d3.event.shiftKey);
-		  this.zoomView.highlight();
-	          this.callback();
-	      }
-	      else {
-		  if (t.tagName == "rect" && t.classList.contains("block") && !d3.event.shiftKey) {
-		      this.zoomView.hiFeats = {};
-		      this.zoomView.highlight();
-		      this.callback();
-		  }
-	      }
-	  })
-	  .on("mouseover", () => {
-	      let tgt = d3.select(d3.event.target);
-	      let f = tgt.data()[0];
-	      if (f instanceof Feature) {
-		  fMouseOverHandler(f);
-	      }
-	  })
-	  .on("mouseout", () => {
-	      let tgt = d3.select(d3.event.target);
-	      let f = tgt.data()[0];
-	      if (f instanceof Feature) {
-		  fMouseOutHandler(f);
-	      }
-	  });
 
 	// Button: Gear icon to show/hide left column
 	d3.select("#header > .gear.button")
@@ -1887,123 +2355,13 @@ class MGVApp {
 		this.resize()
 	    });
 	
-	// -------------------------------------------------------------------
-	// My lists
-	// -------------------------------------------------------------------
-	//
-	d3.select('#listeditor [name="editform"]')
-	    .on("click", () => {
-	        let t = d3.event.target;
-		let f = t.form;
-		if ("button" === t.tagName.toLowerCase()){
-		    d3.event.preventDefault();
-		    let ids = f.ids.value.replace(/[,|]/g, ' ').trim().split(/\s+/);
-		    if (t.name === "clear") {
-		        this.editorList = null;
-		    }
-		    else if (t.name === "save") {
-			if (!this.editorList) return;
-			this.listManager.updateList(this.editorList.name, f.name.value, ids);
-			this.updateLists();
-		    }
-		    else if (t.name === "toMgi") {
-		        let frm = d3.select('#mylists [name="mgibatchform"]')[0][0];
-			frm.ids.value = ids.join(" ");
-			frm.submit()
-		    }
-		    else if (t.name === "toMouseMine") {
-		        let frm = d3.select('#mylists [name="mousemineform"]')[0][0];
-			frm.externalids.value = ids.join(",");
-			frm.submit()
-		    }
-		}
-	    });
-
-	// Button: create list from current selection
-	d3.select('#mylists .button[name="newfromselection"]')
-	    .on("click", () => {
-		let ids = Object.keys(this.zoomView.hiFeats);
-		if (ids.length === 0) {
-		    alert("Nothing selected.");
-		    return;
-		}
-		let newlist = this.listManager.createOrUpdate("selected features", ids);
-		this.updateLists(newlist);
-	    });
-	/*
-	// Button: open the list operation box
-	// NOTE: there are two <i> icons combining to look like one button.
-	// So we need to selectAll.
-	d3.selectAll('#mylists [name="newfromlistop"] i')
-	    .on("click", function () {
-		// flip the editing state of the box
-		let listbox = d3.select("#mylists");
-		let isediting = ! listbox.classed("editing");
-		listbox.classed("editing", isediting);
-		// if editing, clear the input area and give focus
-		if (isediting) {
-		    let inp = d3.select('#listeditor [name="listexpr"] [name="formula"]');
-		    inp[0][0].value = "";
-		    inp[0][0].focus();
-		    inp.classed("valid", false).classed("invalid", false);
-		}
-		
-	    });
-	*/
-	d3.select('#listeditor [name="idsection"] .button[name="editformula"]')
-	    .on("click", () => {
-	        let le = d3.select('#listeditor');
-		le.classed("showformula", !le.classed("showformula"));
-	    });
-	// Input box: list expression: validate on any input
-	d3.select('#listeditor [name="listexpr"] [name="formula"]')
-	    .on("input", () => this.validateExpr())
-
-	// Buttons: the list operator buttons (union, intersection, etc.)
-	d3.selectAll('#listeditor [name="listexpr"] .button')
-	    .on("click", function () {
-		// add my symbol to the formula
-		let inelt = d3.select('#listeditor [name="listexpr"] [name="formula"]')[0][0];
-		let op = d3.select(this).attr("name");
-		self.addToListExpr(op);
-		self.validateExpr();
-	    });
-
-	// Button: "OK" button for creating a list from a list op expression
-	d3.select('#listeditor [name="listexpr"] button[name="OK"]')
-            .on("click", () => {
-		let inp = d3.select('#listeditor [name="listexpr"] input')[0][0];
-                let expr = inp.value.trim();
-		if (expr) {
-		    let name = "_";
-		    let lst = this.listManager.createFromCombo(name, expr);
-		    if (lst) {
-		        this.updateLists();
-			d3.select("#mylists").classed("editing", false);
-			// let user edit the default name
-			let n = d3.select(`#mylists .listInfo[name="${name}"] [name="name"]`)
-			    .attr('contenteditable','true');
-			n[0][0].focus();
-		    }
-		    else {
-		        inp.focus();
-		    }
-		}
-	    });
-
-	// Button: delete all lists (get confirmation first).
-	d3.select('#mylists .button[name="purge"]')
-	    .on("click", () => {
-		if (this.listManager.getNames().length === 0) {
-		    alert("No lists.");
-		    return;
-		}
-	        if (window.confirm("Delete all lists. Are you sure?")) {
-		    this.listManager.purge();
-		    this.updateLists();
-		}
-	    });
-
+	// Create context menu. Only one command so far...
+	this.zoomView.initContextMenu([{
+            label: "MGI SNPs", 
+	    icon: "open_in_new",
+	    tooltip: "Get SNPs from MGI for the current strains in the current region. (Some strains not available.)",
+	    handler: ()=> this.linkToMgiSnpReport()
+	}]);
 	//
 	// -------------------------------------------------------------------
 	// Facets
@@ -2084,26 +2442,6 @@ class MGVApp {
 	    .attr("class","material-icons busy rotating")
 	    ;
 
-	// zoom controls
-	d3.select("#zoomOut").on("click",
-	    () => { this.zoom(this.defaultZoom) });
-	d3.select("#zoomIn") .on("click",
-	    () => { this.zoom(1/this.defaultZoom) });
-	d3.select("#zoomOutMore").on("click",
-	    () => { this.zoom(2*this.defaultZoom) });
-	d3.select("#zoomInMore") .on("click",
-	    () => { this.zoom(1/(2*this.defaultZoom)) });
-
-	// pan controls
-	d3.select("#panLeft") .on("click",
-	    () => { this.pan(-this.defaultPan) });
-	d3.select("#panRight").on("click",
-	    () => { this.pan(+this.defaultPan) });
-	d3.select("#panLeftMore") .on("click",
-	    () => { this.pan(-5*this.defaultPan) });
-	d3.select("#panRightMore").on("click",
-	    () => { this.pan(+5*this.defaultPan) });
-
 	// initial highlighted features 
 	(cfg.highlight || []).forEach(h => this.zoomView.hiFeats[h]=h);
 
@@ -2134,7 +2472,7 @@ class MGVApp {
 	    self.auxDataManager[searchType](term)
 	      .then(feats => {
 		  self.listManager.createOrUpdate(lstName, feats.map(f => f.primaryIdentifier))
-		  self.updateLists();
+		  self.listManager.update();
 		  //
 		  self.zoomView.hiFeats = {};
 		  feats.forEach(f => self.zoomView.hiFeats[f.mgiid] = f.mgiid);
@@ -2441,63 +2779,6 @@ class MGVApp {
     }
 
     //----------------------------------------------
-    // Checks the current expression and sets the valid/invalid class.
-    validateExpr  () {
-	let inp = d3.select('#listeditor [name="listexpr"] [name="formula"]');
-	let expr = inp[0][0].value.trim();
-	if (!expr) {
-	    inp.classed("valid",false).classed("invalid",false);
-	}
-	else {
-	    let isValid = self.listManager.isValid(expr);
-	    inp.classed("valid", isValid).classed("invalid", !isValid);
-	}
-    }
-    //----------------------------------------------
-    addToListExpr (text) {
-	let inp = d3.select('#listeditor [name="listexpr"] [name="formula"]');
-	let ielt = inp[0][0];
-	let v = ielt.value;
-	let splice = function (e,t){
-	    let v = e.value;
-	    let r = getCaretRange(e);
-	    e.value = v.slice(0,r[0]) + t + v.slice(r[1]);
-	    setCaretPosition(e, r[0]+t.length);
-	    e.focus();
-	}
-	let range = getCaretRange(ielt);
-	if (range[0] === range[1]) {
-	    // no current selection
-	    splice(ielt, text);
-	    if (text === "()") 
-		moveCaretPosition(ielt, -1);
-	}
-	else {
-	    // there is a current selection
-	    if (text === "()")
-		// surround current selection with parens, then move caret after
-		text = '(' + v.slice(range[0],range[1]) + ')';
-	    splice(ielt, text)
-	}
-    }
-
-    //----------------------------------------------
-    get editorList () {
-        return this.editList;
-    }
-    set editorList (lst) {
-        this.editList = lst;
-	let form  = d3.select('#listeditor form')[0][0];
-	if (!lst) {
-	    form.name.value = '';
-	    form.ids.value = '';
-	}
-	else {
-	    form.name.value = lst.name;
-	    form.ids.value = lst.ids.join('\n');
-	}
-    }
-    //----------------------------------------------
     get currentList () {
         return this.currList;
     }
@@ -2523,91 +2804,6 @@ class MGVApp {
 	    this.zoomView.update();
 	    //
 	    this.genomeView.drawTicks([]);
-	}
-    }
-
-    //----------------------------------------------
-    // Updates the "My lists" box with the currently available lists.
-    // Args:
-    //   newlist (List) optional. If specified, we just created that list, and its name is
-    //   	a generated default. Place focus there so user can type new name.
-    updateLists (newlist) {
-	self = this;
-        let lists = this.listManager.getAll();
-	let byName = (a,b) => {
-	    let an = a.name.toLowerCase();
-	    let bn = b.name.toLowerCase();
-	    return (an < bn ? -1 : an > bn ? +1 : 0);
-	};
-	let byDate = (a,b) => ((new Date(b.modified)).getTime() - (new Date(a.modified)).getTime());
-	lists.sort(byName);
-	let items = d3.select('#mylists [name="lists"]').selectAll(".listInfo")
-	    .data(lists);
-	let newitems = items.enter().append("div")
-	    .attr("class","listInfo flexrow");
-
-	newitems.append("i").attr("class","material-icons button")
-	    .attr("name","edit")
-	    .text("mode_edit")
-	    .attr("title","Edit this list.");
-
-	newitems.append("span").attr("name","name");
-
-	newitems.append("span").attr("name","size");
-	newitems.append("span").attr("name","date");
-
-	newitems.append("i").attr("class","material-icons button")
-	    .attr("name","delete")
-	    .text("highlight_off")
-	    .attr("title","Delete this list.");
-
-	items
-	    .attr("name", lst=>lst.name)
-	    .on("click", function (lst) {
-		// if user clicks on a list entry while editing a list op expression,
-		// add this list's name to the expression at the current cursor position.
-		let mls = d3.select("#mylists");
-	        let isediting = mls.classed("editing");
-		if (isediting) {
-		    let s = lst.name;
-		    let re = /[ =()+*-]/;
-		    if (s.search(re) >= 0)
-		        s = '"' + s + '"';
-		    //
-		    self.addToListExpr(s+' ');
-		    self.validateExpr();
-		}
-		// otherwise, toggle this as the current list
-		else 
-		    self.currentList = self.currentList === lst ? null : lst;
-	    });
-	items.select('.button[name="edit"]')
-	    // edit: click 
-	    .on("click", function(lst) {
-	        self.editorList = lst;
-		d3.select("#listeditor").classed("closed", false);
-	    });
-	items.select('span[name="name"]')
-	    .text(lst => lst.name);
-	items.select('span[name="date"]').text(lst => {
-	    let md = new Date(lst.modified);
-	    let d = `${md.getFullYear()}-${md.getMonth()+1}-${md.getDate()} ` 
-	          + `:${md.getHours()}.${md.getMinutes()}.${md.getSeconds()}`;
-	    return d;
-	});
-	items.select('span[name="size"]').text(lst => lst.ids.length);
-	items.select('.button[name="delete"]')
-	    .on("click", lst => {
-	        this.listManager.deleteList(lst.name);
-		this.updateLists();
-	    });
-	//
-	items.exit().remove();
-	//
-	if (newlist) {
-	    let nameelt = 
-	        d3.select(`#mylists [name="lists"] [name="${newlist.name}"] [name="name"]`)[0][0];
-            nameelt.focus();
 	}
     }
 
@@ -2720,42 +2916,6 @@ class MGVApp {
 	    });
 	    g.chromosomes = chrs;
 	});
-    }
-    //----------------------------------------------
-    // Args:
-    //     data (list of menuItem configs) Each config looks like {label:string, handler: function}
-    initContextMenu (data) {
-	let menu = d3.select("#cxtMenu");
-	menu.selectAll(".menuItem").remove(); // in case of re-init
-        let mitems = d3.select("#cxtMenu")
-	  .selectAll(".menuItem")
-	  .data(data);
-	let news = mitems.enter()
-	  .append("div")
-	  .attr("class", "menuItem flexrow")
-	  .attr("title", d => d.tooltip || null );
-	news.append("label")
-	  .text(d => d.label)
-	  .on("click", d => {
-	      d.handler();
-	      this.hideContextMenu();
-	  });
-	news.append("i")
-	  .attr("class", "material-icons")
-	  .text( d=>d.icon );
-    }
-
-    //----------------------------------------------
-    showContextMenu (x,y) {
-        d3.select("#cxtMenu")
-	    .classed("showing", true)
-	    .style("left", `${x}px`)
-	    .style("top", `${y}px`)
-	    ;
-    }
-    //----------------------------------------------
-    hideContextMenu () {
-        d3.select("#cxtMenu").classed("showing", false);
     }
     //----------------------------------------------
     linkToMgiSnpReport () {
