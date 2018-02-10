@@ -446,6 +446,7 @@ class ListManager extends Component {
         super(app, elt);
 	this.name2list = null;
 	this._lists = new LocalStorageManager  ("listManager.lists")
+	this.formulaEval = new ListFormulaEvaluator(this);
 	this._load();
 	this.initDom();
     }
@@ -458,7 +459,7 @@ class ListManager extends Component {
 		    alert("Nothing selected.");
 		    return;
 		}
-		let newlist = this.createOrUpdate("selected features", ids);
+		let newlist = this.createList("selection", ids);
 		this.update(newlist);
 	    });
 
@@ -540,40 +541,37 @@ class ListManager extends Component {
 	this._save();
 	return this.name2list[name];
     }
-    // create list by combining others
-    // Args:
-    //   name (string) name for the list
-    //   expr (string) Expression involving list names and operators, e.g. "(a+b)*c - d"
-    createFromCombo (name, expr) {
-	try {
-	    let ast = (new ListExprParser()).parse(expr);
-	    let reach = (n) => {
-		if (typeof(n) === "string") {
-		    let lst = this.get(n);
-		    return new Set(lst.ids);
-		}
-		else {
-		    let l = reach(n.left);
-		    let r = reach(n.right);
-		    return l[n.op](r);
-		}
-	    }
-	    let ids = reach(ast);
-	    return this.createList(name, Array.from(ids), expr);
-	}
-	catch (e) {
-	    alert("I'm terribly sorry, but there appears to be a problem with your list formula: " + e);
-	    return null;
+    // Provide access to evaluation service
+    evalFormula (expr) {
+	return this.formulaEval.eval(expr);
+    }
+    // Refreshes a list and returns a promise for the refreshed list.
+    // If the list if a POLO, promise resolves immediately to the list.
+    // Otherwise, starts a reevaluation of the formula that resolves after the
+    // list's ids have been updated.
+    // If there is an error, the returned promise rejects with the error.
+    refreshList (name) {
+        let lst = this.get(name);
+	if (!lst) throw "No such list: " + name;
+	lst.modified = ""+new Date();
+	if (!lst.formula)
+	    return Promise.resolve(lst);
+	else {
+	    let p = this.formualEval.eval(lst.formula).then( ids => {
+		    lst.ids = ids;
+		    return lst;
+		});
+	    return p;
 	}
     }
+
     // updates the ids in the given list
     updateList (name, newname, newids, newformula) {
 	let lst = this.get(name);
         if (! lst) throw "No such list: " + name;
 	if (newname) {
-	    if (this.has(newname) && newname !== name) throw "Name already exists: " + newname;
 	    delete this.name2list[lst.name];
-	    lst.name = newname;
+	    lst.name = this.uniquify(newname);
 	    this.name2list[lst.name] = lst;
 	}
 	if (newids) lst.ids  = newids;
@@ -597,28 +595,7 @@ class ListManager extends Component {
     // Returns true iff expr is valid, which means it is both syntactically correct 
     // and all mentioned lists exist.
     isValid (expr) {
-	try {
-	    // first check syntax
-	    let ast = (new ListExprParser()).parse(expr);
-	    // now check list names
-	    (function reach(n) {
-		if (typeof(n) === "string") {
-		    let lst = this.get(n);
-		    if (!lst) throw "Unknown list: " + n
-		}
-		else {
-		    reach(n.left);
-		    reach(n.right);
-		}
-	    })(ast);
-
-	    // Thumbs up!
-	    return true;
-	}
-	catch (e) {
-	    // syntax error or unknown list name
-	    return false;
-	}
+	return this.formulaEval.isValid(expr);
     }
     //----------------------------------------------
     // Updates the "My lists" box with the currently available lists.
@@ -746,13 +723,13 @@ class ListEditor extends Component {
 		    }
 		    // forward to MGI
 		    else if (t.name === "toMgi") {
-		        let frm = this.root.select('[name="mgibatchform"]')[0][0];
+		        let frm = d3.select('#mgibatchform')[0][0];
 			frm.ids.value = ids.join(" ");
 			frm.submit()
 		    }
 		    // forward to MouseMine
 		    else if (t.name === "toMouseMine") {
-		        let frm = this.root.select('[name="mousemineform"]')[0][0];
+		        let frm = d3.select('#mousemineform')[0][0];
 			frm.externalids.value = ids.join(",");
 			frm.submit()
 		    }
@@ -786,10 +763,19 @@ class ListEditor extends Component {
 		self.validateExpr();
 	    });
 
-	// Button: "OK" button for creating a list from a list op expression
-	this.root.select('[name="formulaeditor"] .button[name="saveformula"]')
+	// Button: refresh button for running the formula
+	this.root.select('[name="formulaeditor"] .button[name="refresh"]')
             .on("click", () => {
-	        // FIXME
+		let emessage="I'm terribly sorry, but there appears to be a problem with your list expression: ";
+		let formula = this.form.formula.value.trim();
+		if (formula.length === 0)
+		    return;
+	        this.app.listManager
+		    .evalFormula(formula)
+		    .then(ids => {
+		        this.form.ids.value = ids.join("\n");
+		     })
+		    .catch(e => alert(emessage + e));
 	    });
 
 	// Button: close formula editor
@@ -818,6 +804,7 @@ class ListEditor extends Component {
 	if (!lst) {
 	    this.form.name.value = '';
 	    this.form.ids.value = '';
+	    this.form.ids.disabled = false;
 	    this.form.formula.value = '';
 	    this.form.save.disabled = true;
 	    this.form.toMgi.disabled = true;
@@ -867,7 +854,7 @@ class ListEditor extends Component {
  	    this.form.ids.disabled = false;
 	}
 	else {
-	    let isValid = this.app.listFormulaEval.isValid(expr);
+	    let isValid = this.app.listManager.isValid(expr); // FIXME - reachover
 	    inp.classed("valid", isValid).classed("invalid", !isValid);
  	    this.form.ids.disabled = true;
 	}
@@ -905,46 +892,51 @@ class ListEditor extends Component {
 // ---------------------------------------------
 // Knows how to parse and evaluate a list formula (aka list expression).
 class ListFormulaEvaluator {
-    constructor (app) {
-	this.app = app;
+    constructor (listManager) {
+	this.listManager = listManager;
         this.parser = new ListExprParser();
     }
-    // Evaluates the expression and returns a list.
-    // Throws an exception if there's an error.
+    // Evaluates the expression and returns a Promise for the list of ids.
+    // If there is an error, the promise rejects with the error message.
     eval (expr) {
-	try {
-	    let ast = this.parser.parse(expr);
-	    let lm = this.app.listManager;
-	    let reach = (n) => {
-		if (typeof(n) === "string") {
-		    let lst = lm.get(n);
-		    return new Set(lst.ids);
+	 return new Promise(function(resolve, reject) {
+	     try {
+		let ast = this.parser.parse(expr);
+		let lm = this.listManager;
+		let reach = (n) => {
+		    if (typeof(n) === "string") {
+			let lst = lm.get(n);
+			if (!lst) throw "No such list: " + n;
+			return new Set(lst.ids);
+		    }
+		    else {
+			let l = reach(n.left);
+			let r = reach(n.right);
+			return l[n.op](r);
+		    }
 		}
-		else {
-		    let l = reach(n.left);
-		    let r = reach(n.right);
-		    return l[n.op](r);
-		}
+		let ids = reach(ast);
+		resolve(Array.from(ids));
 	    }
-	    let ids = reach(ast);
-	    return Array.from(ids);
-	}
-	catch (e) {
-	    alert("I'm terribly sorry, but there appears to be a problem with your list expression: " + e);
-	    throw e;
-	}
+	    catch (e) {
+		reject(e);
+	    }
+	 }.bind(this));
     }
-    // Checks the current expression and sets the valid/invalid class.
+    // Checks the current expression for syntactic and semantic validity and sets the 
+    // valid/invalid class accordingly. Semantic validity simply means all names in the
+    // expression are bound.
+    //
     isValid  (expr) {
 	try {
 	    // first check syntax
 	    let ast = this.parser.parse(expr);
-	    let lm  = this.app.listManager;  // FIXME - reachover
+	    let lm  = this.listManager; 
 	    // now check list names
 	    (function reach(n) {
 		if (typeof(n) === "string") {
 		    let lst = lm.get(n);
-		    if (!lst) throw "Unknown list: " + n
+		    if (!lst) throw "No such list: " + n
 		}
 		else {
 		    reach(n.left);
@@ -2405,7 +2397,6 @@ class MGVApp {
 	this.listManager.update();
 	//
 	this.listEditor = new ListEditor(this, '#listeditor');
-	this.listFormulaEval = new ListFormulaEvaluator(this);
 	//
 	this.translator     = new BTManager(this);
 	this.featureManager = new FeatureManager(this);

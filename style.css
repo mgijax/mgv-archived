@@ -336,6 +336,9 @@ label > i.material-icons {
     text-align: center;
     border-radius: 8px;
 }
+#listeditor [name="formulaeditor"] .button.listop[name="()"] {
+    font-size: 12px;
+}
 #listeditor [name="formulaeditor"] .button.listop:not([name="()"]) {
     font-size: 16px;
 }

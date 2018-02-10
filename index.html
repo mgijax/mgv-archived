@@ -51,22 +51,6 @@
 		<!-- All my lists -->
 		<div name="lists" class="flexcolumn"></div>
 
-		<!-- Hidden form for submitting IDs to MGI batch query -->
-		<form name="mgibatchform"
-		  method="POST" enctype="multipart/form-data"
-		  action="http://www.informatics.jax.org/batch/summary"
-		  target="_blank">
-		    <input type="hidden" name="idType" value="MGI" />
-		    <input type="hidden" name="ids" value="" />
-		</form>
-		<!-- Hidden form for submitting IDs to MouseMine -->
-		<form name="mousemineform"
-		  method="POST" 
-		  action="http://www.mousemine.org/mousemine/portal.do"
-		  target="_blank">
-		    <input type="hidden" name="class" value="SequenceFeature" />
-		    <input type="hidden" name="externalids" value="" />
-		</form>
 		<div name="tools" class="flexrow">
 		    <i name="newfromselection" class="material-icons button" title="Create list from current selection.">playlist_add</i>
 		    <i name="purge" class="material-icons button" title="Delete all lists.">delete_sweep</i>
@@ -96,7 +80,7 @@
 				    <span name="()" title="group" class="button listop">()</i>
 				 </div>
 				 <div class="flexrow">
-				     <i name="saveformula" title="" class="material-icons button">save</i>
+				     <i name="refresh" title="Run this puppy." class="material-icons button">sync</i>
 				     <i name="close" title="close" class="material-icons button">cancel</i>
 				 </div>
 			    </div>
@@ -229,6 +213,23 @@
     </div>
 
 
+    <!-- Hidden form for submitting IDs to MGI batch query -->
+    <form id="mgibatchform"
+      method="POST" enctype="multipart/form-data"
+      action="http://www.informatics.jax.org/batch/summary"
+      target="_blank">
+	<input type="hidden" name="idType" value="MGI" />
+	<input type="hidden" name="ids" value="" />
+    </form>
+
+    <!-- Hidden form for submitting IDs to MouseMine -->
+    <form id="mousemineform"
+      method="POST" 
+      action="http://www.mousemine.org/mousemine/portal.do"
+      target="_blank">
+	<input type="hidden" name="class" value="SequenceFeature" />
+	<input type="hidden" name="externalids" value="" />
+    </form>
 </div>    
 <script src="viewer.js"></script>
 </body>
