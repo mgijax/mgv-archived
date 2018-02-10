@@ -463,6 +463,17 @@ class ListManager extends Component {
 		this.update(newlist);
 	    });
 
+	// Button: combine lists: open list editor with formula editor open
+	this.root.select('.button[name="combine"]')
+	    .on("click", () => {
+		if (this.getNames().length === 0) {
+		    alert("No lists.");
+		    return;
+		}
+		let le = this.app.listEditor;
+		le.open();
+		le.openFormulaEditor();
+	    });
 	// Button: delete all lists (get confirmation first).
 	this.root.select('.button[name="purge"]')
 	    .on("click", () => {
@@ -635,20 +646,22 @@ class ListManager extends Component {
 	items
 	    .attr("name", lst=>lst.name)
 	    .on("click", function (lst) {
-		// if user clicks on a list entry while editing a list op expression,
-		// add this list's name to the expression at the current cursor position.
-		let le = self.app.listEditor; // FIXME reachover
-		if (le.isEditingFormula) {
+		if (d3.event.shiftKey) {
+		    let le = self.app.listEditor; // FIXME reachover
 		    let s = lst.name;
 		    let re = /[ =()+*-]/;
 		    if (s.search(re) >= 0)
-		        s = '"' + s + '"';
+			s = '"' + s + '"';
+		    if (!le.isEditingFormula) {
+		        le.open();
+			le.openFormulaEditor();
+		    }
 		    //
 		    le.addToListExpr(s+' ');
 		}
-		// otherwise, toggle this as the current list
+		// otherwise, set this as the current list
 		else 
-		    self.app.currentList = lst; // FIXME reachup
+		    self.app.currentList = lst; // FIXME reachover
 	    });
 	items.select('.button[name="edit"]')
 	    // edit: click 
@@ -805,6 +818,7 @@ class ListEditor extends Component {
 	    this.form.name.value = '';
 	    this.form.ids.value = '';
 	    this.form.ids.disabled = false;
+	    this.form.modified.value = '';
 	    this.form.formula.value = '';
 	    this.form.save.disabled = true;
 	    this.form.toMgi.disabled = true;
@@ -815,6 +829,7 @@ class ListEditor extends Component {
 	    this.form.ids.value = lst.ids.join('\n');
 	    this.form.formula.value = lst.formula || "";
 	    this.form.ids.disabled = this.form.formula.value.trim().length > 0;
+	    this.form.modified.value = lst.modified;
 	    this.form.save.disabled = false;
 	    this.form.toMgi.disabled 
 	      = this.form.toMouseMine.disabled 
@@ -835,6 +850,9 @@ class ListEditor extends Component {
     openFormulaEditor () {
 	this.root.classed("editingformula", true);
 	this.isEditingFormula = true;
+	let f = this.form.formula.value;
+	this.form.formula.focus();
+	setCaretPosition(this.form.formula, f.length);
     }
     closeFormulaEditor () {
 	this.root.classed("editingformula", false);

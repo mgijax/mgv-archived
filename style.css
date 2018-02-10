@@ -262,6 +262,13 @@ label > i.material-icons {
     color: red;
     font-weight: bold;
 }
+#mylists .button[name="combine"] {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+    border-radius: 12px;
+    text-align: center;
+}
 #mylists .button[name="purge"] {
 }
 #mylists .button[name="purge"]:hover {
@@ -284,6 +291,18 @@ label > i.material-icons {
 }
 #listeditor [name="editform"] label {
     font-size: 12px !important;
+}
+#listeditor [name="editform"] [name="title"] > .flexrow:first-child {
+    justify-content: space-between;
+}
+#listeditor [name="editform"] div[name="modified"] * {
+    font-size: 10px !important;
+}
+#listeditor [name="editform"] input[name="modified"] {
+    border: none;
+    width: 100%;
+    background-color: transparent;
+    font-size: smaller;
 }
 #listeditor [name="editform"] .button:hover {
     background-color: #2076b4;

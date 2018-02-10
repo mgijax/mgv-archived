@@ -52,7 +52,8 @@
 		<div name="lists" class="flexcolumn"></div>
 
 		<div name="tools" class="flexrow">
-		    <i name="newfromselection" class="material-icons button" title="Create list from current selection.">playlist_add</i>
+		    <i name="newfromselection" title="Create list from current selection." class="material-icons button">playlist_add</i>
+		    <span name="combine" title="Create list by combining other lists." class="button">&cup;</span>
 		    <i name="purge" class="material-icons button" title="Delete all lists.">delete_sweep</i>
 		</div>
 	    </div>
@@ -63,8 +64,9 @@
 		<form name="editform" class="flexcolumn">
 		    <!-- Name -->
 		    <div name="title" class="flexcolumn">
-		        <label>List:</label>
+			<label>List:</label>
 			<input name="name" placeholder="Name"></input>
+			<input name="modified" disabled></input>
 		    </div>
 		    <!-- Formula editor -->
 		    <div name="formulaeditor" class="formulaeditor flexcolumn">
@@ -80,7 +82,7 @@
 				    <span name="()" title="group" class="button listop">()</i>
 				 </div>
 				 <div class="flexrow">
-				     <i name="refresh" title="Run this puppy." class="material-icons button">sync</i>
+				     <i name="refresh" title="Run this puppy." class="material-icons button">play_circle_outline</i>
 				     <i name="close" title="close" class="material-icons button">cancel</i>
 				 </div>
 			    </div>
