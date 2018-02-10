@@ -716,7 +716,8 @@ class ListEditor extends Component {
 		if ("button" === t.tagName.toLowerCase()){
 		    d3.event.preventDefault();
 		    let f = this.form;
-		    let ids = f.ids.value.replace(/[,|]/g, ' ').trim().split(/\s+/);
+		    let s = f.ids.value.replace(/[,|]/g, ' ').trim();
+		    let ids = s ? s.split(/\s+/) : [];
 		    // save list
 		    if (t.name === "save") {
 			if (!this.list) return;
@@ -726,6 +727,10 @@ class ListEditor extends Component {
 		    // create new list
 		    else if (t.name === "new") {
 			let n = f.name.value.trim();
+			if (!n) {
+			   alert("Your list has no name and is very sad. Please give it a name and try again.");
+			   return
+			}
 		        this.list = this.app.listManager.createList(n, ids, f.formula.value);
 			this.app.listManager.update();
 		    }
