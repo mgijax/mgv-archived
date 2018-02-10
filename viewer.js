@@ -1,10 +1,13 @@
 (function () {
+
+PREFIX="apps.mgv.";
  
 // ---------------------------------------------
 // Interacts with localStorage.
+//
 class StorageManager {
     constructor (name, storage) {
-	this.name = name;
+	this.name = PREFIX+name;
 	this.storage = storage;
 	this.myDataObj = null;
 	//
