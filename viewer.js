@@ -363,7 +363,7 @@ class AuxDataManager {
     //----------------------------------------------
     featuresById        (qryString) { return this.featuresByLookup(qryString); }
     featuresByFunction  (qryString) { return this.featuresByOntologyTerm(qryString, "GOTerm"); }
-    featuresByPathway   (qryString) { return this.featuresByPathwayTerm(qryString); }
+    //featuresByPathway   (qryString) { return this.featuresByPathwayTerm(qryString); }
     featuresByPhenotype (qryString) { return this.featuresByOntologyTerm(qryString, "MPTerm"); }
     featuresByDisease   (qryString) { return this.featuresByOntologyTerm(qryString, "DOTerm"); }
     //----------------------------------------------
@@ -402,6 +402,7 @@ class QueryManager extends Component {
     initDom () {
 	this.select = this.root.select('[name="searchtype"]');
 	this.term   = this.root.select('[name="searchterm"]');
+	//
 	this.term.attr("placeholder", this.cfg[0].placeholder)
 	initOptList(this.select[0][0], this.cfg, c=>c.method, c=>c.label);
 	// When user changes the query type (selector), change the placeholder text.
@@ -411,21 +412,21 @@ class QueryManager extends Component {
 	    
 	});
 	// When user enters a search term, run a query
-	d3.select("#searchterm").on("change", function () {
-	    let term = this.value;
-	    this.value = "";
-	    let searchType  = d3.select("#searchtype")[0][0].value;
-	    //let lstName = searchType.replace(/featuresBy/,"").toLowerCase() + "= " + term;
+	this.term.on("change", () => {
+	    let term = this.term.property("value");
+	    this.term.property("value","");
+	    let searchType  = this.select.property("value");
 	    let lstName = term;
-	    d3.select("#mylists").classed("busy",true);
-	    self.auxDataManager[searchType](term)	// <- run the query
+	    d3.select("#mylists").classed("busy",true); // FIXME - reachover
+	    this.auxDataManager[searchType](term)	// <- run the query
 	      .then(feats => {
-		  self.listManager.createOrUpdate(lstName, feats.map(f => f.primaryIdentifier))
-		  self.listManager.update();
+		  // FIXME - reachover - this whole handler
+		  this.app.listManager.createList(lstName, feats.map(f => f.primaryIdentifier))
+		  this.app.listManager.update();
 		  //
-		  self.zoomView.hiFeats = {};
-		  feats.forEach(f => self.zoomView.hiFeats[f.mgiid] = f.mgiid);
-		  self.zoomView.highlight();
+		  this.app.zoomView.hiFeats = {};
+		  feats.forEach(f => this.app.zoomView.hiFeats[f.mgiid] = f.mgiid);
+		  this.app.zoomView.highlight();
 		  //
 		  d3.select("#mylists").classed("busy",false);
 	      });
@@ -2421,7 +2422,7 @@ class MGVApp {
 	    placeholder: "Gene Ontology (GO) terms/IDs"
 	},{
 	    method: "featuresByPhenotype",
-	    label: "...by mutant Phenotype",
+	    label: "...by mutant phenotype",
 	    template: "",
 	    placeholder: "Mammalian Phenotype (MP) terms/IDs"
 	},{
@@ -2483,7 +2484,8 @@ class MGVApp {
 	    .on("change", function () {
 		let coords = parseCoords(this.value);
 		if (! coords) {
-		    alert("Please enter a coordinate range formatted as 'chr:start..end'. For example, '5:10000000..50000000'.");
+		    alert("Please enter a coordinate range formatted as 'chr:start..end'. " +
+		          "For example, '5:10000000..50000000'.");
 		    this.value = "";
 		    return;
 		}
