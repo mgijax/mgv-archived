@@ -320,10 +320,6 @@ class FeatureManager {
 // AuxDataManager - knows how to query an external source (i.e., MouseMine) for genes
 // annotated to different ontologies. 
 class AuxDataManager {
-    constructor (app) {
-	this.app = app;
-    }
-
     //----------------------------------------------
     getAuxData (q) {
 	let format = 'jsonobjects';
@@ -394,6 +390,50 @@ class Component {
     }
 }
 // ---------------------------------------------
+class QueryManager extends Component {
+    constructor (app, elt, cfg) {
+        super(app, elt);
+	this.cfg = cfg;
+	this.auxDataManager = new AuxDataManager();
+	this.select = null;	// my <select> element
+	this.term = null;	// my <input> element
+	this.initDom();
+    }
+    initDom () {
+	this.select = this.root.select('[name="searchtype"]');
+	this.term   = this.root.select('[name="searchterm"]');
+	this.term.attr("placeholder", this.cfg[0].placeholder)
+	initOptList(this.select[0][0], this.cfg, c=>c.method, c=>c.label);
+	// When user changes the query type (selector), change the placeholder text.
+	this.select.on("change", () => {
+	    let opt = this.select.property("selectedOptions")[0];
+	    this.term.attr("placeholder", opt.__data__.placeholder)
+	    
+	});
+	// When user enters a search term, run a query
+	d3.select("#searchterm").on("change", function () {
+	    let term = this.value;
+	    this.value = "";
+	    let searchType  = d3.select("#searchtype")[0][0].value;
+	    //let lstName = searchType.replace(/featuresBy/,"").toLowerCase() + "= " + term;
+	    let lstName = term;
+	    d3.select("#mylists").classed("busy",true);
+	    self.auxDataManager[searchType](term)	// <- run the query
+	      .then(feats => {
+		  self.listManager.createOrUpdate(lstName, feats.map(f => f.primaryIdentifier))
+		  self.listManager.update();
+		  //
+		  self.zoomView.hiFeats = {};
+		  feats.forEach(f => self.zoomView.hiFeats[f.mgiid] = f.mgiid);
+		  self.zoomView.highlight();
+		  //
+		  d3.select("#mylists").classed("busy",false);
+	      });
+	})
+    }
+}
+
+// ---------------------------------------------
 // Maintains named lists of IDs. Lists may be temporary, lasting only for the session, or permanent,
 // lasting until the user clears the browser local storage area.
 //
@@ -463,7 +503,7 @@ class ListManager extends Component {
     uniquify (name) {
 	if (!this.has(name)) 
 	    return name;
-	for (let i = 0; ; i += 1) {
+	for (let i = 1; ; i += 1) {
 	    let nn = `${name}.${i}`;
 	    if (!this.has(nn))
 	        return nn;
@@ -695,7 +735,6 @@ class ListEditor extends Component {
 		    // create new list
 		    else if (t.name === "new") {
 			let n = f.name.value.trim();
-			if 
 		        this.list = this.app.listManager.createList(n, ids, f.formula.value);
 			this.app.listManager.update();
 		    }
@@ -2345,7 +2384,30 @@ class MGVApp {
 	//
 	this.translator     = new BTManager(this);
 	this.featureManager = new FeatureManager(this);
-	this.auxDataManager = new AuxDataManager(this);
+	//
+	let searchTypes = [{
+	    method: "featuresById",
+	    label: "...by symbol/ID",
+	    template: "",
+	    placeholder: "MGI symbols/IDs"
+	},{
+	    method: "featuresByFunction",
+	    label: "...by cellular function",
+	    template: "",
+	    placeholder: "Gene Ontology (GO) terms/IDs"
+	},{
+	    method: "featuresByPhenotype",
+	    label: "...by mutant Phenotype",
+	    template: "",
+	    placeholder: "Mammalian Phenotype (MP) terms/IDs"
+	},{
+	    method: "featuresByDisease",
+	    label: "...by disease implication",
+	    template: "",
+	    placeholder: "Disease Ontology (DO) terms/IDs"
+	}];
+	this.queryManager = new QueryManager(this, "#findgenes", searchTypes);
+	//
 
 	// Button: Gear icon to show/hide left column
 	d3.select("#header > .gear.button")
@@ -2445,42 +2507,6 @@ class MGVApp {
 	// initial highlighted features 
 	(cfg.highlight || []).forEach(h => this.zoomView.hiFeats[h]=h);
 
-	// ------------------------------
-	// ------------------------------
-	// Query box
-	//
-	let searchTypes = [{
-	    method: "featuresById",
-	    label: "...by ID/symbol",
-	    template: "",
-	    placeholder: "Comma-separated IDs/symbols"
-	}];
-	// When user changes the query type (selector), change the placeholder text.
-	d3.select("#searchtype")
-	    .on("change", function () {
-	        let stype = this.value;
-
-	    });
-	// When user enters a search term, run a query
-	d3.select("#searchterm").on("change", function () {
-	    let term = this.value;
-	    this.value = "";
-	    let searchType  = d3.select("#searchtype")[0][0].value;
-	    //let lstName = searchType.replace(/featuresBy/,"").toLowerCase() + "= " + term;
-	    let lstName = term;
-	    d3.select("#mylists").classed("busy",true);
-	    self.auxDataManager[searchType](term)
-	      .then(feats => {
-		  self.listManager.createOrUpdate(lstName, feats.map(f => f.primaryIdentifier))
-		  self.listManager.update();
-		  //
-		  self.zoomView.hiFeats = {};
-		  feats.forEach(f => self.zoomView.hiFeats[f.mgiid] = f.mgiid);
-		  self.zoomView.highlight();
-		  //
-		  d3.select("#mylists").classed("busy",false);
-	      });
-	})
 	// ------------------------------
 	// ------------------------------
 
@@ -2944,7 +2970,7 @@ class MGVApp {
 // ---------------------------------------------
 // (Re-)Initializes an option list.
 // Args:
-//   selector (string) CSS selector of the container <select> element.
+//   selector (string or Node) CSS selector of the container <select> element. Or the element itself.
 //   opts (list) List of option data objects. May be simple strings. May be more complex.
 //   value (function or null) Function to produce the <option> value from an opts item
 //       Defaults to the identity function (x=>x).
