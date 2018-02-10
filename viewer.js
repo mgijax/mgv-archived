@@ -794,6 +794,13 @@ class ListEditor extends Component {
 	// Button: close formula editor
 	this.root.select('[name="formulaeditor"] .button[name="close"]')
             .on("click", () => this.closeFormulaEditor() );
+	
+	// Clicking the box collapse button should clear the form
+	this.root.select(".button.collapse")
+	    .on("click.extra", () => {
+	        this.list = null;
+		this.closeFormulaEditor();
+	    });
     }
     parseIds (s) {
 	return s.replace(/[,|]/g, ' ').trim().split(/\s+/);
@@ -2376,6 +2383,23 @@ class MGVApp {
 	    "other_feature_type"
 	]);
 	//
+	d3.selectAll(".collapsible")
+	    .append("i")
+	    .attr("class","material-icons button collapse")
+	    .on("click.default", function () {
+		let p = d3.select(this.parentNode);
+		p.classed("closed", ! p.classed("closed"));
+	    });
+	//
+	d3.select("#featureDetails .button.collapse")
+	    .on("click.extra", () => this.updateFeatureDetails());
+
+	// 
+	d3.selectAll(".pagebox")
+	    .append("i")
+	    .attr("class","material-icons busy rotating")
+	    ;
+	//
 	this.listManager    = new ListManager(this, "#mylists");
 	this.listManager.update();
 	//
@@ -2486,23 +2510,6 @@ class MGVApp {
 		    });
 		}
 	    });
-	//
-	d3.selectAll(".collapsible")
-	    .append("i")
-	    .attr("class","material-icons button collapse")
-	    .on("click.default", function () {
-		let p = d3.select(this.parentNode);
-		p.classed("closed", ! p.classed("closed"));
-	    });
-	//
-	d3.select("#featureDetails .button.collapse")
-	    .on("click.extra", () => this.updateFeatureDetails());
-
-	// 
-	d3.selectAll(".pagebox")
-	    .append("i")
-	    .attr("class","material-icons busy rotating")
-	    ;
 
 	// initial highlighted features 
 	(cfg.highlight || []).forEach(h => this.zoomView.hiFeats[h]=h);
