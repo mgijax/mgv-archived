@@ -423,12 +423,14 @@ class QueryManager extends Component {
 	    this.auxDataManager[searchType](term)	// <- run the query
 	      .then(feats => {
 		  // FIXME - reachover - this whole handler
-		  this.app.listManager.createList(lstName, feats.map(f => f.primaryIdentifier))
-		  this.app.listManager.update();
+		  let lst = this.app.listManager.createList(lstName, feats.map(f => f.primaryIdentifier))
+		  this.app.listManager.update(lst);
 		  //
 		  this.app.zoomView.hiFeats = {};
 		  feats.forEach(f => this.app.zoomView.hiFeats[f.mgiid] = f.mgiid);
 		  this.app.zoomView.highlight();
+		  //
+		  this.app.currentList = lst;
 		  //
 		  d3.select("#mylists").classed("busy",false);
 	      });
@@ -650,6 +652,11 @@ class ListManager extends Component {
 	    .text("highlight_off")
 	    .attr("title","Delete this list.");
 
+	if (newitems[0][0]) {
+	    let last = newitems[0][newitems[0].length-1];
+	    last.scrollIntoView();
+	}
+
 	items
 	    .attr("name", lst=>lst.name)
 	    .on("click", function (lst) {
@@ -699,10 +706,9 @@ class ListManager extends Component {
 	items.exit().remove();
 	//
 	if (newlist) {
-	    // FIXME
-	    let nameelt = 
-	        d3.select(`#mylists [name="lists"] [name="${newlist.name}"] [name="name"]`)[0][0];
-            nameelt.focus();
+	    let lstelt = 
+	        d3.select(`#mylists [name="lists"] [name="${newlist.name}"]`)[0][0];
+            lstelt.scrollIntoView(false);
 	}
     }
 
@@ -735,7 +741,7 @@ class ListEditor extends Component {
 		    if (t.name === "save") {
 			if (!this.list) return;
 			this.list = this.app.listManager.updateList(this.list.name, f.name.value, ids, f.formula.value);
-			this.app.listManager.update();
+			this.app.listManager.update(this.list);
 		    }
 		    // create new list
 		    else if (t.name === "new") {
@@ -749,7 +755,7 @@ class ListEditor extends Component {
 			   return
 			}
 		        this.list = this.app.listManager.createList(n, ids, f.formula.value);
-			this.app.listManager.update();
+			this.app.listManager.update(this.list);
 		    }
 		    // clear form
 		    else if (t.name === "clear") {
