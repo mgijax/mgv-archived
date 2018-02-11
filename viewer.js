@@ -598,12 +598,17 @@ class ListManager extends Component {
         let lst = this.get(name);
 	delete this.name2list[name];
 	this._save();
+	if (lst === this.app.currentList) this.app.currentList = null;
+	if (lst === this.app.listEditor.list) this.app.listEditor.list = null;
 	return lst;
     }
     // delete all lists
     purge () {
         this.name2list = {}
 	this._save();
+	//
+	this.app.currentList = null;
+	this.app.listEditor.list = null; // FIXME - reachacross
     }
     // Returns true iff expr is valid, which means it is both syntactically correct 
     // and all mentioned lists exist.
@@ -683,7 +688,13 @@ class ListManager extends Component {
 	    .on("click", lst => {
 	        this.deleteList(lst.name);
 		this.update();
+
+		// Not sure why this is necessary here. But without it, the list item after the one being
+		// deleted here will receive a click event.
+		d3.event.stopPropagation();
+		//
 	    });
+
 	//
 	items.exit().remove();
 	//
