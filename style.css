@@ -370,6 +370,9 @@ label > i.material-icons {
 #header > label {
     text-align: center;
 }
+#header [name="mgilogo"] {
+    height: 40px;
+}
 
 #mgv {
     align-items: flex-start;
