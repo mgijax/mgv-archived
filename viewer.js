@@ -31,19 +31,18 @@ class StorageManager {
 	this._save();
     }
 }
-
+//
 class SessionStorageManager extends StorageManager {
     constructor (name) {
         super(name, window.sessionStorage);
     }
 }
-
+//
 class LocalStorageManager extends StorageManager {
     constructor (name) {
         super(name, window.localStorage);
     }
 }
-
 // ---------------------------------------------
 class Genome {
   constructor (cfg) {
@@ -649,7 +648,7 @@ class ListManager extends Component {
 	items
 	    .attr("name", lst=>lst.name)
 	    .on("click", function (lst) {
-		if (d3.event.shiftKey) {
+		if (d3.event.altKey) {
 		    let le = self.app.listEditor; // FIXME reachover
 		    let s = lst.name;
 		    let re = /[ =()+*-]/;
@@ -732,6 +731,10 @@ class ListEditor extends Component {
 			let n = f.name.value.trim();
 			if (!n) {
 			   alert("Your list has no name and is very sad. Please give it a name and try again.");
+			   return
+			}
+			else if (n.indexOf('"') >= 0) {
+			   alert("Oh dear, your list's name has a double quote character, and I'm afaraid that's not allowed. Please remove the '\"' and try again.");
 			   return
 			}
 		        this.list = this.app.listManager.createList(n, ids, f.formula.value);
@@ -1322,6 +1325,21 @@ class SVGView extends Component {
       this.setSize(width - r.x)
   }
 
+    //
+    drawText (x, y, lines, classes) {
+	let lineHeight = 14; // FIXME
+	if (typeof(lines) === "string") lines = [lines];
+	if (typeof(classes) === "string")
+	    classes = [classes];
+	else if (!classes)
+	    classes = [];
+        let content = lines.map((s,i) => {
+	    let cls = classes[i] || classes[classes.length-1] || "";
+	    return `<tspan x="${x}" y="${y + i*lineHeight}" class="${cls}">${s}</tspan>`;
+	}).join('');
+	this.title.html(content);
+    }
+
 } // end class SVGView
 
 // ---------------------------------------------
@@ -1340,7 +1358,6 @@ class GenomeView extends SVGView {
 	this.gLabels  = this.svgMain.append('g').attr("name", "labels");
 	this.gBrushes = this.svgMain.append('g').attr("name", "brushes");
 	this.title    = this.svgMain.append('text').attr("class", "title");
-	this.subTitle   = this.title.append('tspan').attr("class","subtitle");
     }
     setBrushCoords (coords) {
 	this.clearBrushes();
@@ -1486,19 +1503,15 @@ class GenomeView extends SVGView {
     }
 
     // ---------------------------------------------
-    // Args: 
-    //    title (string) main title. optional. if not provided, will use name of current ref genome
-    //    subtitle (string) optional subtitle.
-    drawTitle (title, subtitle) {
-	// Ref genome label
-	let tsp1 = `<tspan class="title">${title || this.app.rGenome.label}</tspan>`;
-	let tsp2 = `<tspan class="subtitle"> ${subtitle || ""}</tspan>`;
-	let html = `${tsp1}${tsp2}`;
-	this.title.html(html)
-	    .attr("x", this.width/2)
-	    .attr("y", this.height - 20);
+    drawTitle () {
+	let refg = this.app.rGenome.label;
+	let blockg = this.currBlocks ? this.currBlocks.comp.label : null;
+	let lst = this.app.currList ? this.app.currList.name : null;
+	let lines = [`${refg}${(blockg || lst) ? ', showing' : ''}`];
+	blockg && lines.push(`- synteny blocks vs ${blockg}`);
+	lst && lines.push(`- list "${lst}"`);
+	this.drawText( this.width/2, this.height-30, lines, ["title", "subtitle"] );
     }
-
     // ---------------------------------------------
     // Draws the outlines of synteny blocks of the ref genome vs.
     // the given genome.
@@ -1537,8 +1550,7 @@ class GenomeView extends SVGView {
 	    .classed("translocation", b => b.fromChr !== b.toChr)
 	    ;
 
-	let subt = `vs ${blockData.comp.label}`;
-	this.drawTitle(null, blockData.ref===blockData.comp ? null : subt);
+	this.drawTitle();
     }
 
     // ---------------------------------------------
@@ -2536,11 +2548,14 @@ class MGVApp {
 	// ------------------------------
 	// ------------------------------
 
-	// Things are all wired up. Now lets get some data.
+	// Things are all wired up. Now let's get some data.
 	// Start with the file of all the genomes.
 	d3tsv("./data/genomeList.tsv").then(function(data){
 	    // create Genome objects from the raw data.
 	    this.allGenomes   = data.map(g => new Genome(g));
+	    this.allGenomes.sort( (a,b) => {
+	        return a.label < b.label ? -1 : a.label > b.label ? +1 : 0;
+	    });
 	    // build a name->Genome index
 	    this.name2genome  = this.allGenomes
 	        .reduce((acc,g) => { acc[g.name] = g; return acc; }, {});
@@ -2849,6 +2864,7 @@ class MGVApp {
 		.then( feats => {
 		    //console.log("FEATS", feats);
 		    this.genomeView.drawTicks(feats);
+		    this.genomeView.drawTitle();
 		});
 	}
 	else {
@@ -2856,6 +2872,7 @@ class MGVApp {
 	    this.zoomView.update();
 	    //
 	    this.genomeView.drawTicks([]);
+	    this.genomeView.drawTitle();
 	}
     }
 
@@ -3007,7 +3024,7 @@ class MGVApp {
 //       Defaults to d=>False. Note that this function is only applied to new options.
 // Returns:
 //   The option list in a D3 selection.
-function initOptList( selector, opts, value, label, multi, selected ) {
+function initOptList(selector, opts, value, label, multi, selected) {
 
     // set up the functions
     let ident = d => d;
@@ -3032,12 +3049,6 @@ function initOptList( selector, opts, value, label, multi, selected ) {
         ;
     //
     os.exit().remove() ;
-    //
-    os.sort( (a,b) => {
-        let ta = label(a);
-	let tb = label(b);
-	return ta < tb ? -1 : ta > tb ? 1 : 0;
-    });
 
     //
     return s;

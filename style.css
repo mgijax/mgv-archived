@@ -266,7 +266,7 @@ label > i.material-icons {
     font-size: 24px;
     width: 24px;
     height: 24px;
-    border-radius: 12px;
+    border-radius: 6px;
     text-align: center;
 }
 #mylists .button[name="purge"] {
