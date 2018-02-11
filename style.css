@@ -367,6 +367,8 @@ label > i.material-icons {
 #header {
     justify-content: space-between;
     padding: 3px 12px;
+    background-color: #557f9e;
+    color: #eee;
 }
 #header > label {
     text-align: center;
