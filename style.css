@@ -370,6 +370,10 @@ label > i.material-icons {
     background-color: #557f9e;
     color: #eee;
 }
+#header .button:hover {
+    color :rgb(31, 119, 180);
+    background-color: white;
+}
 #header > label {
     text-align: center;
 }
@@ -387,8 +391,17 @@ label > i.material-icons {
 }
 
 #footer {
-    background-color: inherit;
+    background-color: #557f9e;
+    color: #eee;
     border: none;
+    justify-content: space-between;
+}
+#footer a:link,
+#footer a:visited {
+    color: white;
+}
+#footer a:hover {
+    color: gold;
 }
 
 .leftcolumn {
