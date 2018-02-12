@@ -375,6 +375,7 @@ label > i.material-icons {
 }
 #listeditor [name="formulaeditor"] [name="formula"] {
     outline-style: none;
+    outline-width: 2px;
 }
 #listeditor [name="formulaeditor"] [name="formula"].valid {
     outline-color: green;

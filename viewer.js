@@ -298,6 +298,7 @@ class FeatureManager {
 	    let feats = [];
 	    let seen = new Set();
 	    let addf = (f) => {
+		if (f.genome !== genome) return;
 		if (seen.has(f.id)) return;
 		seen.add(f.id);
 		feats.push(f);
@@ -869,6 +870,7 @@ class ListEditor extends Component {
 	      = this.form.toMouseMine.disabled 
 	        = (this.form.ids.value.trim().length === 0);
 	}
+	this.validateExpr();
     }
     clear () {
         this.list = null;
