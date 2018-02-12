@@ -455,6 +455,12 @@ class ListManager extends Component {
 	this.initDom();
     }
     initDom () {
+	// Button: show/hide warning message
+	this.root.select('.button.warning')
+	    .on('click', () => {
+	        let w = this.root.select('[name="message"]');
+		w.classed('showing', !w.classed('showing'));
+	    });
 	// Button: create list from current selection
 	this.root.select('.button[name="newfromselection"]')
 	    .on("click", () => {

@@ -17,6 +17,13 @@ a {
     text-decoration: none;
 }
 
+.material-icons.warning {
+    color: yellow;
+    background-color: #ccc;
+    font-size: 20px;
+    border-radius: 4px;
+}
+
 .brush > .extent {
     fill-opacity : 0.3;
     stroke : blue;
@@ -229,6 +236,13 @@ label > i.material-icons {
     overflow: auto;
 }
 
+#mylists [name="message"] {
+    display: none;
+}
+#mylists [name="message"].showing {
+    display: block;
+}
+
 #mylists .listInfo {
     justify-content: space-between;
     margin: 0px;
@@ -285,6 +299,7 @@ label > i.material-icons {
 #mylists [name="tools"] {
     border-top: thin solid #555;
     justify-content: space-between;
+    align-items: flex-start;
 }
 
 
