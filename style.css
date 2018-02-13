@@ -226,6 +226,9 @@ label > i.material-icons {
 #featureDetails table > tr:first-child {
     font-weight: bold;
 }
+#featureDetails table td {
+    overflow: hidden;
+}
 
 /* -----------------------------------------
  * mylists

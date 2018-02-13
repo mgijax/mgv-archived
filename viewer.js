@@ -2059,8 +2059,8 @@ class ZoomView extends SVGView {
 	let offset = []; // offset of start  position of next block, by strip index (0===ref)
 	fbs.each( (b,i,j) => { // b=block, i=index within strip, j=strip index
 	    let fsx = this.xscale(b.fStart);
-	    //let x1 = i === 0 ? fsx : offset[j];
-	    let x1 = i === 0 ? fsx : Math.max(fsx, offset[j]);
+	    let x1 = i === 0 ? fsx : offset[j];
+	    //let x1 = i === 0 ? fsx : Math.max(fsx, offset[j]);
 	    let x2 = x1 + ppb * (b.end - b.start + 1)
 	    let delta = 0; // a hook for adjusting range (for line-em-up function)
 	    b.xscale = d3.scale.linear().domain([b.start, b.end]).range([x1+delta, x2+delta]);
@@ -2811,12 +2811,12 @@ class MGVApp {
 	//
 	let colHeaders = [
 	    // columns headers and their % widths
-	    ["Genome"     ,10],
+	    ["Genome"     ,9],
 	    ["MGP id"     ,17],
-	    ["Type"       ,12.5],
-	    ["BioType"    ,12.5],
+	    ["Type"       ,10.5],
+	    ["BioType"    ,18.5],
 	    ["Coords"     ,18],
-	    ["Length"     ,10],
+	    ["Length"     ,7],
 	    ["MGI id"     ,10],
 	    ["MGI symbol" ,10]
 	];
