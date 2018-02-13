@@ -245,7 +245,17 @@ class FeatureManager {
     // are in the cache. Returns a promise that resolves to true when the condition is met.
     _ensureFeaturesById (genome, ids) {
 	// subtract ids of features already in the cache
-	let needids = ids.filter(i => !(i in this.featCache || i in this.mgiCache));
+	let needids = ids.filter(i => {
+	    if (i in this.featCache) {
+	        return false;
+	    }
+	    else if (i in this.mgiCache) {
+		let fs = this.mgiCache[i].filter(f => f.genome === genome);
+		return fs.length === 0;
+	    }
+	    else
+		return true;
+	});
 	let dataString = `genome=${genome.name}&ids=${needids.join("+")}`;
 	let url = "./bin/getFeatures.cgi?" + dataString;
 	let self = this;
@@ -767,7 +777,6 @@ class ListEditor extends Component {
 		    // clear form
 		    else if (t.name === "clear") {
 		        this.list = null;
-			this.closeFormulaEditor();
 		    }
 		    // forward to MGI
 		    else if (t.name === "toMgi") {
@@ -2049,12 +2058,8 @@ class ZoomView extends SVGView {
 	// create the appropriate x scales.
 	let offset = []; // offset of start  position of next block, by strip index (0===ref)
 	fbs.each( (b,i,j) => { // b=block, i=index within strip, j=strip index
-	    // This one scales each comp block to be the same width as its ref range.
-	    // let x1 = this.xscale(b.fStart);
-	    // let x2 = this.xscale(b.fEnd);
-	    //
-	    // This one lets each comp block be its 'actual' width
 	    let fsx = this.xscale(b.fStart);
+	    //let x1 = i === 0 ? fsx : offset[j];
 	    let x1 = i === 0 ? fsx : Math.max(fsx, offset[j]);
 	    let x2 = x1 + ppb * (b.end - b.start + 1)
 	    let delta = 0; // a hook for adjusting range (for line-em-up function)
@@ -2887,7 +2892,6 @@ class MGVApp {
 	    // show this list as tick marks in the genome view
 	    this.featureManager.getFeaturesById(this.rGenome, lst.ids)
 		.then( feats => {
-		    //console.log("FEATS", feats);
 		    this.genomeView.drawTicks(feats);
 		    this.genomeView.drawTitle();
 		});
