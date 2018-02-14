@@ -1,0 +1,29 @@
+{
+    "name": "mgv",
+    "version": "0.0.1",
+    "description": "MGV is a Multi-Genome Viewer (a kind of synteny browser)",
+    "author": "Joel Richardson <joel.richardson@jax.org>",
+    "scripts": {
+        "watch": "webpack --watch",
+        "build": "webpack"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/JoelRichardson/mgv"
+    },
+    "bugs": {
+        "url": "https://github.com/JoelRichardson/mgv/issues"
+    },
+    "keywords": [
+        "bioinformatics",
+        "genome",
+        "browser",
+        "synteny"
+    ],
+    "dependencies": {
+        "d3": "3.2.4",
+        "webpack": "^3.11.0"
+    },
+    "devDependencies": {},
+    "license": "MIT"
+}
