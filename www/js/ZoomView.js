@@ -73,12 +73,13 @@ class ZoomView extends SVGView {
 		    this.timeout = window.setTimeout(function(){ this.app.callback(); }.bind(this), 1000);
 		    this.highlight();
 		}
-		else
+		else if (!d3.event.shiftKey)
 		    this.highlight(f);
 	}.bind(this);
 	//
 	let fMouseOutHandler = function(f) {
-		this.highlight();
+	    if (!d3.event.shiftKey)
+		this.highlight(); 
 	}.bind(this);
 	// Background click in zoom view = unselect all.
 	this.svg
@@ -712,10 +713,12 @@ class ZoomView extends SVGView {
 	    return s;
 	})
 	.on("mouseover", (p) => {
-	    this.highlight(p[0]);
+	    if (!d3.event.shiftKey)
+	        this.highlight(p[0]);
 	})
 	.on("mouseout",  (p) => {
-	    this.highlight();
+	    if (!d3.event.shiftKey)
+	        this.highlight();
 	});
 
     }
