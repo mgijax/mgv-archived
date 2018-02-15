@@ -163,7 +163,13 @@ class GenomeView extends SVGView {
     // ---------------------------------------------
     drawTitle () {
 	let refg = this.app.rGenome.label;
-	let blockg = this.currBlocks ? this.currBlocks.comp.label : null;
+	let blockg = this.currBlocks ? 
+	    this.currBlocks.comp !== this.app.rGenome ?
+	        this.currBlocks.comp.label
+		:
+		null
+	    :
+	    null;
 	let lst = this.app.currList ? this.app.currList.name : null;
 	let lines = [`${refg}${(blockg || lst) ? ', showing' : ''}`];
 	blockg && lines.push(`- synteny blocks vs ${blockg}`);

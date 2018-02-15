@@ -1,17 +1,14 @@
 import { parseCoords, formatCoords, d3tsv, initOptList, same } from './utils';
-import { SessionStorageManager, LocalStorageManager } from './StorageManager';
-import { Genome } from './Genome';
-import { Feature } from './Feature';
-import { FeatureManager } from './FeatureManager';
-import { Component } from './Component';
-import { QueryManager } from './QueryManager';
-import { ListManager } from './ListManager';
-import { ListEditor } from './ListEditor';
-import { BlockTranslator } from './BlockTranslator';
-import { BTManager } from './BTManager';
-import { GenomeView } from './GenomeView';
-import { ZoomView } from './ZoomView';
-import { FacetManager } from './FacetManager';
+import { Genome }          from './Genome';
+import { FeatureManager }  from './FeatureManager';
+import { QueryManager }    from './QueryManager';
+import { ListManager }     from './ListManager';
+import { ListEditor }      from './ListEditor';
+import { FacetManager }    from './FacetManager';
+import { BTManager }       from './BTManager';
+import { GenomeView }      from './GenomeView';
+import { ZoomView }        from './ZoomView';
+
 // ---------------------------------------------
 class MGVApp {
     constructor (cfg) {
