@@ -7,6 +7,7 @@ import { ListEditor }      from './ListEditor';
 import { FacetManager }    from './FacetManager';
 import { BTManager }       from './BTManager';
 import { GenomeView }      from './GenomeView';
+import { FeatureDetails }  from './FeatureDetails';
 import { ZoomView }        from './ZoomView';
 
 // ---------------------------------------------
@@ -18,11 +19,12 @@ class MGVApp {
 	//
 	this.callback = (cfg.oncontextchange || function(){});
 	//
-	this.name2genome = {}; // map from genome name -> genome data obj
+	this.name2genome = {};  // map from genome name -> genome data obj
 	this.label2genome = {}; // map from genome label -> genome data obj
 	//
-	this.rGenome = null; // thereference genome
-	this.cGenomes = []; // comparison genomes
+	this.allGenomes = [];   // list of all genomes
+	this.rGenome = null;    // the reference genome
+	this.cGenomes = [];     // comparison genomes
 	this.coords = { chr:"1", start:1, end:10000000 }; // current coordinates
 	//
 	this.dur = 250;         // anomation duration
@@ -30,10 +32,14 @@ class MGVApp {
 				// (zooming in uses 1/this amount)
 	this.defaultPan  = 0.15;// fraction of current range width
 	//
-	this.allGenomes = []; // list of all genome names
+	// Initial coordinates
+	let startingCoords = parseCoords(formatCoords(cfg) || "1:10000000..20000000");
 	//
-	this.genomeView = new GenomeView(this, "#genomeView", 800, 250, this);
-	this.zoomView   = new ZoomView  (this, "#zoomView", 800, 250, this);
+	this.genomeView = new GenomeView(this, "#genomeView", 800, 250);
+	this.zoomView   = new ZoomView  (this, "#zoomView", 800, 250, startingCoords, cfg.highlight);
+        //
+	this.featureDetails = new FeatureDetails(this, "#featureDetails");
+
 	this.cscale = d3.scale.category10().domain([
 	    "protein_coding_gene",
 	    "pseudogene",
@@ -50,10 +56,6 @@ class MGVApp {
 		let p = d3.select(this.parentNode);
 		p.classed("closed", ! p.classed("closed"));
 	    });
-	//
-	d3.select("#featureDetails .button.collapse")
-	    .on("click.extra", () => this.updateFeatureDetails());
-
 	// 
 	d3.selectAll(".pagebox")
 	    .append("i")
@@ -100,13 +102,6 @@ class MGVApp {
 		this.resize()
 	    });
 	
-	// Create context menu. Only one command so far...
-	this.zoomView.initContextMenu([{
-            label: "MGI SNPs", 
-	    icon: "open_in_new",
-	    tooltip: "Get SNPs from MGI for the current strains in the current region. (Some strains not available.)",
-	    handler: ()=> this.linkToMgiSnpReport()
-	}]);
 	//
 	// -------------------------------------------------------------------
 	// Facets
@@ -135,44 +130,6 @@ class MGVApp {
 	    self.zoomView.highlight();
 	});
 
-	// Initial coordinates
-	let startingCoords = formatCoords(cfg);
-	d3.select("#zoomCoords")
-	    .call(zcs => zcs[0][0].value = startingCoords || "1:10000000..20000000")
-	    .on("change", function () {
-		let coords = parseCoords(this.value);
-		if (! coords) {
-		    alert("Please enter a coordinate range formatted as 'chr:start..end'. " +
-		          "For example, '5:10000000..50000000'.");
-		    this.value = "";
-		    return;
-		}
-		self.setContext(coords);
-	    });
-	// 
-	d3.select("#zoomWSize")
-	    .on("change", function() {
-	        let ws = parseInt(this.value);
-		let c = self.zoomView.coords;
-		if (isNaN(ws) || ws < 100) {
-		    alert("Invalid window size. Please enter an integer >= 100.");
-		    this.value = Math.round(c.end - c.start + 1);
-		}
-		else {
-		    let mid = (c.start + c.end) / 2;
-		    let news = Math.round(mid - ws/2);
-		    let newe = news + ws - 1;
-		    self.setContext({
-		        chr: c.chr,
-			start: news,
-			end: newe
-
-		    });
-		}
-	    });
-
-	// initial highlighted features 
-	(cfg.highlight || []).forEach(h => this.zoomView.hiFeats[h]=h);
 
 	// ------------------------------
 	// ------------------------------
@@ -235,6 +192,9 @@ class MGVApp {
 	    this.resize( cfg.width, cfg.height );
 
 	}.bind(this));
+    }
+    //----------------------------------------------
+    initDom () {
     }
     //----------------------------------------------
     showBlocks (comp) {
@@ -379,99 +339,6 @@ class MGVApp {
 	let coords = `chr=${c.chr}&start=${c.start}&end=${c.end}`;
 	let hls = `highlight=${c.highlight.join("+")}`;
 	return `${ref}&${comps}&${coords}&${hls}`;
-    }
-    //----------------------------------------------
-    //
-    updateFeatureDetails (f) {
-	// if called with no args, update using the previous feature
-	f = f || this.lastFeature;
-	if (!f) {
-	   // fallback. take the first highlighted.
-	   let r = this.zoomView.svgMain.select("rect.feature.highlight")[0][0];
-	   // fallback. take the first feature
-	   if (!r) r = this.zoomView.svgMain.select("rect.feature")[0][0];
-	   if (r) f = r.__data__;
-	}
-	// remember
-        if (!f) throw "Cannot update feature details. No feature.";
-	this.lastFeature = f;
-
-	// list of features to show in details area.
-	// the given feature and all equivalents in other genomes.
-	let flist = [f];
-	if (f.mgiid) {
-	    flist = this.featureManager.getCachedFeaturesByMgiId(f.mgiid);
-	}
-	// Got the list. Now order it the same as the displayed genomes
-	// build index of genome name -> feature in flist
-	let ix = flist.reduce((acc,f) => { acc[f.genome.name] = f; return acc; }, {})
-	let genomeOrder = ([this.rGenome].concat(this.cGenomes));
-	flist = genomeOrder.map(g => ix[g.name] || null);
-	//
-	let colHeaders = [
-	    // columns headers and their % widths
-	    ["Genome"     ,9],
-	    ["MGP id"     ,17],
-	    ["Type"       ,10.5],
-	    ["BioType"    ,18.5],
-	    ["Coords"     ,18],
-	    ["Length"     ,7],
-	    ["MGI id"     ,10],
-	    ["MGI symbol" ,10]
-	];
-	//
-	let fds = d3.select('#featureDetails');
-	// In the closed state, only show the header and the row for the passed feature
-	if (fds.classed('closed'))
-	    flist = flist.filter( (ff, i) => ff === f );
-	// Draw the table
-	let t = d3.select('#featureDetails > table');
-	let rows = t.selectAll('tr').data( [colHeaders].concat(flist) );
-	rows.enter().append('tr')
-	  .on("mouseenter", (f,i) => i !== 0 && this.zoomView.highlight(f, true))
-	  .on("mouseleave", (f,i) => i !== 0 && this.zoomView.highlight());
-	      
-	rows.exit().remove();
-	rows.classed("highlight", (ff, i) => (i !== 0 && ff === f));
-	//
-	// Given a feature, returns a list of strings for populating a table row.
-	// If i===0, then f is not a feature, but a list columns names+widths.
-	// 
-	let cellData = function (f, i) {
-	    if (i === 0) {
-		return f;
-	    }
-	    let cellData = [ genomeOrder[i-1].label, ".", ".", ".", ".", ".", ".", "." ];
-	    // f is null if it doesn't exist for genome i 
-	    if (f) {
-		let link = "";
-		let mgiid = f.mgiid || "";
-		if (mgiid) {
-		    let url = `http://www.informatics.jax.org/accession/${mgiid}`;
-		    link = `<a target="_blank" href="${url}">${mgiid}</a>`;
-		}
-		cellData = [
-		    f.genome.label,
-		    f.mgpid,
-		    f.type,
-		    f.biotype,
-		    `${f.chr}:${f.start}..${f.end} (${f.strand})`,
-		    `${f.end - f.start + 1} bp`,
-		    link || mgiid,
-		    f.symbol
-		];
-	    }
-	    //return cellData.map( d => `<td>${d}</td>` ).join('');
-	    return cellData;
-	};
-	let cells = rows.selectAll("td")
-	    .data((f,i) => cellData(f,i));
-	cells.enter().append("td");
-	cells.exit().remove();
-	cells.html((d,i,j) => {
-	    return j === 0 ? d[0] : d
-	})
-	.style("width", (d,i,j) => j === 0 ? `${d[1]}%` : null);
     }
 
     //----------------------------------------------

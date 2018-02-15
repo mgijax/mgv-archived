@@ -5,7 +5,7 @@ import { formatCoords } from './utils';
 // ---------------------------------------------
 class ZoomView extends SVGView {
     //
-    constructor (app, elt, width, height) {
+    constructor (app, elt, width, height, initialCoords, initialHi) {
       super(app, elt, width, height);
       //
       this.minSvgHeight = 250;
@@ -17,8 +17,10 @@ class ZoomView extends SVGView {
       this.stripHeight = 70;    // height per genome in the zoom view
       this.stripGap = 20;	// space between strips
       //
-      this.coords = null;	// curr zoom view coords { chr, start, end }
-      this.hiFeats = {};	// IDs of Features we're highlighting. May be mgpid  or mgiId
+      this.coords = initialCoords;// curr zoom view coords { chr, start, end }
+      // IDs of Features we're highlighting. May be mgpid  or mgiId
+      // hiFeats is an obj whose keys are the IDs
+      this.hiFeats = (initialHi || []).reduce( (a,v) => { a[v]=v; return a; }, {} );
       this.svgMain.append("g")
         .attr("class","fiducials");
       this.svgMain.append("g")
@@ -51,6 +53,14 @@ class ZoomView extends SVGView {
 	r.select("#panRightMore").on("click",
 	    () => { a.pan(+5*a.defaultPan) });
 
+	// Create context menu. Only one command so far...
+	this.initContextMenu([{
+            label: "MGI SNPs", 
+	    icon: "open_in_new",
+	    tooltip: "Get SNPs from MGI for the current strains in the current region. (Some strains not available.)",
+	    handler: ()=> this.app.linkToMgiSnpReport()
+	}]);
+	//
 	//
 	let fSelect = function (f, shift, preserve) {
 	    let id = f.mgiid || f.mgpid;
@@ -123,6 +133,41 @@ class ZoomView extends SVGView {
 	      let bb = d3.select(this)[0][0].getBoundingClientRect();
 	      self.showContextMenu(cx-bb.left,cy-bb.top);
 	  });
+	// zoom coordinates box
+	this.root.select("#zoomCoords")
+	    .call(zcs => zcs[0][0].value = formatCoords(this.coords))
+	    .on("change", function () {
+		let coords = parseCoords(this.value);
+		if (! coords) {
+		    alert("Please enter a coordinate range formatted as 'chr:start..end'. " +
+		          "For example, '5:10000000..50000000'.");
+		    this.value = "";
+		    return;
+		}
+		self.app.setContext(coords);
+	    });
+	// zoom window size box
+	this.root.select("#zoomWSize")
+	    .on("change", function() {
+	        let ws = parseInt(this.value);
+		let c = self.coords;
+		if (isNaN(ws) || ws < 100) {
+		    alert("Invalid window size. Please enter an integer >= 100.");
+		    this.value = Math.round(c.end - c.start + 1);
+		}
+		else {
+		    let mid = (c.start + c.end) / 2;
+		    let news = Math.round(mid - ws/2);
+		    let newe = news + ws - 1;
+		    self.app.setContext({
+		        chr: c.chr,
+			start: news,
+			end: newe
+
+		    });
+		}
+	    });
+
     }
     //----------------------------------------------
     // Args:
@@ -615,7 +660,8 @@ class ZoomView extends SVGView {
 	    data.push({ fid: k, rects: pairs, cls: (currFeat && currFeat.id === k ? 'current' : '') });
 	}
 	this.drawFiducials(data, currFeat);
-	this.app.updateFeatureDetails(currFeat);
+	// FIXME: reachover
+	this.app.featureDetails.update(currFeat);
     }
 
     //----------------------------------------------
