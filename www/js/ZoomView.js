@@ -597,6 +597,7 @@ class ZoomView extends SVGView {
 	      // 
 	      d3.select(this)
 		  .classed("highlight", hl)
+		  .classed("current", hl && currFeat && this.__data__.id === currFeat.id)
 		  .classed("extra", pulseCurrent && ff === currFeat)
 	      return hl;
 	  })
@@ -712,6 +713,7 @@ class ZoomView extends SVGView {
 	    //
 	    return s;
 	})
+	// mousing over the fiducial highlights (as if the user had moused over the feature itself)
 	.on("mouseover", (p) => {
 	    if (!d3.event.shiftKey)
 	        this.highlight(p[0]);

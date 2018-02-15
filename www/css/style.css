@@ -538,6 +538,9 @@ rect.feature.highlight {
     outline-width: 2px;
     outline-color: #34ff9a;
 }
+rect.feature.highlight.current {
+    outline-color: #ffff00;
+}
 rect.feature.highlight.extra {
     outline-width: 6px;
     animation: blinker 1s linear infinite;

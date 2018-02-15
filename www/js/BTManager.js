@@ -47,28 +47,21 @@ class BTManager {
 	// We'll try one and if that's not it, then try the other.
 	// (And if THAT's not it, then cry a river...)
 	let self = this;
-	console.log("Trying:", fn1);
 	return d3tsv(fn1)
 	  .then(function(blocks){
-              console.log("Found:", fn1);
 	      // yup, it was A-B
 	      self.registerBlocks(fn1, aGenome, bGenome, blocks);
 	      return blocks
 	  })
 	  .catch(function(e){
-	      console.log("Caught: ", e);
-	      console.log("Trying:", fn2);
 	      console.log(`INFO: Disregard that 404 message! ${fn1} was not found. Trying ${fn2}.`);
 	      return d3tsv(fn2)
 		  .then(function(blocks){
-		      console.log("Found:", fn2);
 		      // nope, it was B-A
 		      self.registerBlocks(fn2, bGenome, aGenome, blocks);
 		      return blocks
 		  })
 		  .catch(function(e){
-		      console.log("Not found:", fn2);
-		      console.log("Caught: ", e);
 		      console.log('But THAT 404 message is a problem.');
 		      throw `Cannot get block file for this genome pair: ${aGenome.name} ${bGenome.name}.\n(Error=${e})`;
 		  });
