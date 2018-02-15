@@ -83,12 +83,12 @@ class ZoomView extends SVGView {
 		    this.timeout = window.setTimeout(function(){ this.app.callback(); }.bind(this), 1000);
 		    this.highlight();
 		}
-		else if (!d3.event.shiftKey)
+		else if (!d3.event.ctrlKey)
 		    this.highlight(f);
 	}.bind(this);
 	//
 	let fMouseOutHandler = function(f) {
-	    if (!d3.event.shiftKey)
+	    if (!d3.event.ctrlKey)
 		this.highlight(); 
 	}.bind(this);
 	// Background click in zoom view = unselect all.
@@ -761,11 +761,11 @@ class ZoomView extends SVGView {
 	})
 	// mousing over the fiducial highlights (as if the user had moused over the feature itself)
 	.on("mouseover", (p) => {
-	    if (!d3.event.shiftKey)
+	    if (!d3.event.ctrlKey)
 	        this.highlight(p[0]);
 	})
 	.on("mouseout",  (p) => {
-	    if (!d3.event.shiftKey)
+	    if (!d3.event.ctrlKey)
 	        this.highlight();
 	});
 

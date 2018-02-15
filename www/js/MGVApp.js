@@ -31,9 +31,21 @@ class MGVApp {
 	this.defaultZoom = 2;	// multiplier of current range width. Must be >= 1. 1 == no zoom.
 				// (zooming in uses 1/this amount)
 	this.defaultPan  = 0.15;// fraction of current range width
-	//
 	// Initial coordinates
 	let startingCoords = parseCoords(formatCoords(cfg) || "1:10000000..20000000");
+	//
+	d3.selectAll(".collapsible")
+	    .append("i")
+	    .attr("class","material-icons button collapse")
+	    .on("click.default", function () {
+		let p = d3.select(this.parentNode);
+		p.classed("closed", ! p.classed("closed"));
+	    });
+	// 
+	d3.selectAll(".pagebox")
+	    .append("i")
+	    .attr("class","material-icons busy rotating")
+	    ;
 	//
 	this.genomeView = new GenomeView(this, "#genomeView", 800, 250);
 	this.zoomView   = new ZoomView  (this, "#zoomView", 800, 250, startingCoords, cfg.highlight);
@@ -49,18 +61,6 @@ class MGVApp {
 	    "other_feature_type"
 	]);
 	//
-	d3.selectAll(".collapsible")
-	    .append("i")
-	    .attr("class","material-icons button collapse")
-	    .on("click.default", function () {
-		let p = d3.select(this.parentNode);
-		p.classed("closed", ! p.classed("closed"));
-	    });
-	// 
-	d3.selectAll(".pagebox")
-	    .append("i")
-	    .attr("class","material-icons busy rotating")
-	    ;
 	//
 	this.listManager    = new ListManager(this, "#mylists");
 	this.listManager.update();

@@ -10,7 +10,7 @@ class FeatureDetails extends Component {
     //----------------------------------------------
     initDom () {
 	//
-	d3.select(".button.collapse")
+	this.root.select (".button.collapse")
 	    .on("click.extra", () => this.update());
     }
 
