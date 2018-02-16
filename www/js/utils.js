@@ -15,9 +15,12 @@
 //   multi (boolean) Specifies if the list support multiple selections. (default = false)
 //   selected (function or null) Function to determine if a given option is selectd.
 //       Defaults to d=>False. Note that this function is only applied to new options.
+//   sortBy (function) Optional. If provided, a comparison function to use for sorting the options.
+//   	 The comparison function is passes the data objects corresponding to two options and should
+//   	 return -1, 0 or +1. If not provided, the option list will have the same sort order as the opts argument.
 // Returns:
 //   The option list in a D3 selection.
-function initOptList(selector, opts, value, label, multi, selected) {
+function initOptList(selector, opts, value, label, multi, selected, sortBy) {
 
     // set up the functions
     let ident = d => d;
@@ -42,6 +45,14 @@ function initOptList(selector, opts, value, label, multi, selected) {
         ;
     //
     os.exit().remove() ;
+
+    // sort the results
+    if (!sortBy) sortBy = (a,b) => {
+    	let ai = opts.indexOf(a);
+	let bi = opts.indexOf(b);
+	return ai - bi;
+    }
+    os.sort(sortBy);
 
     //
     return s;
