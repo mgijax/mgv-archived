@@ -59,11 +59,15 @@ class GenomeView extends SVGView {
 
     //----------------------------------------------
     getX (chr) {
-	return this.app.rGenome.xscale(chr);
+	let x = this.app.rGenome.xscale(chr);
+	if (isNaN(x)) throw "x is NaN"
+	return x;
     }
     //----------------------------------------------
     getY (pos) {
-	return this.app.rGenome.yscale(pos);
+	let y = this.app.rGenome.yscale(pos);
+	if (isNaN(y)) throw "y is NaN"
+	return y;
     }
     
     //----------------------------------------------
@@ -182,6 +186,7 @@ class GenomeView extends SVGView {
     // Passing null erases all synteny blocks.
     // Args:
     //    blockData == { ref:Genome, comp:Genome, blocks: list of synteny blocks }
+    //    Each sblock === { blockId:int, ori:+/-, fromChr, fromStart, fromEnd, toChr, toStart, toEnd }
     drawBlocks (blockData) {
 	//
 	this.currBlocks = blockData;
@@ -209,7 +214,7 @@ class GenomeView extends SVGView {
 	    .attr("x", b => this.getX(b.fromChr) + bwidth/2 )
 	    .attr("y", b => this.getY(b.fromStart))
 	    .attr("width", bwidth)
-	    .attr("height", b => this.getY(b.fromEnd - b.fromStart + 1))
+	    .attr("height", b => Math.max(0,this.getY(b.fromEnd - b.fromStart + 1)))
 	    .classed("inversion", b => b.ori === "-")
 	    .classed("translocation", b => b.fromChr !== b.toChr)
 	    ;
