@@ -95,6 +95,10 @@ class SyntenyBlockGenerator:
 	self.closeGaps()
         self.writeBlocks()
 
+    def log (self, s) :
+        sys.stderr.write(s)
+	sys.stderr.write('\n')
+
     def initArgParser (self):
         """
         Sets up the parser for the command line args.
@@ -150,30 +154,31 @@ class SyntenyBlockGenerator:
     def readFeatureFile (self, fname) :
         """
         Reads a tsv file of features. Returns list of gff3.Feature objects.
-	Each row has these fields: chromosome, start, end, strand, type, biotype, id, mgiid, symbol
+	Each row has these fields: 
+	  chromosome, start, end, strand, contig, lane, type, biotype, id, mgiid, symbol
         """
 	feats = []
 	for r in self.readTsv(fname):
 	    if r[0] == "chromosome":
 	        continue
-	    idval = r[6] if r[7] == "." else r[7]
+	    idval = r[8] if r[9] == "." else r[9]
 	    f = gff3.Feature([
-	        r[0],
+	        r[0],	# FIXME: using column numbers is brittle
 		".",
-		r[4],
+		r[6],
 		r[1],
 		r[2],
 		".",
 		r[3],
 		".",
 		{ "ID" : idval,
-		  "bioType": r[5],
-		  "mgpId" : r[6]
+		  "bioType": r[7],
+		  "mgpId" : r[8]
 		}
 	    ])
-	    if r[7] != ".":
-	        f.attributes["mgiId"] = r[7]
-		f.attributes["mgiSymbol"] = r[8]
+	    if r[9] != ".":
+	        f.attributes["mgiId"] = r[9]
+		f.attributes["mgiSymbol"] = r[10]
 	    feats.append(f);
         return feats
 
@@ -313,17 +318,6 @@ class SyntenyBlockGenerator:
               }
             self.pairs.append(pair)
         #
-        '''
-        for b in self.B:
-            bid = b['ID']
-            if not bid in self.b2a:
-                # b outer join row
-                pair = {
-                    'a': self.INSERTED,
-                    'b': b
-                }
-        '''
-
         # the join step may cause genes to drop out, and it is important that the
         # sequence is unbroken for each genome
         self.renumber()
@@ -374,7 +368,7 @@ class SyntenyBlockGenerator:
             pair['b']['index'] = currPair['b']['index']
             ids.add(currPair['b']['ID'])
 
-    def canMerge(self,currPair,currBlock):
+    def canMerge(self,newPair,currBlock):
         """
         Returns True iff the given pair can merge with (and extend)
         the given synteny block. 
@@ -382,15 +376,27 @@ class SyntenyBlockGenerator:
         if currBlock is None:
                     return False
         bid,ori,bcount,pair,ids = currBlock
-        if currPair['a'] is self.INSERTED or currPair['b'] is self.INSERTED:
+        if newPair['a'] is self.INSERTED or newPair['b'] is self.INSERTED:
             cori = +1
         else:
-            cori = 1 if (currPair['a']['strand']==currPair['b']['strand']) else -1
-        return \
-            currPair['a']['chr'] == pair['a']['chr'] \
-            and currPair['b']['chr'] == pair['b']['chr'] \
+            cori = 1 if (newPair['a']['strand']==newPair['b']['strand']) else -1
+        canMrg = \
+            newPair['a']['chr'] == pair['a']['chr'] \
+            and newPair['b']['chr'] == pair['b']['chr'] \
             and ori == cori \
-            and (currPair['b'] is self.INSERTED or currPair['b']['index'] == pair['b']['index']+ori)
+            and (newPair['b'] is self.INSERTED \
+	         or newPair['b']['index'] == pair['b']['index'] \
+	         or newPair['b']['index'] == pair['b']['index']+ori)
+	return canMrg
+
+    def sanityCheck (self, block):
+        bid,ori,bcount,pair,ids = block
+	a = pair['a']
+	alen = a['end'] - a['start'] + 1
+	b = pair['b']
+	blen =  b['end'] - b['start'] + 1
+	if alen < 1 or blen < 1:
+	    raise RuntimeError("Insane block");
 
     def generateBlocks (self) :
         """
@@ -402,6 +408,9 @@ class SyntenyBlockGenerator:
             if self.canMerge(currPair,currBlock):
                 self.extendBlock(currPair,currBlock)
             else:
+		if currBlock: self.sanityCheck(currBlock)
+		if currBlock and currBlock[0] == 141:
+		    self.log("")
                 currBlock = self.startBlock(currPair)
                 self.blocks.append(currBlock)
             currPair['block'] = currBlock[0]
@@ -413,7 +422,7 @@ class SyntenyBlockGenerator:
 	#
 	self.sortBlocksBy(which)
 	#
-	pblk = None # previous block
+	pblk = None   # previous block
 	for cblk in self.blocks:
 	    if pblk:
 		cblkid, cblkori, cblkcount, cblkfields, cblkids = cblk
@@ -422,10 +431,13 @@ class SyntenyBlockGenerator:
 		    # starting new chromosome
 		    pblk = None
 		    continue
-		# distance between previous and current
+		# half the distance between previous and current
 		delta = (cblkfields[which]['start'] - pblkfields[which]['end'] - 1) / 2.0
-		pblkfields[which]['end'] += int(math.floor(delta))
-		cblkfields[which]['start'] -= int(math.ceil(delta))
+		if delta < 0:
+		    self.log("Negative distance between blocks.")
+		else:
+		    pblkfields[which]['end'] += int(math.floor(delta))
+		    cblkfields[which]['start'] -= int(math.ceil(delta))
 	    #
 	    pblk = cblk
 
