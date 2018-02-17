@@ -77,8 +77,10 @@ class BlockTranslator {
 		    fChr:   blk[fromC],
 		    fStart: s,
 		    fEnd:   e,
-		    // include the block id corresponding to this piece
-		    blockId: blk.blockId
+		    // include the block id and full block coords
+		    blockId: blk.blockId,
+		    blockStart: blk[toS],
+		    blockEnd: blk[toE]
 		};
 	    })
 	// 

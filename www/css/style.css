@@ -56,15 +56,6 @@ a {
     background-color: white !important;
 }
 
-line.chr {
-    stroke: #bbb;
-    stroke-width: 10px;
-}
-
-.chrlabel {
-    text-anchor : middle;
-}
-
 .facet select option {
     margin: 0px;
 }
@@ -466,6 +457,13 @@ label > i.material-icons {
     height: 250px;
     transition: height 0.5s;
 }
+#genomeView line.chr {
+    stroke: #bbb;
+    stroke-width: 1px;
+}
+#genomeView .chrlabel {
+    text-anchor : middle;
+}
 #genomeView svg [name="ticks"] line.feature {
     stroke: black;
 }
@@ -474,15 +472,20 @@ label > i.material-icons {
     fill-opacity: 0.3;
 }
 #genomeView .sblock {
-    fill: #bbb;
-    stroke: #aaa;
+    fill: #ccc;
+    stroke: #ccc;
 }
 #genomeView .sblock.inversion {
-    transform: translateX(-3px);
+    fill: red;
+    stroke: red;
 }
 #genomeView .sblock.translocation {
-    fill: #f1a541;
-    stroke: #f1a541;
+    fill: blue;
+    stroke: blue;
+}
+#genomeView .sblock.inversion.translocation {
+    fill: yellow;
+    stroke: yellow;
 }
 #genomeView svg .title {
 }
@@ -521,6 +524,10 @@ label > i.material-icons {
 }
 .zoomBlock.minus > rect.block {
     fill: #000;
+}
+.zoomBlock.translocation > rect.block {
+    stroke: #000;
+    stroke-width: 0.5px;
 }
 .zoomBlock text {
    font-size: 12px;

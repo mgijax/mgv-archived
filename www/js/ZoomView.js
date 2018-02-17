@@ -447,23 +447,24 @@ class ZoomView extends SVGView {
 	    .attr("font-size", 10)
 	    .text(d => d.genome.label);
 
-	// feature blocks
+	// groups to hold the features, one per zoomBlock
 	let fbs = zrFeats.selectAll(".zoomBlock")
 	    .data(d => d.blocks, d => d.blockId);
 	let newFbs = fbs.enter().append("g")
-	    .attr("class", b => "zoomBlock" + (b.ori==="+" ? " plus" : " minus"))
+	    .attr("class", b => "zoomBlock" + (b.ori==="+" ? " plus" : " minus") + (b.chr !== b.fChr ? " translocation" : ""))
 	    .attr("name", b=>b.blockId);
 	//
 	fbs.exit().remove();
 
-	// fiducial blocks
+	// groups to hold other stuff, one per zoomBlock
 	let fids = zrFids.selectAll(".zoomBlock")
 	    .data(d => d.blocks, d => d.blockId);
 	let newFids = fids.enter().append("g")
-	    .attr("class", b => "zoomBlock" + (b.ori==="+" ? " plus" : " minus"))
+	    .attr("class", b => "zoomBlock" + (b.ori==="+" ? " plus" : " minus") + (b.chr !== b.fChr ? " translocation" : ""))
 	    .attr("name", b=>b.blockId);
 	//
 	fids.exit().remove();
+
 	// rectangle for the whole block
 	newFids.append("rect").attr("class", "block");
 	// the axis line
@@ -488,11 +489,11 @@ class ZoomView extends SVGView {
 	    offset[j] = x2+2;
 	});
 
-	// sblock label
+	// synteny block label
 	fids.select("text.blockLabel")
 	    .text( b => b.chr );
 
-	// shadow box for the sblock
+	// synteny rect
 	fids.select("rect.block")
 	  .attr("x",     b => b.xscale(b.start))
 	  .attr("y",     b => b.genome.zoomY - this.blockHeight / 2)
