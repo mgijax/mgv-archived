@@ -472,8 +472,9 @@ label > i.material-icons {
     fill-opacity: 0.3;
 }
 #genomeView .sblock {
-    fill: #ccc;
-    stroke: #ccc;
+    fill: #fff;
+    fill-opacity: 0.3;
+    stroke-opacity: 0.3;
 }
 #genomeView .sblock.inversion {
     fill: red;
@@ -523,11 +524,13 @@ label > i.material-icons {
     fill-opacity: 0.3;
 }
 .zoomBlock.minus > rect.block {
-    fill: #000;
+    fill: red;
 }
 .zoomBlock.translocation > rect.block {
-    stroke: #000;
-    stroke-width: 0.5px;
+    fill: blue;
+}
+.zoomBlock.minus.translocation > rect.block {
+    fill: yellow;
 }
 .zoomBlock text {
    font-size: 12px;
