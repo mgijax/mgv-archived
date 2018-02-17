@@ -504,6 +504,10 @@ label > i.material-icons {
    height: 10px;
 }
 
+#zoomView text.blockLabel {
+    text-anchor: middle;
+}
+
 .zoomStrip.highlighted > text {
 }
 .zoomStrip line {
