@@ -53,12 +53,17 @@ class ZoomView extends SVGView {
 	r.select("#panRightMore").on("click",
 	    () => { a.pan(+5*a.defaultPan) });
 
-	// Create context menu. Only one command so far...
+	// Create context menu. 
 	this.initContextMenu([{
             label: "MGI SNPs", 
 	    icon: "open_in_new",
 	    tooltip: "Get SNPs from MGI for the current strains in the current region. (Some strains not available.)",
 	    handler: ()=> this.app.linkToMgiSnpReport()
+	},{
+            label: "MGI JBrowse", 
+	    icon: "open_in_new",
+	    tooltip: "Open MGI JBrowse (C57BL/6J GRCm38) with the current coordinate range.",
+	    handler: ()=> this.app.linkToMgiJBrowse()
 	}]);
 	//
 	//

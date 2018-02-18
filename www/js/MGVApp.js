@@ -495,6 +495,18 @@ class MGVApp {
 	let linkUrl = `${urlBase}?${tabArg}&${searchByArg}&${chrArg}&${coordArg}&${unitArg}&${rsArg}&${csArgs.join('&')}`
 	window.open(linkUrl, "_blank");
     }
+    //----------------------------------------------
+    linkToMgiJBrowse () {
+	let c = this.getContext();
+	let urlBase = 'http://jbrowse.informatics.jax.org/';
+	let dataArg = 'data=data%2Fmouse'; // "data/mouse"
+	let locArg  = `loc=chr${c.chr}%3A${c.start}..${c.end}`;
+	let tracks  = ['DNA','MGI_Genome_Features','NCBI_CCDS','NCBI','ENSEMBL'];
+	let tracksArg=`tracks=${tracks.join(',')}`;
+	let highlightArg = 'highlight=';
+	let linkUrl = `${urlBase}?${ [dataArg,locArg,tracksArg,highlightArg].join('&') }`;
+	window.open(linkUrl, "_blank");
+    }
 } // end class MGVApp
 
 export { MGVApp };
