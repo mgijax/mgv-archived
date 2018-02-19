@@ -521,27 +521,27 @@ label > i.material-icons {
     stroke: #aaa;
     fill: none;
 }
-#zoomView svg .zoomBlock > rect.block {
+#zoomView svg .sBlock [name="layer0"] rect.block {
     stroke: none;
     fill: #fff;
     fill-opacity: 0.3;
 }
-#zoomView svg .zoomBlock.minus > rect.block {
+#zoomView svg .sBlock.minus [name="layer0"] rect.block {
     fill: red;
 }
-#zoomView svg .zoomBlock.translocation > rect.block {
+#zoomView svg .sBlock.translocation [name="layer0"] rect.block {
     fill: blue;
 }
-#zoomView svg .zoomBlock.minus.translocation > rect.block {
+#zoomView svg .sBlock.minus.translocation [name="layer0"] rect.block {
     fill: yellow;
 }
-#zoomView svg .zoomBlock text {
+#zoomView svg .sBlock text {
    font-size: 12px;
 }
-#zoomView svg rect.zoomStripShadow {
+#zoomView svg .zoomStrip rect[name="zoomStripShadow"] {
    fill: none;
 }
-#zoomView svg rect.zoomStripShadow.highlighted {
+#zoomView svg .zoomStrip.highlighted rect[name="zoomStripShadow"] {
    fill: white;
 }
 

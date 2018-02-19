@@ -21,10 +21,12 @@ class ZoomView extends SVGView {
       // IDs of Features we're highlighting. May be mgpid  or mgiId
       // hiFeats is an obj whose keys are the IDs
       this.hiFeats = (initialHi || []).reduce( (a,v) => { a[v]=v; return a; }, {} );
-      this.svgMain.append("g")
+      this.fiducials = this.svgMain.append("g")
         .attr("class","fiducials");
-      this.svgMain.append("g")
+      this.stripsGrp = this.svgMain.append("g")
         .attr("class","strips");
+      this.axis = this.svgMain.append("g")
+        .attr("class","axis");
       this.cxtMenu = this.root.select('[name="cxtMenu"]');
       this.initDom();
     }
@@ -312,7 +314,7 @@ class ZoomView extends SVGView {
 	  // note that translated results include block identifiers, which tell
 	  // us the block (and hence, brushes) in the display to target.
 	  rs.forEach( rr => {
-	      let bb = this.svgMain.select(`.zoomStrip[name="${g.name}"] .zoomBlock[name="${rr.blockId}"] .brush`)
+	      let bb = this.svgMain.select(`.zoomStrip[name="${g.name}"] .sBlock[name="${rr.blockId}"] .brush`)
 	      bb.each( function(b) {
 	          b.brush.extent([rr.start, rr.end]);
 		  d3.select(this).call(b.brush);
@@ -381,6 +383,20 @@ class ZoomView extends SVGView {
 	// zoomBlock_data = { xscale, chr, start, end, fChr, fStart, fEnd, ori, [ feature_data ] }
 	// feature_data = { mgpid, mgiid, symbol, chr, start, end, strand, type, biotype }
 	//
+
+	// set the y-coords for each genome in the zoom view
+	data.forEach( (d,i) => d.genome.zoomY = this.topOffset + (i * (this.stripHeight+this.stripGap)) );
+
+	// reset the svg size based on number of strips
+	let totalHeight = (this.stripHeight+this.stripGap)*(data.length+1)
+	this.svg
+	    .attr("height", Math.max(this.minSvgHeight, totalHeight));
+
+	// Draw the title on the zoomview position controls
+	d3.select("#zoomView .zoomCoords label")
+	    .text(data[0].genome.label + " coords");
+	
+	// the reference genome block (always just 1 of these).
 	let rBlock = data[0].blocks[0];
 
 	// x-scale and x-axis based on the ref genome data.
@@ -388,103 +404,80 @@ class ZoomView extends SVGView {
 	    .domain([rBlock.start,rBlock.end])
 	    .range([0,this.width]);
 	//
-	// pixels per base
+	// conversion: pixels per base
 	let ppb = this.width / (rBlock.end - rBlock.start + 1);
 
-	// The title on the zoomview position controls
-	d3.select("#zoomView .zoomCoords label")
-	    .text(data[0].genome.label + " coords");
-	
-	// x-axis.
+        // -----------------------------------------------------
+	// draw the axis
+        // -----------------------------------------------------
 	this.axisFunc = d3.svg.axis()
 	    .scale(this.xscale)
 	    .orient("top")
 	    .outerTickSize(0)
 	    .ticks(5)
 	    ;
-	// axis container
-	let axis = this.svgMain.selectAll("g.axis")
-	    .data([this]);
-	axis.enter().append("g").attr("class","axis");
-	// inject the axis elts
-	axis.call(this.axisFunc);
+	this.axis.call(this.axisFunc);
 
-	// strips, one per genome
-	let zrs = this.svgMain.select("g.strips")
-		  .selectAll("g.zoomStrip")
-		  .data(data, d => d.genome.name);
-	let newZrs = zrs.enter()
-	    .append("g")
-		.attr("class", "zoomStrip")
+        // -----------------------------------------------------
+	// zoom strips (one per genome)
+        // -----------------------------------------------------
+        let zstrips = this.stripsGrp
+	        .selectAll("g.zoomStrip")
+		.data(data, d => d.genome.name);
+	let newzs = zstrips.enter()
+	        .append("g")
+		.attr("class","zoomStrip")
 		.attr("name", d => d.genome.name)
 		.on("click", function (g) {
 		    self.highlightStrip(g.genome, this);
 		});
-	//
-	zrs.exit().remove();
-	//
-	newZrs.append("g").attr("class","layer0");
-	newZrs.append("g").attr("class","layer1");
-	newZrs.append("g").attr("class","layer2");
-	//
-        let zrFids     = zrs.select(".layer0"); // underlay (fiducials)
-        let zrFeats    = zrs.select(".layer1"); // main (features)
-        let zrTop      = zrs.select(".layer2");	// overlay (axes, brushes)
-
-	// reset the svg size based on number of strips
-	let totalHeight = (this.stripHeight+this.stripGap)*(data.length+1)
-	this.svg
-	    .attr("height", Math.max(this.minSvgHeight, totalHeight));
-
-	// y-coords for each genome in the zoom view
-	data.forEach( (d,i) => d.genome.zoomY = this.topOffset + (i * (this.stripHeight+this.stripGap)) );
-	//
-	// genome labels. Put them in the view's fiducial layer
-	let gLabels = this.svgMain.select("g.fiducials")
-	    .selectAll("text.genomeLabel")
-	    .data(data, d => d.genome.name);
-	gLabels.enter().insert("text").attr("class","genomeLabel");
-	gLabels.exit().remove();
-	gLabels
+	newzs.append("rect")
+	    .attr("name", "zoomStripShadow")
+	    .attr("x", -15)
+	    .attr("y", d => d.genome.zoomY - this.blockHeight / 2)
+	    .attr("width", 15)
+	    .attr("height", this.blockHeight)
+	    ;
+	newzs.append("text")
+	    .attr("name", "genomeLabel")
+	    .text( d => d.genome.label)
 	    .attr("x", 0)
 	    .attr("y", d => d.genome.zoomY - (this.blockHeight/2 + 3))
 	    .attr("font-family","sans-serif")
 	    .attr("font-size", 10)
-	    .text(d => d.genome.label);
+	    ;
+	newzs.append("g").attr("name", "sBlocks");
 
-	// groups to hold the features, one per zoomBlock
-	let fbs = zrFeats.selectAll(".zoomBlock")
-	    .data(d => d.blocks, d => d.blockId);
-	let newFbs = fbs.enter().append("g")
-	    .attr("class", b => "zoomBlock" + (b.ori==="+" ? " plus" : " minus") + (b.chr !== b.fChr ? " translocation" : ""))
-	    .attr("name", b=>b.blockId);
-	//
-	fbs.exit().remove();
+        zstrips.exit().remove();
 
-	// groups to hold other stuff, one per zoomBlock
-	let fids = zrFids.selectAll(".zoomBlock")
+
+
+        let sblocks = zstrips.select('[name="sBlocks"]').selectAll('g.sBlock')
 	    .data(d => d.blocks, d => d.blockId);
-	let newFids = fids.enter().append("g")
-	    .attr("class", b => "zoomBlock" + (b.ori==="+" ? " plus" : " minus") + (b.chr !== b.fChr ? " translocation" : ""))
-	    .attr("name", b=>b.blockId);
-	//
-	fids.exit().remove();
+	let newsbs = sblocks.enter()
+	    .append("g")
+	    .attr("class", b => "sBlock" + (b.ori==="+" ? " plus" : " minus") + (b.chr !== b.fChr ? " translocation" : ""))
+	    .attr("name", b=>b.blockId)
+	    ;
+	let l0 = newsbs.append("g").attr("name", "layer0");
+	let l1 = newsbs.append("g").attr("name", "layer1");
 
 	// rectangle for the whole block
-	newFids.append("rect").attr("class", "block");
+	l0.append("rect").attr("class", "block");
 	// the axis line
-	newFids.append("line").attr("class","axis") ;
+	l0.append("line").attr("class","axis") ;
 	// label
-	newFids.append("text")
+	l0.append("text")
 	    .attr("class","blockLabel") ;
 	// brush
-	newFids.append("g").attr("class","brush");
+	l0.append("g").attr("class","brush");
 
+	sblocks.exit().remove();
 
 	// To line each chunk up with the corresponding chunk in the reference genome,
 	// create the appropriate x scales.
 	let offset = []; // offset of start  position of next block, by strip index (0===ref)
-	fbs.each( (b,i,j) => { // b=block, i=index within strip, j=strip index
+	sblocks.each( (b,i,j) => { // b=block, i=index within strip, j=strip index
 	    let fsx = this.xscale(b.fStart);
 	    let x1 = i === 0 ? fsx : offset[j];
 	    //let x1 = i === 0 ? fsx : Math.max(fsx, offset[j]);
@@ -494,32 +487,21 @@ class ZoomView extends SVGView {
 	    offset[j] = x2+2;
 	});
 
-	// synteny block label
-	fids.select("text.blockLabel")
-	    .text( b => b.chr );
+	// synteny block labels
+	sblocks.select("text.blockLabel")
+	    .text( b => b.chr )
+	    .attr("x", b => (b.xscale(b.start) + b.xscale(b.end))/2 )
+	    .attr("y", b => b.genome.zoomY + this.blockHeight / 2 + 10);
 
-	// synteny rect
-	fids.select("rect.block")
+	// synteny block rects
+	sblocks.select("rect.block")
 	  .attr("x",     b => b.xscale(b.start))
 	  .attr("y",     b => b.genome.zoomY - this.blockHeight / 2)
 	  .attr("width", b=>b.xscale(b.end)-b.xscale(b.start))
 	  .attr("height",this.blockHeight);
 
-	// shadow box for the strip
-	let zsRects = this.svgMain.select("g.fiducials")
-	    .selectAll("rect.zoomStripShadow")
-	    .data(data, d => d.genome.name);
-	zsRects.enter().append("rect").attr("class","zoomStripShadow");
-	zsRects.exit().remove();
-	zsRects
-	    .attr("x", -15)
-	    .attr("y", d => d.genome.zoomY - this.blockHeight / 2)
-	    .attr("width", 15)
-	    .attr("height", this.blockHeight)
-	    ;
-
-	// axis line
-	fids.select("line.axis")
+	// synteny block axis lines
+	sblocks.select("line.axis")
 	    .attr("x1", b => b.xscale.range()[0])
 	    .attr("y1", b => b.genome.zoomY)
 	    .attr("x2", b => b.xscale.range()[1])
@@ -527,7 +509,8 @@ class ZoomView extends SVGView {
 	    ;
 
 	// brush
-	fids.select(".brush")
+	sblocks.select("g.brush")
+	    .attr("transform", b => `translate(0,${b.genome.zoomY + this.blockHeight / 2})`)
 	    .each(function(b) {
 		if (!b.brush) {
 		    b.brush = d3.svg.brush()
@@ -541,15 +524,23 @@ class ZoomView extends SVGView {
 	    .selectAll("rect")
 		.attr("height", 10);
 
-	fids.select(".brush")
-	    .attr("transform", b => `translate(0,${b.genome.zoomY + this.blockHeight / 2})`);
+	this.drawFeatures(sblocks);
 
-	// chromosome label 
-	fids.select("text.blockLabel")
-	    .attr("x", b => (b.xscale(b.start) + b.xscale(b.end))/2 )
-	    .attr("y", b => b.genome.zoomY + this.blockHeight / 2 + 10);
+	//
+	this.app.facetManager.applyAll();
 
-	// features
+	// We need to let the view render before doing the highlighting, since it depends on
+	// the positions of rectangles in the scene.
+	window.setTimeout(this.highlight.bind(this), 50);
+    };
+
+    //----------------------------------------------
+    // Draws the features (rectangles) for the specified synteny blocks.
+    // Args:
+    //     sblocks (D3 selection of g.sblock nodes)
+    //
+    drawFeatures (sblocks) {
+        let self = this;
 	//
 	// never draw the same feature twice
 	let drawn = new Set();	// set of mgpids of drawn features
@@ -561,7 +552,7 @@ class ZoomView extends SVGView {
 	    drawn.add(fid);
 	    return v;
 	};
-	let feats = fbs.selectAll(".feature")
+	let feats = sblocks.selectAll(".feature")
 	    .data(d=>d.features.filter(filterDrawn), d=>d.mgpid);
 	feats.exit().remove();
 	//
@@ -588,14 +579,7 @@ class ZoomView extends SVGView {
 	       })
 	  .attr("height", this.featHeight)
 	  ;
-	
-	//
-	this.app.facetManager.applyAll();
-
-	// We need to let the view render before doing the highlighting, since it depends on
-	// the positions of rectangles in the scene.
-	window.setTimeout(this.highlight.bind(this), 50);
-    };
+    }
 
     //----------------------------------------------
     // Updates feature highlighting in the current zoom view.
