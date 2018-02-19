@@ -120,6 +120,17 @@ label > i.material-icons {
  * collapsible
  * -----------------------------------------
  */
+
+/* in closed state, immediate children are not displayed */
+.collapsible.closed > * {
+    display: none;
+}
+/* ...except for for the first <label> and the open/close button */
+.collapsible.closed > label:first-of-type,
+.collapsible.closed > .button.collapse {
+    display: inherit;
+}
+/* the button */
 .collapsible > .button.collapse {
     position: absolute;
     top: -1px;
@@ -133,13 +144,7 @@ label > i.material-icons {
 .collapsible.closed > .button.collapse::after {
     content: "arrow_drop_down"
 }
-.collapsible.closed > * {
-    display: none;
-}
-.collapsible.closed > label,
-.collapsible.closed > .button.collapse {
-    display: inherit;
-}
+
 
 /* -----------------------------------------
  * pagebox
@@ -500,62 +505,60 @@ label > i.material-icons {
 #zoomView {
     display: inline-block;
 }
-#zoomView .svgcontainer > i.collapse {
-    top: -45px;
+#zoomView.closed [name="zoomcontrols"] {
+    display: flex; /* override closed style */
 }
 
-#zoomView .brush rect {
+#zoomView svg .brush rect {
    height: 10px;
 }
-
-#zoomView text.blockLabel {
+#zoomView svg text.blockLabel {
     text-anchor: middle;
 }
-
-.zoomStrip.highlighted > text {
+#zoomView svg .zoomStrip.highlighted > text {
 }
-.zoomStrip line {
+#zoomView svg .zoomStrip line {
     stroke: #aaa;
     fill: none;
 }
-.zoomBlock > rect.block {
+#zoomView svg .zoomBlock > rect.block {
     stroke: none;
     fill: #fff;
     fill-opacity: 0.3;
 }
-.zoomBlock.minus > rect.block {
+#zoomView svg .zoomBlock.minus > rect.block {
     fill: red;
 }
-.zoomBlock.translocation > rect.block {
+#zoomView svg .zoomBlock.translocation > rect.block {
     fill: blue;
 }
-.zoomBlock.minus.translocation > rect.block {
+#zoomView svg .zoomBlock.minus.translocation > rect.block {
     fill: yellow;
 }
-.zoomBlock text {
+#zoomView svg .zoomBlock text {
    font-size: 12px;
 }
-rect.zoomStripShadow {
+#zoomView svg rect.zoomStripShadow {
    fill: none;
 }
-rect.zoomStripShadow.highlighted {
+#zoomView svg rect.zoomStripShadow.highlighted {
    fill: white;
 }
 
 
-rect.feature {
+#zoomView svg rect.feature {
     fill : #aaa;
     stroke: none;
 }
-rect.feature.highlight {
+#zoomView svg rect.feature.highlight {
     outline-style: solid;
     outline-width: 2px;
     outline-color: #34ff9a;
 }
-rect.feature.highlight.current {
+#zoomView svg rect.feature.highlight.current {
     outline-color: #ffff00;
 }
-rect.feature.highlight.extra {
+#zoomView svg rect.feature.highlight.extra {
     outline-width: 6px;
     animation: blinker 1s linear infinite;
 }
@@ -563,10 +566,10 @@ rect.feature.highlight.extra {
     50% { outline-width: 0px; }
 }
 
-#zoomView > :first-child {
+#zoomView [name="zoomcontrols"] {
     justify-content: space-around;
 }
-#zoomView > :first-child * {
+#zoomView > [name="zoomcontrols"] * {
     margin-left: 6px;
 }
 #zoomView g.axis path {
@@ -637,7 +640,7 @@ rect.feature.highlight.extra {
 }
 
 /* -----------------------------------------
- * Facet: Feature Type
+ * Feature Details section
  * -----------------------------------------
  */
 #featureDetails > table {
