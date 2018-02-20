@@ -509,6 +509,10 @@ label > i.material-icons {
     display: flex; /* override closed style */
 }
 
+#zoomView.closed [name="svgcontainer"] {
+    display: flex; /* override closed style */
+}
+
 #zoomView svg .brush rect {
    height: 10px;
 }

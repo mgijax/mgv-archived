@@ -35,6 +35,10 @@ class ZoomView extends SVGView {
         let self = this;
 	let r = this.root;
 	let a = this.app;
+	//
+	r.select('.button.collapse')
+	    .on('click', () => this.update());
+
 	// zoom controls
 	r.select("#zoomOut").on("click",
 	    () => { a.zoom(a.defaultZoom) });
@@ -242,11 +246,13 @@ class ZoomView extends SVGView {
 		ori    : "+",
 		blockId: mgv.rGenome.name
 		}]));
-	    // Add a request for each comparison genome, using translated coordinates. 
-	    mgv.cGenomes.forEach(cGenome => {
-		let ranges = mgv.translator.translate( mgv.rGenome, c.chr, c.start, c.end, cGenome );
-		promises.push(mgv.featureManager.getFeatures(cGenome, ranges))
-	    });
+	    if (! self.root.classed("closed")) {
+		// Add a request for each comparison genome, using translated coordinates. 
+		mgv.cGenomes.forEach(cGenome => {
+		    let ranges = mgv.translator.translate( mgv.rGenome, c.chr, c.start, c.end, cGenome );
+		    promises.push(mgv.featureManager.getFeatures(cGenome, ranges))
+		});
+	    }
 	    // when everything is ready, call the draw function
 	    Promise.all(promises).then( data => {
 	        self.draw(data);
@@ -388,9 +394,10 @@ class ZoomView extends SVGView {
 	data.forEach( (d,i) => d.genome.zoomY = this.topOffset + (i * (this.stripHeight+this.stripGap)) );
 
 	// reset the svg size based on number of strips
-	let totalHeight = (this.stripHeight+this.stripGap)*(data.length+1)
+	let totalHeight = (this.stripHeight+this.stripGap) * data.length + 12;
 	this.svg
-	    .attr("height", Math.max(this.minSvgHeight, totalHeight));
+	    //.attr("height", Math.max(this.minSvgHeight, totalHeight));
+	    .attr("height", totalHeight);
 
 	// Draw the title on the zoomview position controls
 	d3.select("#zoomView .zoomCoords label")
