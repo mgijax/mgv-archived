@@ -543,10 +543,14 @@ label > i.material-icons {
    font-size: 12px;
 }
 #zoomView svg .zoomStrip rect[name="zoomStripShadow"] {
-   fill: none;
+  fill: #ccc;
+}
+#zoomView svg .zoomStrip rect[name="zoomStripShadow"]:hover {
+   cursor: grab;
+   cursor: -webkit-grab;
 }
 #zoomView svg .zoomStrip.highlighted rect[name="zoomStripShadow"] {
-   fill: white;
+    fill:#888;
 }
 
 

@@ -29,6 +29,19 @@ class ZoomView extends SVGView {
       this.axis = this.svgMain.append("g")
         .attr("class","axis");
       this.cxtMenu = this.root.select('[name="cxtMenu"]');
+      //
+      this.dragger = d3.behavior.drag()
+          .on("dragstart", function(g) {
+	      console.log("DRAGSTART", this, g, d3.event);
+	  })
+	  .on("drag",      function (g) {
+	      console.log("DRAG", this, g, d3.event);
+	  })
+	  .on("dragend",   function (g) {
+	      console.log("DRAGEND", this, g, d3.event);
+	  })
+	  ;
+      //
       this.initDom();
     }
     //
@@ -442,21 +455,28 @@ class ZoomView extends SVGView {
 	newzs.append("rect")
 	    .attr("name", "zoomStripShadow")
 	    .attr("x", -15)
-	    .attr("y", d => d.genome.zoomY - this.blockHeight / 2)
+	    .attr("y", -this.blockHeight / 2)
 	    .attr("width", 15)
 	    .attr("height", this.blockHeight)
+	    //.call(this.dragger) disabled for now
 	    ;
 	newzs.append("text")
 	    .attr("name", "genomeLabel")
 	    .text( d => d.genome.label)
 	    .attr("x", 0)
-	    .attr("y", d => d.genome.zoomY - (this.blockHeight/2 + 3))
+	    .attr("y", -(this.blockHeight/2 + 3))
 	    .attr("font-family","sans-serif")
 	    .attr("font-size", 10)
 	    ;
 	newzs.append("g").attr("name", "sBlocks");
 
-        zstrips.exit().remove();
+	zstrips
+	    .attr("transform", g => `translate(0,${g.genome.zoomY})`)
+	    ;
+
+        zstrips.exit()
+	    .on(".drag", null)
+	    .remove();
 
 
 
@@ -483,42 +503,42 @@ class ZoomView extends SVGView {
 	sblocks.exit().remove();
 
 	// To line each chunk up with the corresponding chunk in the reference genome,
-	// create the appropriate x scales.
+	// create the appropriate x scales and transforms.
 	let offset = []; // offset of start  position of next block, by strip index (0===ref)
-	sblocks.each( (b,i,j) => { // b=block, i=index within strip, j=strip index
-	    let fsx = this.xscale(b.fStart);
-	    let x1 = i === 0 ? fsx : offset[j];
-	    //let x1 = i === 0 ? fsx : Math.max(fsx, offset[j]);
-	    let x2 = x1 + ppb * (b.end - b.start + 1)
-	    let delta = 0; // a hook for adjusting range (for line-em-up function)
-	    b.xscale = d3.scale.linear().domain([b.start, b.end]).range([x1+delta, x2+delta]);
-	    offset[j] = x2+2;
+	sblocks.each( function (b,i,j) { // b=block, i=index within strip, j=strip index
+	    let blen = ppb * (b.end - b.start + 1); // total screen width of this sblock
+	    b.xscale = d3.scale.linear().domain([b.start, b.end]).range([0, blen]);
+	    let dx = i === 0 ? 0 : offset[j];
+	    d3.select(this).attr("transform", `translate(${dx},0)`);
+	    offset[j] = dx + blen + 2;
 	});
+	//
 
 	// synteny block labels
 	sblocks.select("text.blockLabel")
 	    .text( b => b.chr )
 	    .attr("x", b => (b.xscale(b.start) + b.xscale(b.end))/2 )
-	    .attr("y", b => b.genome.zoomY + this.blockHeight / 2 + 10);
+	    .attr("y", this.blockHeight / 2 + 10)
+	    ;
 
 	// synteny block rects
 	sblocks.select("rect.block")
 	  .attr("x",     b => b.xscale(b.start))
-	  .attr("y",     b => b.genome.zoomY - this.blockHeight / 2)
+	  .attr("y",     b => -this.blockHeight / 2)
 	  .attr("width", b=>b.xscale(b.end)-b.xscale(b.start))
 	  .attr("height",this.blockHeight);
 
 	// synteny block axis lines
 	sblocks.select("line.axis")
 	    .attr("x1", b => b.xscale.range()[0])
-	    .attr("y1", b => b.genome.zoomY)
+	    .attr("y1", 0)
 	    .attr("x2", b => b.xscale.range()[1])
-	    .attr("y2", b => b.genome.zoomY)
+	    .attr("y2", 0)
 	    ;
 
 	// brush
 	sblocks.select("g.brush")
-	    .attr("transform", b => `translate(0,${b.genome.zoomY + this.blockHeight / 2})`)
+	    .attr("transform", b => `translate(0,${this.blockHeight / 2})`)
 	    .each(function(b) {
 		if (!b.brush) {
 		    b.brush = d3.svg.brush()
@@ -580,10 +600,10 @@ class ZoomView extends SVGView {
 	  .attr("width", function (f) { return fBlock(this).xscale(f.end)-fBlock(this).xscale(f.start)+1 })
 	  .attr("y", function (f) {
 	       if (f.strand == "+")
-		   return f.genome.zoomY - self.laneHeight*f.lane;
+		   return -self.laneHeight*f.lane;
 	       else
 		   // f.lane is negative for "-" strand
-	           return f.genome.zoomY - self.laneHeight*f.lane - self.featHeight; 
+	           return -self.laneHeight*f.lane - self.featHeight; 
 	       })
 	  .attr("height", this.featHeight)
 	  ;
@@ -651,6 +671,9 @@ class ZoomView extends SVGView {
 	    // for each highlighted feature, sort the rectangles in its list by Y-coordinate
 	    let rects = stacks[k];
 	    rects.sort( (a,b) => parseFloat(a.getAttribute("y")) - parseFloat(b.getAttribute("y")) );
+	    rects.sort( (a,b) => {
+		return a.__data__.genome.zoomY - b.__data__.genome.zoomY;
+	    });
 	    // want a polygon between each successive pair of items
 	    // Add a class ("current") for the polygons associated with the mouseover feature so they
 	    // can be distinguished from others.
@@ -695,7 +718,7 @@ class ZoomView extends SVGView {
 	labels.exit().remove();
 	labels
 	  .attr("x", d => parseInt(d.rect.getAttribute("x")) + parseInt(d.rect.getAttribute("width"))/2 )
-	  .attr("y", d => d.rect.__data__.genome.zoomY - this.blockHeight/2 - 3)
+	  .attr("y", d => d.rect.__data__.genome.zoomY - 3)
 	  .text(d => {
 	       let f = d.rect.__data__;
 	       let sym = f.symbol || f.mgpid;
@@ -746,21 +769,6 @@ class ZoomView extends SVGView {
 	    let c2= coordsAfterTransform(r[1]);
 	    let s = `${c1.x},${c1.y+c1.height} ${c2.x},${c2.y} ${c2.x+c2.width},${c2.y} ${c1.x+c1.width},${c1.y+c1.height}`
 	    return s;
-	    /*
-	    let x1 = parseFloat(r[0].getAttribute("x"));
-	    let y1 = parseFloat(r[0].getAttribute("y"));
-	    let w1 = parseFloat(r[0].getAttribute("width"));
-	    let h1 = parseFloat(r[0].getAttribute("height"));
-	    //
-	    let x2 = parseFloat(r[1].getAttribute("x"));
-	    let y2 = parseFloat(r[1].getAttribute("y"));
-	    let w2 = parseFloat(r[1].getAttribute("width"));
-	    let h2 = parseFloat(r[1].getAttribute("height"));
-	    //
-	    let s = `${x1},${y1+h1} ${x2},${y2} ${x2+w2},${y2} ${x1+w1},${y1+h1}`
-	    //
-	    return s;
-	    */
 	})
 	// mousing over the fiducial highlights (as if the user had moused over the feature itself)
 	.on("mouseover", (p) => {
