@@ -1,4 +1,5 @@
 import { SVGView } from './SVGView';
+import { coordsAfterTransform } from './utils';
 
 // ---------------------------------------------
 class GenomeView extends SVGView {
@@ -258,6 +259,7 @@ class GenomeView extends SVGView {
 	}
 	//
 	feats.exit().remove()
+
     }
 
 } // end class GenomeView

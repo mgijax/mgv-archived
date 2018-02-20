@@ -1,11 +1,12 @@
 import { SVGView } from './SVGView';
 import { Feature } from './Feature';
-import { formatCoords } from './utils';
+import { formatCoords, coordsAfterTransform } from './utils';
 
 // ---------------------------------------------
 class ZoomView extends SVGView {
     //
     constructor (app, elt, width, height, initialCoords, initialHi) {
+      console.log("ZoomView constructor");
       super(app, elt, width, height);
       //
       this.minSvgHeight = 250;
@@ -21,7 +22,7 @@ class ZoomView extends SVGView {
       // IDs of Features we're highlighting. May be mgpid  or mgiId
       // hiFeats is an obj whose keys are the IDs
       this.hiFeats = (initialHi || []).reduce( (a,v) => { a[v]=v; return a; }, {} );
-      this.fiducials = this.svgMain.append("g")
+      this.fiducials = this.svg.insert("g",":first-child") // 
         .attr("class","fiducials");
       this.stripsGrp = this.svgMain.append("g")
         .attr("class","strips");
@@ -675,8 +676,7 @@ class ZoomView extends SVGView {
 	let self = this;
 	//
 	// put fiducial marks in their own group 
-	let fGrp = this.svgMain.select("g.fiducials")
-	    .classed("hidden", false);
+	let fGrp = this.fiducials.classed("hidden", false);
 
 	// Bind first level data to "featureMarks" groups
 	let ffGrps = fGrp.selectAll("g.featureMarks")
@@ -741,20 +741,26 @@ class ZoomView extends SVGView {
 	    .attr("class","fiducial")
 	    ;
 	//
-	pgons.attr("points", p => {
-	    let x1 = parseFloat(p[0].getAttribute("x"));
-	    let y1 = parseFloat(p[0].getAttribute("y"));
-	    let w1 = parseFloat(p[0].getAttribute("width"));
-	    let h1 = parseFloat(p[0].getAttribute("height"));
+	pgons.attr("points", r => {
+	    let c1 = coordsAfterTransform(r[0]);
+	    let c2= coordsAfterTransform(r[1]);
+	    let s = `${c1.x},${c1.y+c1.height} ${c2.x},${c2.y} ${c2.x+c2.width},${c2.y} ${c1.x+c1.width},${c1.y+c1.height}`
+	    return s;
+	    /*
+	    let x1 = parseFloat(r[0].getAttribute("x"));
+	    let y1 = parseFloat(r[0].getAttribute("y"));
+	    let w1 = parseFloat(r[0].getAttribute("width"));
+	    let h1 = parseFloat(r[0].getAttribute("height"));
 	    //
-	    let x2 = parseFloat(p[1].getAttribute("x"));
-	    let y2 = parseFloat(p[1].getAttribute("y"));
-	    let w2 = parseFloat(p[1].getAttribute("width"));
-	    let h2 = parseFloat(p[1].getAttribute("height"));
+	    let x2 = parseFloat(r[1].getAttribute("x"));
+	    let y2 = parseFloat(r[1].getAttribute("y"));
+	    let w2 = parseFloat(r[1].getAttribute("width"));
+	    let h2 = parseFloat(r[1].getAttribute("height"));
 	    //
 	    let s = `${x1},${y1+h1} ${x2},${y2} ${x2+w2},${y2} ${x1+w1},${y1+h1}`
 	    //
 	    return s;
+	    */
 	})
 	// mousing over the fiducial highlights (as if the user had moused over the feature itself)
 	.on("mouseover", (p) => {
@@ -765,7 +771,6 @@ class ZoomView extends SVGView {
 	    if (!d3.event.ctrlKey)
 	        this.highlight();
 	});
-
     }
     //----------------------------------------------
     hideFiducials () {

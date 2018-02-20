@@ -7,7 +7,8 @@ class SVGView extends Component {
     this.svg = this.root.select("svg");
     this.svgMain = this.svg
           .append("g")    // the margin-translated group
-          .append("g");	  // main group for the drawing
+          .append("g")	  // main group for the drawing
+	  .attr("name","svgmain");
     this.setSize(width, height, {top: 20, right: 10, bottom: 20, left: 10});
   }
   setSize (width, height, margin) {
@@ -20,7 +21,7 @@ class SVGView extends Component {
     //
     this.svg.attr("width", this.outerWidth)
             .attr("height", this.outerHeight)
-          .select("g")
+          .select('g[name="svgmain"]')
             .attr("transform", `translate(${this.margin.left},${this.margin.top})`);
   }
   // Args:
