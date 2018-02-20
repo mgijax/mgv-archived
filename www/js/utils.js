@@ -211,6 +211,74 @@ function getCaretPosition (elt) {
     return r[1];
 }
 
+// ---------------------------------------------
+// Returns the screen coordinates of an SVG shape (circle, rect, polygon, line)
+// after all transforms have been applied.
+//
+// Args:
+//     shape (node) The SVG shape 
+//
+// Returns:
+//     The form of the returned value depends on the shape.
+//     circle:  { cx, cy, r }
+//         returns the transformed center point and transformed radius         
+//     line:	{ x1, y1, x2, y2 }
+//         returns the transformed endpoints
+//     rect:	{ x, y, width, height, theta }
+//         returns the transformed corner point and transforms width+height.
+//         theta is 
+//     polygon: [ {x,y}, {x,y} , ... ]
+//
+// Adapted from: https://stackoverflow.com/questions/6858479/rectangle-coordinates-after-transform?rq=1
+//
+function coordsAfterTransform (shape) {
+    let svg = shape.closest("svg");
+    if (!svg) throw "Could not find svg ancestor.";
+    let matrix = shape.getCTM();
+    let p = svg.createSVGPoint();
+    let p2= svg.createSVGPoint();
+    let dshape = d3.select(shape);
+    switch (shape.tagName.toLowerCase()) {
+    //
+    case 'circle':
+	p.x = parseFloat(d3.select(shape).attr("cx"));
+	p.y = parseFloat(d3.select(shape).attr("cy"));
+	p = p.matrixTransform(matrix);
+        return { cx: p.x, cy: p.y };
+    //
+    case 'rect':
+	p.x  = parseFloat(d3.select(shape).attr("x"));
+	p.y  = parseFloat(d3.select(shape).attr("y"));
+	p2.x = p.x + parseFloat(d3.select(shape).attr("width"));
+	p2.y = p.y + parseFloat(d3.select(shape).attr("height"));
+	//
+	p  = p.matrixTransform(matrix);
+	p2 = p2.matrixTransform(matrix);
+	//
+        return { x: p.x, y: p.y, width: p2.x-p.x, height: p2.y-p.y };
+    //
+    case 'polygon':
+        let pts = dshape.attr("points").split(/ +/);
+	return pts.map( pt => {
+	    let xy = pt.split(",");
+	    p.x = parseFloat(xy[0])
+	    p.y = parseFloat(xy[1])
+	    p = p.matrixTransform(matrix);
+	    return { x: p.x, y: p.y };
+            
+	});
+    //
+    case 'line':
+        break;
+    //
+    default:
+	throw "Unsupported node type: " + shape.tagName.toLowerCase()
+    }
+
+}
+
+// ---------------------------------------------
+// ---------------------------------------------
 export {
     initOptList,
     d3tsv,
@@ -226,5 +294,6 @@ export {
     setCaretRange,
     setCaretPosition,
     moveCaretPosition,
-    getCaretPosition
+    getCaretPosition,
+    coordsAfterTransform
 };
