@@ -1,35 +1,49 @@
 import { MGVApp } from './MGVApp';
+import { removeDups } from './utils';
 
 // ---------------------------------------------
 // ---------------------------------------------
+//
+// pqstring = Parse qstring. Parses the parameter portion of the URL.
+//
 function pqstring (qstring) {
-    // FIXME: URLSearchParams API is not supported in all browsers. OK for development
-    // but need a fallback eventually.
+    //
+    let cfg = {};
+
+    // FIXME: URLSearchParams API is not supported in all browsers.
+    // OK for development but need a fallback eventually.
     let prms = new URLSearchParams(qstring);
+    let genomes = [];
+
+    // ----- genomes ------------
+    let pgenomes = prms.get("genomes") || "";
+    // For now, allow "comps" as synonym for "genomes". Eventually, don't support "comps".
+    pgenomes = (pgenomes +  " " + (prms.get("comps") || ""));
     //
-    let comps = new Set();
-    let comps0 = prms.getAll("comps");
-    comps0.forEach(c0 => {
-        c0.split(/[, ]+/).forEach(c => c && comps.add(c));
-    });
-    //
+    pgenomes = removeDups(pgenomes.trim().split(/ +/));
+    pgenomes.length > 0 && (cfg.genomes = pgenomes);
+
+    // ----- ref genome ------------
+    let ref = prms.get("ref");
+    ref && (cfg.ref = ref);
+
+    // ----- highlight IDs --------------
     let hls = new Set();
-    let hls0 = prms.getAll("highlight");
-    hls0.forEach(h0 => {
-        h0.split(/[, ]+/).forEach(h => h && hls.add(h));
-    });
-    //
-    let cfg = {
-	ref: prms.get("ref") || "C57BL/6J",
-	comps: Array.from(comps),
-	chr: prms.get("chr") || "1",
-	start: parseInt(prms.get("start") || "1"),
-	end: parseInt(prms.get("end") || "20000000"),
-	highlight: Array.from(hls)
-    };
-    if (cfg.start > cfg.end) {
-        let x = cfg.start; cfg.start = cfg.end; cfg.end = x;
+    let hls0 = prms.get("highlight");
+    if (hls0) {
+	hls0 = hls0.replace(/[ ,]+/g, ' ').split(' ').filter(x=>x);
+	hls0.length > 0 && (cfg.highlight = hls0);
     }
+
+    // ----- coordinates --------------
+    //
+    let chr   = prms.get("chr");
+    let start = prms.get("start");
+    let end   = prms.get("end");
+    chr   && (cfg.chr = chr);
+    start && (cfg.start = parseInt(start));
+    end   && (cfg.end = parseInt(end));
+    //
     return cfg;
 }
 
@@ -37,7 +51,6 @@ function pqstring (qstring) {
 let mgv = null;
 
 // The main program, wherein the app is created and wired to the browser. 
-// ALL dependencies on the browser window are confined to this function.
 //
 function __main__ () {
     // Callback to pass into the app to register changes in context.

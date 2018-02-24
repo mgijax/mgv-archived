@@ -14,25 +14,38 @@ import { ZoomView }        from './ZoomView';
 class MGVApp {
     constructor (cfg) {
 	//
-	//console.log("MGVApp. cfg=", cfg);
-	let self = this;
+	this.initialCfg = cfg;
 	//
-	this.callback = (cfg.oncontextchange || function(){});
+	this.contextChanged = (cfg.oncontextchange || function(){});
 	//
 	this.name2genome = {};  // map from genome name -> genome data obj
 	this.label2genome = {}; // map from genome label -> genome data obj
+	this.nl2genome = {};    // combines indexes
 	//
-	this.allGenomes = [];   // list of all genomes
-	this.rGenome = null;    // the reference genome
-	this.cGenomes = [];     // comparison genomes
-	this.coords = { chr:"1", start:1, end:10000000 }; // current coordinates
+	this.allGenomes = [];   // list of all available genomes
+	this.rGenome = null;    // the current reference genome
+	this.cGenomes = [];     // current comparison genomes (rGenome is *not* included).
+	this.vGenomes = [];	// list of all currenty viewed genomes (ref+comps) in Y-order.
 	//
-	this.dur = 250;         // anomation duration
+	this.dur = 250;         // animation duration, in ms
 	this.defaultZoom = 2;	// multiplier of current range width. Must be >= 1. 1 == no zoom.
 				// (zooming in uses 1/this amount)
 	this.defaultPan  = 0.15;// fraction of current range width
-	// Initial coordinates
-	let startingCoords = parseCoords(formatCoords(cfg) || "1:10000000..20000000");
+	this.coords = { chr: "1", start: 1000000, end: 10000000 };
+	//
+	this.genomeView = new GenomeView(this, "#genomeView", 800, 250);
+	this.zoomView   = new ZoomView  (this, "#zoomView", 800, 250, this.coords);
+        //
+	this.featureDetails = new FeatureDetails(this, "#featureDetails");
+
+	this.cscale = d3.scale.category10().domain([
+	    "protein_coding_gene",
+	    "pseudogene",
+	    "ncRNA_gene",
+	    "gene_segment",
+	    "other_gene",
+	    "other_feature_type"
+	]);
 	//
 	d3.selectAll(".collapsible")
 	    .append("i")
@@ -46,20 +59,6 @@ class MGVApp {
 	    .append("i")
 	    .attr("class","material-icons busy rotating")
 	    ;
-	//
-	this.genomeView = new GenomeView(this, "#genomeView", 800, 250);
-	this.zoomView   = new ZoomView  (this, "#zoomView", 800, 250, startingCoords, cfg.highlight);
-        //
-	this.featureDetails = new FeatureDetails(this, "#featureDetails");
-
-	this.cscale = d3.scale.category10().domain([
-	    "protein_coding_gene",
-	    "pseudogene",
-	    "ncRNA_gene",
-	    "gene_segment",
-	    "other_gene",
-	    "other_feature_type"
-	]);
 	//
 	//
 	this.listManager    = new ListManager(this, "#mylists");
@@ -108,6 +107,7 @@ class MGVApp {
 	// -------------------------------------------------------------------
 	//
 	this.facetManager = new FacetManager(this);
+	let self = this;
 
 	// Feature-type facet
 	let ftFacet  = this.facetManager.addFacet("FeatureType", f => f.getMungedType());
@@ -142,39 +142,37 @@ class MGVApp {
 	    this.allGenomes.sort( (a,b) => {
 	        return a.label < b.label ? -1 : a.label > b.label ? +1 : 0;
 	    });
+	    //
 	    // build a name->Genome index
+	    this.nl2genome = {}; // also build the combined list at the same time...
 	    this.name2genome  = this.allGenomes
-	        .reduce((acc,g) => { acc[g.name] = g; return acc; }, {});
+	        .reduce((acc,g) => { this.nl2genome[g.name] = acc[g.name] = g; return acc; }, {});
 	    // build a label->Genome index
 	    this.label2genome = this.allGenomes
-	        .reduce((acc,g) => { acc[g.label] = g; return acc; }, {});
+	        .reduce((acc,g) => { this.nl2genome[g.label] = acc[g.label] = g; return acc; }, {});
 
-	    // Initializes the comparison genomes <select> list. 
-	    // The main thing
-	    // is to be sure the currently selected ref genome is not 
-	    // in the comparison genome list.
-	    function initCompGenomesList(selected) {
-		let rg = d3.select("#refGenome").property("selectedOptions")[0];
-		let cgs = self.allGenomes.filter(g => g.label !== rg.innerText);
-		initOptList("#compGenomes", cgs, g=>g.name, g=>g.label, true, selected );
-	    }
+	    //
+	    let cfg = this.sanitizeCfg(this.initialCfg);
+	    let self = this;
 
 	    // initialize the ref and comp genome option lists
-	    initOptList("#refGenome",   this.allGenomes, g=>g.name, g=>g.label, false, g => g.label === cfg.ref);
-	    initCompGenomesList(function (g) { 
-	        return cfg.comps.indexOf(g.label) >= 0
+	    initOptList("#refGenome",   this.allGenomes, g=>g.name, g=>g.label, false, g => g === cfg.ref);
+	    initOptList("#compGenomes", this.allGenomes, g=>g.name, g=>g.label, true,  g => cfg.genomes.indexOf(g) !== -1);
+	    d3.select("#refGenome").on("change", function() {
+		self.setContext({ ref: this.value });
 	    });
-	    //
-	    d3.select("#refGenome").on("change", () => {
-		// whenever the user changes the reference genome, reinitialize the 
-		// comparison genomes list and redraw
-		initCompGenomesList();
-	        this.draw();
-	    });
-	    d3.select("#compGenomes").on("change", () => {
-	        this.draw(); 
-		if (this.cGenomes.length === 1)
-		    this.showBlocks(this.cGenomes[0]);
+	    d3.select("#compGenomes").on("change", function() {
+		let selectedNames = [];
+		for(let x of this.selectedOptions){
+		    selectedNames.push(x.value);
+		}
+		// want to preserve current genome order as much as possible 
+		let gNames = self.vGenomes.map(g=>g.name)
+		    .filter(n => {
+		        return selectedNames.indexOf(n) >= 0 || n === self.rGenome.name;
+		    });
+		gNames = gNames.concat(selectedNames.filter(n => gNames.indexOf(n) === -1));
+		self.setContext({ genomes: gNames });
 	    });
 	    //
 	    // Preload all the chromosome files for all the genomes
@@ -186,12 +184,34 @@ class MGVApp {
 	    this.processChromosomes(data);
 
 	    // FINALLY! We are ready to draw the initial scene.
-	    this.draw();
-
-	    // the first time we draw, resize to the dimensions passed in the config
-	    this.resize( cfg.width, cfg.height );
+	    this.setContext(this.initialCfg);
 
 	}.bind(this));
+    }
+    //----------------------------------------------
+    processChromosomes (data) {
+	// data is a list of chromosome lists, one per genome
+	// Fill in the genomeChrs map (genome -> chr list)
+	this.allGenomes.forEach((g,i) => {
+	    // nicely sort the chromosomes
+	    let chrs = data[i];
+	    g.maxlen = 0;
+	    chrs.forEach( c => {
+		//
+		c.length = parseInt(c.length)
+		g.maxlen = Math.max(g.maxlen, c.length);
+		// because I'd rather say "chromosome.name" than "chromosome.chromosome"
+		c.name = c.chromosome;
+		delete c.chromosome;
+	    });
+	    // nicely sort the chromosomes
+	    chrs.sort((a,b) => {
+		let aa = parseInt(a.name) - parseInt(b.name);
+		if (!isNaN(aa)) return aa;
+		return a.name < b.name ? -1 : a.name > b.name ? +1 : 0;
+	    });
+	    g.chromosomes = chrs;
+	});
     }
     //----------------------------------------------
     initDom () {
@@ -212,41 +232,37 @@ class MGVApp {
 	    .classed("rotating", isBusy);
     }
     //----------------------------------------------
-    draw () {
-	let ref = d3.select("#refGenome")[0][0].value;
-	let comps = [];
-	for(let x of d3.select("#compGenomes")[0][0].selectedOptions){
-	    comps.push(x.value);
-	}
-	let c = parseCoords(d3.select("#zoomCoords")[0][0].value);
-	this.setContext({ref, comps, chr:c.chr, start:c.start, end: c.end});
-    }
-    //----------------------------------------------
+    // Args:
+    //   g  (string) genome name (eg "mus_caroli") or label (eg "CAROLI/EiJ") 
+    // Returns:
+    //   true iff the ref genome was actually changed
     setRefGenome (g) {
 	//
 	if (!g) return false;
 	//
-	let rg = this.name2genome[g] || this.label2genome[g];
+	let rg = this.nl2genome[g];
 	if (rg && rg !== this.rGenome){
 	    // change the ref genome
 	    this.rGenome = rg;
 	    d3.selectAll("#refGenome option")
-	        .property("selected",  gg => (gg.label === g  || null));
-	    this.genomeView.draw();
+	        .property("selected",  gg => (gg.label === rg.label  || null));
 	    return true;
 	}
 	return false;
     }
     //----------------------------------------------
-    // Sets or returns
+    // Args:
+    //   glist (list of strings) genome name or labels
+    // Returns:
+    //   true iff comp genomes actually changed
     setCompGenomes (glist) {
         //
         if (!glist) return false;
 	// 
 	let cgs = [];
 	for( let x of glist ) {
-	    let cg = this.name2genome[x] || this.label2genome[x];
-	    cg && cgs.push(cg);
+	    let cg = this.nl2genome[x];
+	    cg && cg !== this.rGenome && cgs.indexOf(cg) === -1 && cgs.push(cg);
 	}
 	let cgns = cgs.map( cg => cg.label );
 	d3.selectAll("#compGenomes option")
@@ -272,7 +288,7 @@ class MGVApp {
         let c = this.zoomView.coords;
         return {
 	    ref : this.rGenome.label,
-	    comps: this.cGenomes.map(g => g.label),
+	    genomes: this.vGenomes.map(g=>g.label),
 	    chr: c.chr,
 	    start: c.start,
 	    end: c.end,
@@ -280,54 +296,132 @@ class MGVApp {
 	}
     }
     //----------------------------------------------
-    // Sets the current context from the config object
+    // Sets the current context from the config object. Only those context items specified in the
+    // argument are affected (except as noted). The possible config items:
+    //    genomes   (list o strings) All the genomes you want to see, in Y-order. 
+    //          May be internal names or display labels, eg, "mus_musculus_129s1svimj" or "129S1/SvImJ".
+    //    ref       (string) The genome to use as the reference. May be name or label.
+    //    chr       (string) Coordinate range chromosome
+    //    start     (int) Coordinate range start position
+    //    end       (int) Coordinate range end position
+    //    highlight (list o strings)
     //
-    setContext (cfg) {
+    // Before being appied, the config argument is sanitized as follows:
+    //
+    //    If ref is specified
+    //    Any unrecognized genome name/label is ignored (and reported in the console)
+    //
+    //
+    //
+    //    If start > end, they are switched.
+    //    If chr does not exist for the current ref genome, it is ignored (and reported)
+    //
+    //
+    // 
+    // Args:
+    //    c (object) A configuration object that specifies some/all config values.
+    // Returns:
+    //    Nothing
+    // Side effects:
+    //	  Redraws 
+    //	  Calls contextChanged() 
+    //
 
-	//console.log("SET CONTEXT", cfg);
+    sanitizeCfg (c) {
+	let cfg = {};
 
+	// Sanitize the input.
+	//
+	// Set cfg.ref to specified genome, 
+	//   with fallback to current ref genome, 
+	//      with fallback to C57BL/6J (1st time thru)
+	// FIXME: final fallback should be a config setting.
+	cfg.ref = (c.ref ? this.nl2genome[c.ref] || this.rGenome : this.rGenome) || this.nl2genome['C57BL/6J'];
 
-	// ref genome
-	let changedRg = this.setRefGenome(cfg.ref);
-	// comp genomes
-	let changedCg = this.setCompGenomes(cfg.comps);
-
-	// coordinates
-	let changedCoords;
-	let coords = this.sanitizeCoords({ chr: cfg.chr, start: cfg.start, end: cfg.end });
-	if (coords) {
-	    this.coords = coords;
-	    changedCoords = true;
-	}
-	else {
-	    coords = this.coords;
-	    changedCoords = false;
-	}
-
-	// highlighted features
-	let changedHl = this.setHighlight(cfg.highlight);
+	// Set cfg.genomes to be the specified genomes,
+	//     with fallback to the current genomes
+	//        with fallback to [ref] (1st time thru)
+	cfg.genomes = c.genomes ?
+	    (c.genomes.map(g => this.nl2genome[g]).filter(x=>x))
+	    :
+	    this.vGenomes;
+	// Add ref to genomes if not there already
+	if (cfg.genomes.indexOf(cfg.ref) === -1)
+	    cfg.genomes.unshift(cfg.ref);
 	
-	// 
-	let changed = changedRg || changedCg || changedCoords || changedHl;
+	// Set cfg.chr to be the specified chromosome
+	//     with fallback to the current chr
+	//         with fallback to the 1st chromosome in the ref genome
+	cfg.chr = cfg.ref.getChromosome(c.chr);
+	if (!cfg.chr) cfg.chr = cfg.ref.getChromosome( this.coords ? this.coords.chr : "1" );
+	if (!cfg.chr) cfg.chr = cfg.ref.getChromosome(0);
+	//if (!cfg.chr) console.log("warning: no chromosome");
+	
+	// Ensure start <= end
+	if (typeof(c.start) === "number" && typeof(c.end) === "number" && c.start > c.end ) {
+	    // swap
+	    let tmp = c.start; c.start = c.end; c.end = tmp;
+	}
 
+	// Set cfg.start to be the specified start
+	//     with fallback to the current start
+	//        with fallback to 1
+	//           with a min value of 1
+	cfg.start = Math.max( 1, typeof(c.start) === "number" ? c.start : this.coords ? this.coords.start : 1 );
+
+	// Set cfg.end to be the specified end
+	//     with fallback to the current end
+	//         with fallback to start + 10 MB
+	cfg.end = typeof(c.end) === "number" ?
+	    c.end
+	    :
+	    this.coords ?
+	        (cfg.start + this.coords.end - this.coords.start + 1)
+		:
+		cfg.start;
+	// clip at chr end
+	cfg.end = cfg.chr ? Math.min(cfg.end,   cfg.chr.length) : cfg.end;
+
+	// Set cfg.highlight
+	//    with fallback to current highlight
+	//        with fallback to []
+	cfg.highlight = c.highlight || this.zoomView.highlighted || [];
+
+	//
+	return cfg;
+    }
+
+    //
+    setContext (c) {
+        let cfg = this.sanitizeCfg(c);
+	//
+	this.vGenomes = cfg.genomes;
+	this.rGenome  = cfg.ref;
+	this.cGenomes = cfg.genomes.filter(g => g !== cfg.ref);
+	this.coords   = { chr: cfg.chr.name, start: cfg.start, end: cfg.end };
 	//
 	this.genomeView.redraw();
-	this.genomeView.setBrushCoords(coords);
-	this.zoomView.update(coords)
-	if (changed) {
-	    this.callback();
-	}
+	this.genomeView.setBrushCoords(this.coords);
 	//
+	this.zoomView.highlighted = cfg.highlight;
+	this.zoomView.genomes = this.vGenomes;
+	this.zoomView.update(this.coords)
+	//window.setTimeout(()=> this.zoomView.setGenomeYOrder( this.vGenomes.map( g => g.name ) ), 100);
+	//
+	this.contextChanged();
     }
     //----------------------------------------------
     resize (width, height) {
 	width = width || this.lastWidth
+	this.lastWidth = width;
+	//
 	height= height || this.lastHeight;
+	this.lastHeight = height;
+	//
         this.genomeView.fitToWidth(width-24);
         this.zoomView.fitToWidth(width-24);
-	this.draw();
-	this.lastWidth = width;
-	this.lastHeight = height;
+	//
+	this.setContext({});
     }
     //----------------------------------------------
     // Returns the current context as a parameter string
@@ -335,10 +429,10 @@ class MGVApp {
     getParamString () {
 	let c = this.getContext();
         let ref = `ref=${c.ref}`;
-        let comps = `comps=${c.comps.join("+")}`;
+        let genomes = `genomes=${c.genomes.join("+")}`;
 	let coords = `chr=${c.chr}&start=${c.start}&end=${c.end}`;
 	let hls = `highlight=${c.highlight.join("+")}`;
-	return `${ref}&${comps}&${coords}&${hls}`;
+	return `${ref}&${genomes}&${coords}&${hls}`;
     }
 
     //----------------------------------------------
@@ -457,31 +551,6 @@ class MGVApp {
     }
 
     //----------------------------------------------
-    processChromosomes (d) {
-	// d is a list of chromosome lists, one per genome
-	// Fill in the genomeChrs map (genome -> chr list)
-	this.allGenomes.forEach((g,i) => {
-	    // nicely sort the chromosomes
-	    let chrs = d[i];
-	    g.maxlen = 0;
-	    chrs.forEach( c => {
-		//
-		c.length = parseInt(c.length)
-		g.maxlen = Math.max(g.maxlen, c.length);
-		// because I'd rather say "chromosome.name" than "chromosome.chromosome"
-		c.name = c.chromosome;
-		delete c.chromosome;
-	    });
-	    // nicely sort the chromosomes
-	    chrs.sort((a,b) => {
-		let aa = parseInt(a.name) - parseInt(b.name);
-		if (!isNaN(aa)) return aa;
-		return a.name < b.name ? -1 : a.name > b.name ? +1 : 0;
-	    });
-	    g.chromosomes = chrs;
-	});
-    }
-    //----------------------------------------------
     linkToMgiSnpReport () {
 	let c = this.getContext();
 	let urlBase = 'http://www.informatics.jax.org/snp/summary';
@@ -490,7 +559,7 @@ class MGVApp {
 	let chrArg = `selectedChromosome=${c.chr}`;
 	let coordArg = `coordinate=${c.start}-${c.end}`;
 	let unitArg = 'coordinateUnit=bp';
-	let csArgs = c.comps.map(g => `selectedStrains=${g}`)
+	let csArgs = c.genomes.map(g => `selectedStrains=${g}`)
 	let rsArg = `referenceStrain=${c.ref}`;
 	let linkUrl = `${urlBase}?${tabArg}&${searchByArg}&${chrArg}&${coordArg}&${unitArg}&${rsArg}&${csArgs.join('&')}`
 	window.open(linkUrl, "_blank");

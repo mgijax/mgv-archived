@@ -216,7 +216,7 @@ function getCaretPosition (elt) {
 // after all transforms have been applied.
 //
 // Args:
-//     shape (node) The SVG shape 
+//     shape (node) The SVG shape.
 //
 // Returns:
 //     The form of the returned value depends on the shape.
@@ -224,33 +224,46 @@ function getCaretPosition (elt) {
 //         returns the transformed center point and transformed radius         
 //     line:	{ x1, y1, x2, y2 }
 //         returns the transformed endpoints
-//     rect:	{ x, y, width, height, theta }
-//         returns the transformed corner point and transforms width+height.
-//         theta is 
+//     rect:	{ x, y, width, height }
+//         returns the transformed corner point and transformed width+height.
 //     polygon: [ {x,y}, {x,y} , ... ]
+//         returns the transformed list of points
 //
 // Adapted from: https://stackoverflow.com/questions/6858479/rectangle-coordinates-after-transform?rq=1
 //
 function coordsAfterTransform (shape) {
+    //
+    let dshape = d3.select(shape);
     let svg = shape.closest("svg");
     if (!svg) throw "Could not find svg ancestor.";
+    let stype = shape.tagName.toLowerCase();
     let matrix = shape.getCTM();
     let p = svg.createSVGPoint();
     let p2= svg.createSVGPoint();
-    let dshape = d3.select(shape);
-    switch (shape.tagName.toLowerCase()) {
+    //
+    switch (stype) {
     //
     case 'circle':
-	p.x = parseFloat(d3.select(shape).attr("cx"));
-	p.y = parseFloat(d3.select(shape).attr("cy"));
-	p = p.matrixTransform(matrix);
-        return { cx: p.x, cy: p.y };
+	p.x  = parseFloat(dshape.attr("cx"));
+	p.y  = parseFloat(dshape.attr("cy"));
+	p2.x = p.x + parseFloat(dshape.attr("r"));
+	p2.y = p.y;
+	p    = p.matrixTransform(matrix);
+	p2   = p2.matrixTransform(matrix);
+	// calc new radius as distance between transformed points
+	let dx = Math.abs(p.x - p2.x);
+	let dy = Math.abs(p.y - p2.y);
+	let r = Math.sqrt(dx*dx + dy*dy);
+        return { cx: p.x, cy: p.y, r:r };
     //
     case 'rect':
-	p.x  = parseFloat(d3.select(shape).attr("x"));
-	p.y  = parseFloat(d3.select(shape).attr("y"));
-	p2.x = p.x + parseFloat(d3.select(shape).attr("width"));
-	p2.y = p.y + parseFloat(d3.select(shape).attr("height"));
+	// FIXME: does not handle rotations correctly. To fix, translate corner points separately and then
+	// calculate the transformed width and height. As a convenience to the user, might be nice to return
+	// the transformed corner points and possibly the final angle of rotation.
+	p.x  = parseFloat(dshape.attr("x"));
+	p.y  = parseFloat(dshape.attr("y"));
+	p2.x = p.x + parseFloat(dshape.attr("width"));
+	p2.y = p.y + parseFloat(dshape.attr("height"));
 	//
 	p  = p.matrixTransform(matrix);
 	p2 = p2.matrixTransform(matrix);
@@ -258,23 +271,49 @@ function coordsAfterTransform (shape) {
         return { x: p.x, y: p.y, width: p2.x-p.x, height: p2.y-p.y };
     //
     case 'polygon':
-        let pts = dshape.attr("points").split(/ +/);
+        let pts = dshape.attr("points").trim().split(/ +/);
 	return pts.map( pt => {
 	    let xy = pt.split(",");
 	    p.x = parseFloat(xy[0])
 	    p.y = parseFloat(xy[1])
 	    p = p.matrixTransform(matrix);
 	    return { x: p.x, y: p.y };
-            
 	});
     //
     case 'line':
-        break;
+	p.x   = parseFloat(dshape.attr("x1"));
+	p.y   = parseFloat(dshape.attr("y1"));
+	p2.x  = parseFloat(dshape.attr("x2"));
+	p2.y  = parseFloat(dshape.attr("y2"));
+	p     = p.matrixTransform(matrix);
+	p2    = p2.matrixTransform(matrix);
+        return { x1: p.x, y1: p.y, x2: p2.x, x2: p2.y };
     //
+    // FIXME: add case 'text'
+    //
+
     default:
-	throw "Unsupported node type: " + shape.tagName.toLowerCase()
+	throw "Unsupported node type: " + stype;
     }
 
+}
+
+// ---------------------------------------------
+// Removes duplicates from a list while preserving list order.
+// Args:
+//     lst (list)
+// Returns:
+//     A processed copy of lst in which any dups have been removed.
+function removeDups (lst) {
+    let lst2 = [];
+    let seen = new Set();
+    lst.forEach(x => {
+	// remove dups while preserving order
+	if (seen.has(x)) return;
+	lst2.push(x);
+	seen.add(x);
+    });
+    return lst2;
 }
 
 // ---------------------------------------------
@@ -295,5 +334,6 @@ export {
     setCaretPosition,
     moveCaretPosition,
     getCaretPosition,
-    coordsAfterTransform
+    coordsAfterTransform,
+    removeDups
 };

@@ -1,13 +1,14 @@
 import { SVGView } from './SVGView';
 import { Feature } from './Feature';
-import { formatCoords, coordsAfterTransform } from './utils';
+import { formatCoords, coordsAfterTransform, removeDups } from './utils';
 
 // ---------------------------------------------
 class ZoomView extends SVGView {
     //
     constructor (app, elt, width, height, initialCoords, initialHi) {
-      console.log("ZoomView constructor");
       super(app, elt, width, height);
+      //
+      let self = this;
       //
       this.minSvgHeight = 250;
       this.blockHeight = 40;
@@ -17,11 +18,13 @@ class ZoomView extends SVGView {
       this.laneHeight = this.featHeight + this.laneGap;
       this.stripHeight = 70;    // height per genome in the zoom view
       this.stripGap = 20;	// space between strips
+
       //
       this.coords = initialCoords;// curr zoom view coords { chr, start, end }
       // IDs of Features we're highlighting. May be mgpid  or mgiId
       // hiFeats is an obj whose keys are the IDs
       this.hiFeats = (initialHi || []).reduce( (a,v) => { a[v]=v; return a; }, {} );
+      //
       this.fiducials = this.svg.insert("g",":first-child") // 
         .attr("class","fiducials");
       this.stripsGrp = this.svgMain.append("g")
@@ -30,17 +33,8 @@ class ZoomView extends SVGView {
         .attr("class","axis");
       this.cxtMenu = this.root.select('[name="cxtMenu"]');
       //
-      this.dragger = d3.behavior.drag()
-          .on("dragstart", function(g) {
-	      console.log("DRAGSTART", this, g, d3.event);
-	  })
-	  .on("drag",      function (g) {
-	      console.log("DRAG", this, g, d3.event);
-	  })
-	  .on("dragend",   function (g) {
-	      console.log("DRAGEND", this, g, d3.event);
-	  })
-	  ;
+      this.dragging = null;
+      this.dragger = this.getDragger();
       //
       this.initDom();
     }
@@ -105,7 +99,7 @@ class ZoomView extends SVGView {
 		if (d3.event.altKey) {
 		    fSelect(f, d3.event.shiftKey, true);
 		    if (this.timeout) window.clearTimeout(this.timeout);
-		    this.timeout = window.setTimeout(function(){ this.app.callback(); }.bind(this), 1000);
+		    this.timeout = window.setTimeout(function(){ this.app.contextChanged(); }.bind(this), 1000);
 		    this.highlight();
 		}
 		else if (!d3.event.ctrlKey)
@@ -124,13 +118,13 @@ class ZoomView extends SVGView {
 	      if (t.tagName == "rect" && t.classList.contains("feature")) {
 		  fSelect(t.__data__, d3.event.shiftKey);
 		  this.highlight();
-	          this.app.callback();
+	          this.app.contextChanged();
 	      }
 	      else {
 		  if (t.tagName == "rect" && t.classList.contains("block") && !d3.event.shiftKey) {
 		      this.hiFeats = {};
 		      this.highlight();
-		      this.app.callback();
+		      this.app.contextChanged();
 		  }
 	      }
 	  })
@@ -217,6 +211,20 @@ class ZoomView extends SVGView {
 	  .text( d=>d.icon );
     }
     //----------------------------------------------
+    set highlighted (hls) {
+	if (typeof(hls) === "string")
+	    hls = [hls];
+	//
+	this.hiFeats = {};
+        for(let h of hls){
+	    this.hiFeats[h] = h;
+	}
+    }
+    get highlighted () {
+        return this.hiFeats ? Object.keys(this.hiFeats) : [];
+    }
+
+    //----------------------------------------------
     showContextMenu (x,y) {
         this.cxtMenu
 	    .classed("showing", true)
@@ -227,6 +235,99 @@ class ZoomView extends SVGView {
     //----------------------------------------------
     hideContextMenu () {
         this.cxtMenu.classed("showing", false);
+    }
+
+    //----------------------------------------------
+    // Args:
+    //     gs (list of Genomes)
+    // Side effects:
+    //     For each Genome, sets g.zoomY 
+    set genomes (gs) {
+       gs.forEach( (g,i) => {g.zoomY = this.topOffset + i * (this.stripHeight + this.stripGap)} );
+       this._genomes = gs;
+    }
+    get genomes () {
+       return this._genomes;
+    }
+    //----------------------------------------------
+    // Returns the names of the currently displayed genomes (stripes) in top-to-bottom order.
+    //
+    getGenomeYOrder () {
+        let strips = this.svgMain.selectAll(".zoomStrip");
+        let ss = strips[0].map(g=> {
+	    let bb = g.getBoundingClientRect();
+	    return [bb.y, g.__data__.genome.name];
+        });
+        let ns = ss.sort( (a,b) => a[0] - b[0] ).map( x => x[1] )
+	return ns;
+    }
+    //----------------------------------------------
+    // Sets the top-to-bottom order of the currently displayed genomes according to 
+    // the given name list of names. Because we can't guarantee the given names correspond
+    // to actual zoom strips, or that all strips are represented, etc.
+    // Therefore, the list is preprecessed as follows:
+    //     * duplicate names, if they exist, are removed
+    //     * names that do not correspond to existing zoomStrips are removed
+    //     * names of existing zoom strips that don't appear in the list are added to the end
+    // The result is a list of names with these properties:
+    //     * there is a 1:1 correspondence between names and actual zoom strips
+    //     * the name order is consistent with the input list
+    // This is the list used to (re)order the zoom strips.
+    //
+    // Given the list order: 
+    //     * a Y-position is assigned to each genome
+    //     * zoom strips that are NOT CURRENTLY BEING DRAGGED are translated to their new locations
+    //
+    // Args:
+    //     ns (list of strings) Names of the genomes.
+    // Returns:
+    //     nothing
+    // Side effects:
+    //     Recalculates the Y-coordinates for each stripe based on the given order, then translates
+    //     each strip to its new position.
+    //
+    setGenomeYOrder (ns) {
+	this.genomes = removeDups(ns).map(n=> this.app.name2genome[n] ).filter(x=>x);
+        this.genomes.forEach( (g,i) => {
+	    let strip = d3.select(`#zoomView .zoomStrip[name="${g.name}"]`);
+	    if (!strip.classed("dragging"))
+	        strip.attr("transform", `translate(0,${g.zoomY})`);
+	});
+    }
+
+    //----------------------------------------------
+    getDragger () {  
+      let self = this;
+      return d3.behavior.drag()
+	  .origin(function(d,i){
+	      let bb = this.getBoundingClientRect();
+	      return bb;
+	  })
+          .on("dragstart", function(g) {
+	      let t = d3.event.sourceEvent.target;
+	      if (d3.select(t).attr("name") !== "zoomStripHandle"){
+	          return false;
+	      }
+	      let strip = this.closest(".zoomStrip");
+	      self.dragging = d3.select(strip).classed("dragging", true);
+	  })
+	  .on("drag", function (g) {
+	      if (!self.dragging) return;
+	      let my = d3.mouse(self.svgMain[0][0])[1];
+	      self.dragging.attr("transform", `translate(0, ${my})`);
+	      self.setGenomeYOrder(self.getGenomeYOrder());
+	      self.highlight();
+	  })
+	  .on("dragend", function (g) {
+	      if (!self.dragging) return;
+	      //
+	      self.dragging.classed("dragging", false);
+	      self.dragging = null;
+	      self.setGenomeYOrder(self.getGenomeYOrder());
+	      self.app.setContext({ genomes: self.getGenomeYOrder() });
+	      window.setTimeout( self.highlight.bind(self), 250 );
+	  })
+	  ;
     }
 
     //----------------------------------------------
@@ -380,7 +481,7 @@ class ZoomView extends SVGView {
 	//
 	this.svgMain.selectAll('.zoomStrip')
 	    .classed("highlighted", d => d.genome === g);
-	this.svgMain.selectAll('.zoomStripShadow')
+	this.svgMain.selectAll('.zoomStripHandle')
 	    .classed("highlighted", d => d.genome === g);
 	this.app.showBlocks(g);
     }
@@ -405,7 +506,7 @@ class ZoomView extends SVGView {
 	//
 
 	// set the y-coords for each genome in the zoom view
-	data.forEach( (d,i) => d.genome.zoomY = this.topOffset + (i * (this.stripHeight+this.stripGap)) );
+	//data.forEach( (d,i) => d.genome.zoomY = this.topOffset + (i * (this.stripHeight+this.stripGap)) );
 
 	// reset the svg size based on number of strips
 	let totalHeight = (this.stripHeight+this.stripGap) * data.length + 12;
@@ -448,18 +549,13 @@ class ZoomView extends SVGView {
 	let newzs = zstrips.enter()
 	        .append("g")
 		.attr("class","zoomStrip")
+		.classed("reference", d => d.genome === this.app.rGenome)
 		.attr("name", d => d.genome.name)
 		.on("click", function (g) {
 		    self.highlightStrip(g.genome, this);
-		});
-	newzs.append("rect")
-	    .attr("name", "zoomStripShadow")
-	    .attr("x", -15)
-	    .attr("y", -this.blockHeight / 2)
-	    .attr("width", 15)
-	    .attr("height", this.blockHeight)
-	    //.call(this.dragger) disabled for now
-	    ;
+		})
+		.call(this.dragger)
+		;
 	newzs.append("text")
 	    .attr("name", "genomeLabel")
 	    .text( d => d.genome.label)
@@ -469,6 +565,13 @@ class ZoomView extends SVGView {
 	    .attr("font-size", 10)
 	    ;
 	newzs.append("g").attr("name", "sBlocks");
+	newzs.append("rect")
+	    .attr("name", "zoomStripHandle")
+	    .attr("x", -15)
+	    .attr("y", -this.blockHeight / 2)
+	    .attr("width", 15)
+	    .attr("height", this.blockHeight)
+	    ;
 
 	zstrips
 	    .attr("transform", g => `translate(0,${g.genome.zoomY})`)
@@ -516,7 +619,14 @@ class ZoomView extends SVGView {
 
 	// synteny block labels
 	sblocks.select("text.blockLabel")
-	    .text( b => b.chr )
+	    .text( b => {
+		// only show chromosome label for ref genome and for any sblock
+		// whose chromosome differs from the ref
+		if (b.genome === this.app.rGenome || b.chr !== this.coords.chr)
+		    return b.chr;
+		else
+		    return "";
+	    })
 	    .attr("x", b => (b.xscale(b.start) + b.xscale(b.end))/2 )
 	    .attr("y", this.blockHeight / 2 + 10)
 	    ;
@@ -559,7 +669,11 @@ class ZoomView extends SVGView {
 
 	// We need to let the view render before doing the highlighting, since it depends on
 	// the positions of rectangles in the scene.
-	window.setTimeout(this.highlight.bind(this), 50);
+	window.setTimeout(() => {
+	    //this.setGenomeYOrder( this.genomes.map(g => g.name) );
+	    //window.setTimeout(() => this.highlight(), 50);
+	    this.highlight();
+	}, 50);
     };
 
     //----------------------------------------------
@@ -580,7 +694,7 @@ class ZoomView extends SVGView {
 	    drawn.add(fid);
 	    return v;
 	};
-	let feats = sblocks.selectAll(".feature")
+	let feats = sblocks.select('[name="layer1"]').selectAll(".feature")
 	    .data(d=>d.features.filter(filterDrawn), d=>d.mgpid);
 	feats.exit().remove();
 	//
@@ -631,8 +745,6 @@ class ZoomView extends SVGView {
 	let hiFeats = Object.assign({}, this.hiFeats);
 	if (currFeat) {
 	    hiFeats[currFeat.id] = currFeat.id;
-	    //if (currFeat.mgiid)
-		//console.log(this.app.featureManager.getCachedFeaturesByMgiId(currFeat.mgiid));
 	}
 
 	// Filter all features (rectangles) in the scene for those being highlighted.
@@ -665,6 +777,7 @@ class ZoomView extends SVGView {
 	      return hl;
 	  })
 	  ;
+
 	// build data array for drawing fiducials between equivalent features
 	let data = [];
 	for (let k in stacks) {
@@ -674,13 +787,16 @@ class ZoomView extends SVGView {
 	    rects.sort( (a,b) => {
 		return a.__data__.genome.zoomY - b.__data__.genome.zoomY;
 	    });
-	    // want a polygon between each successive pair of items
+	    // Want a polygon between each successive pair of items. The following creates a list of
+	    // n pairs, where rect[i] is paired with rect[i+1]. The last pair consists of the last
+	    // rectangle paired with undefined. (We want this.)
+	    let pairs = rects.map((r, i) => [r,rects[i+1]]);
 	    // Add a class ("current") for the polygons associated with the mouseover feature so they
 	    // can be distinguished from others.
-	    let pairs = rects.map((r, i) => [r,rects[i+1]]);
 	    data.push({ fid: k, rects: pairs, cls: (currFeat && currFeat.id === k ? 'current' : '') });
 	}
 	this.drawFiducials(data, currFeat);
+
 	// FIXME: reachover
 	this.app.featureDetails.update(currFeat);
     }
@@ -711,13 +827,13 @@ class ZoomView extends SVGView {
 	ffGrps.attr("class",d => "featureMarks " + (d.cls || ""))
 
 	// Draw feature labels. Each label is drawn once, above the first rectangle in its list.
+	// 
 	let labels = ffGrps.selectAll('text.featLabel')
-	    .data(d => [{ fid: d.fid, rect: d.rects[0][0] }]);
-	    // .data(d => d.rects.map( function (r) { return { fid: d.fid, rect: r[0] } }));
+	    .data(d => [{ fid: d.fid, rect: d.rects[0][0], trect: coordsAfterTransform(d.rects[0][0]) }]);
 	labels.enter().append('text').attr('class','featLabel');
 	labels.exit().remove();
 	labels
-	  .attr("x", d => parseInt(d.rect.getAttribute("x")) + parseInt(d.rect.getAttribute("width"))/2 )
+	  .attr("x", d => d.trect.x + d.trect.width/2 )
 	  .attr("y", d => d.rect.__data__.genome.zoomY - 3)
 	  .text(d => {
 	       let f = d.rect.__data__;
@@ -765,8 +881,10 @@ class ZoomView extends SVGView {
 	    ;
 	//
 	pgons.attr("points", r => {
-	    let c1 = coordsAfterTransform(r[0]);
-	    let c2= coordsAfterTransform(r[1]);
+	    // polygon connects bottom corners of 1st rect to top corners of 2nd rect
+	    let c1 = coordsAfterTransform(r[0]); // transform coords for 1st rect
+	    let c2= coordsAfterTransform(r[1]);  // transform coords for 2nd rect
+	    // four polygon points
 	    let s = `${c1.x},${c1.y+c1.height} ${c2.x},${c2.y} ${c2.x+c2.width},${c2.y} ${c1.x+c1.width},${c1.y+c1.height}`
 	    return s;
 	})
@@ -785,18 +903,6 @@ class ZoomView extends SVGView {
 	this.svgMain.select("g.fiducials")
 	    .classed("hidden", true);
     }
-    //----------------------------------------------
-    // Translates each strip in the x-dimension as needed so that the
-    // rectangles for the given feature line up.
-    // The translation is sticky.
-    // 
-    alignOn (feat) {
-        // get the feature's rect
-	let fr = this.svgMain.select(`rect.feature[name="${feat.mgpid}"]`);
-	let frs = this.svgMain.selectAll("rect.feature")
-    }
-
-
 } // end class ZoomView
 
 export { ZoomView };

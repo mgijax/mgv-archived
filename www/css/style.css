@@ -525,7 +525,7 @@ label > i.material-icons {
     stroke: #aaa;
     fill: none;
 }
-#zoomView svg .sBlock [name="layer0"] rect.block {
+#zoomView svg .zoomStrip .sBlock [name="layer0"] rect.block {
     stroke: none;
     fill: #fff;
     fill-opacity: 0.3;
@@ -542,16 +542,24 @@ label > i.material-icons {
 #zoomView svg .sBlock text {
    font-size: 12px;
 }
-#zoomView svg .zoomStrip rect[name="zoomStripShadow"] {
+#zoomView svg .zoomStrip rect[name="zoomStripHandle"] {
   fill: #ccc;
 }
-#zoomView svg .zoomStrip rect[name="zoomStripShadow"]:hover {
+#zoomView svg .zoomStrip.reference rect[name="zoomStripHandle"] {
+    fill: blue;
+}
+#zoomView svg .zoomStrip rect[name="zoomStripHandle"]:hover {
    cursor: grab;
    cursor: -webkit-grab;
 }
-#zoomView svg .zoomStrip.highlighted rect[name="zoomStripShadow"] {
-    fill:#888;
+#zoomView svg .zoomStrip.dragging rect[name="zoomStripHandle"]:hover {
+   cursor: grabbing;
+   cursor: -webkit-grabbing;
 }
+#zoomView svg .zoomStrip:not(.dragging) {
+    transition: transform 0.3s;
+}
+
 
 
 #zoomView svg rect.feature {
