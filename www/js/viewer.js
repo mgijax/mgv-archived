@@ -78,14 +78,13 @@ function __main__ () {
     let qstring = window.location.hash.substring(1);
     let cfg = pqstring(qstring);
     cfg.width = window.innerWidth;
-    cfg.height= window.innerHeight;
     cfg.oncontextchange = setHash;
 
     // create the app
     mgv = new MGVApp(cfg);
     
     // handle resize events
-    window.onresize = () => mgv.resize(window.innerWidth, window.innerHeight);
+    window.onresize = () => {mgv.resize();mgv.setContext({});}
 }
 
 

@@ -584,6 +584,7 @@ label > i.material-icons {
 
 #zoomView [name="zoomcontrols"] {
     justify-content: space-around;
+    flex-wrap: wrap;
 }
 #zoomView > [name="zoomcontrols"] * {
     margin-left: 6px;

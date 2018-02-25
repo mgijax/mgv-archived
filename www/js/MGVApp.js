@@ -35,6 +35,7 @@ class MGVApp {
 	//
 	this.genomeView = new GenomeView(this, "#genomeView", 800, 250);
 	this.zoomView   = new ZoomView  (this, "#zoomView", 800, 250, this.coords);
+	this.resize();
         //
 	this.featureDetails = new FeatureDetails(this, "#featureDetails");
 
@@ -296,41 +297,29 @@ class MGVApp {
 	}
     }
     //----------------------------------------------
-    // Sets the current context from the config object. Only those context items specified in the
-    // argument are affected (except as noted). The possible config items:
-    //    genomes   (list o strings) All the genomes you want to see, in Y-order. 
-    //          May be internal names or display labels, eg, "mus_musculus_129s1svimj" or "129S1/SvImJ".
-    //    ref       (string) The genome to use as the reference. May be name or label.
-    //    chr       (string) Coordinate range chromosome
-    //    start     (int) Coordinate range start position
-    //    end       (int) Coordinate range end position
-    //    highlight (list o strings)
+    // Returns a sanitized version of the argument configuration object.
+    // The sanitized version:
+    //     - has a setting for every parameter. Parameters not specified in the argument are (generally) filled
+    //     in with their current values.
+    //     - is always valid, eg
+    //     	- has a list of 1 or more valid genomes, with one of them designated as the ref
+    //     	- has a valid coordinate range
     //
-    // Before being appied, the config argument is sanitized as follows:
-    //
-    //    If ref is specified
-    //    Any unrecognized genome name/label is ignored (and reported in the console)
+    // The sanitized version is also "compiled":
+    //     - it has actual Genome objects, where the argument just has names
+    //     - groups the chr+start+end in "coords" object
     //
     //
-    //
-    //    If start > end, they are switched.
-    //    If chr does not exist for the current ref genome, it is ignored (and reported)
-    //
-    //
-    // 
-    // Args:
-    //    c (object) A configuration object that specifies some/all config values.
-    // Returns:
-    //    Nothing
-    // Side effects:
-    //	  Redraws 
-    //	  Calls contextChanged() 
-    //
-
     sanitizeCfg (c) {
 	let cfg = {};
 
 	// Sanitize the input.
+
+	// 
+	if (c.width || c.height) {
+	    cfg.width = c.width
+	}
+
 	//
 	// Set cfg.ref to specified genome, 
 	//   with fallback to current ref genome, 
@@ -391,6 +380,28 @@ class MGVApp {
 	return cfg;
     }
 
+    //----------------------------------------------
+    // Sets the current context from the config object. 
+    // Only those context items specified in the config are affected, except as noted.
+    //
+    // All configs are sanitized before being applied (see sanitizeCfg).
+    // 
+    // Args:
+    //    c (object) A configuration object that specifies some/all config values.
+    //         The possible config items:
+    //            genomes   (list o strings) All the genomes you want to see, in top-to-bottom order. 
+    //               May use internal names or display labels, eg, "mus_musculus_129s1svimj" or "129S1/SvImJ".
+    //            ref       (string) The genome to use as the reference. May be name or label.
+    //            chr       (string) Chromosome for coordinate range
+    //            start     (int) Coordinate range start position
+    //            end       (int) Coordinate range end position
+    //            highlight (list o strings) IDs of features to highlight
+    //
+    // Returns:
+    //    Nothing
+    // Side effects:
+    //	  Redraws 
+    //	  Calls contextChanged() 
     //
     setContext (c) {
         let cfg = this.sanitizeCfg(c);
@@ -406,22 +417,14 @@ class MGVApp {
 	this.zoomView.highlighted = cfg.highlight;
 	this.zoomView.genomes = this.vGenomes;
 	this.zoomView.update(this.coords)
-	//window.setTimeout(()=> this.zoomView.setGenomeYOrder( this.vGenomes.map( g => g.name ) ), 100);
 	//
 	this.contextChanged();
     }
     //----------------------------------------------
-    resize (width, height) {
-	width = width || this.lastWidth
-	this.lastWidth = width;
-	//
-	height= height || this.lastHeight;
-	this.lastHeight = height;
-	//
-        this.genomeView.fitToWidth(width-24);
-        this.zoomView.fitToWidth(width-24);
-	//
-	this.setContext({});
+    resize () {
+	let w = window.innerWidth - 24;
+	this.genomeView.fitToWidth(w);
+	this.zoomView.fitToWidth(w);
     }
     //----------------------------------------------
     // Returns the current context as a parameter string

@@ -560,7 +560,7 @@ class ZoomView extends SVGView {
 	    .attr("name", "genomeLabel")
 	    .text( d => d.genome.label)
 	    .attr("x", 0)
-	    .attr("y", -(this.blockHeight/2 + 3))
+	    .attr("y", this.blockHeight/2 + 10)
 	    .attr("font-family","sans-serif")
 	    .attr("font-size", 10)
 	    ;
