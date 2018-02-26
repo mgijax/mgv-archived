@@ -24,11 +24,13 @@ a {
     border-radius: 4px;
 }
 
+[name="brush"] > .extent,
 .brush > .extent {
     fill-opacity : 0.3;
     stroke : blue;
     fill: blue;
 }
+[name="brush"]:hover > rect.background,
 .brush:hover > rect.background {
     visibility: visible !important;
     fill: blue;
@@ -451,28 +453,23 @@ label > i.material-icons {
  * Genome View
  * -----------------------------------------
  */
-#genomeView {
-}
-#genomeView > div {
-    margin-top: 18px;
-    background-color: #b9b9b9;
-    padding: 12px 8px;
-}
-#genomeView > svg {
+#genomeView svg {
     height: 250px;
-    transition: height 0.5s;
 }
-#genomeView line.chr {
+#genomeView.closed [name="svgcontainer"] {
+    display: block;
+}
+#genomeView .chromosome [name="backbone"] {
     stroke: #bbb;
     stroke-width: 1px;
 }
-#genomeView .chrlabel {
+#genomeView .chromosome [name="label"] {
     text-anchor : middle;
 }
-#genomeView svg [name="ticks"] line.feature {
+#genomeView .chromosome [name="ticks"] line.feature {
     stroke: black;
 }
-#genomeView svg [name="ticks"] circle.feature {
+#genomeView .chromosome [name="ticks"] circle.feature {
     fill: red;
     fill-opacity: 0.3;
 }

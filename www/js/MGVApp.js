@@ -33,6 +33,20 @@ class MGVApp {
 	this.defaultPan  = 0.15;// fraction of current range width
 	this.coords = { chr: "1", start: 1000000, end: 10000000 };
 	//
+	//
+	d3.selectAll(".collapsible")
+	    .append("i")
+	    .attr("class","material-icons button collapse")
+	    .on("click.default", function () {
+		let p = d3.select(this.parentNode);
+		p.classed("closed", ! p.classed("closed"));
+	    });
+	// 
+	d3.selectAll(".pagebox")
+	    .append("i")
+	    .attr("class","material-icons busy rotating")
+	    ;
+	//
 	this.genomeView = new GenomeView(this, "#genomeView", 800, 250);
 	this.zoomView   = new ZoomView  (this, "#zoomView", 800, 250, this.coords);
 	this.resize();
@@ -47,19 +61,6 @@ class MGVApp {
 	    "other_gene",
 	    "other_feature_type"
 	]);
-	//
-	d3.selectAll(".collapsible")
-	    .append("i")
-	    .attr("class","material-icons button collapse")
-	    .on("click.default", function () {
-		let p = d3.select(this.parentNode);
-		p.classed("closed", ! p.classed("closed"));
-	    });
-	// 
-	d3.selectAll(".pagebox")
-	    .append("i")
-	    .attr("class","material-icons busy rotating")
-	    ;
 	//
 	//
 	this.listManager    = new ListManager(this, "#mylists");

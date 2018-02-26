@@ -1,6 +1,6 @@
 import { SVGView } from './SVGView';
 import { Feature } from './Feature';
-import { formatCoords, coordsAfterTransform, removeDups } from './utils';
+import { parseCoords, formatCoords, coordsAfterTransform, removeDups } from './utils';
 
 // ---------------------------------------------
 class ZoomView extends SVGView {
@@ -79,6 +79,17 @@ class ZoomView extends SVGView {
 	    tooltip: "Open MGI JBrowse (C57BL/6J GRCm38) with the current coordinate range.",
 	    handler: ()=> this.app.linkToMgiJBrowse()
 	}]);
+	// click on background => hide context menu
+	this.root
+	  .on("click.context", () => {
+	      let tgt = d3.event.target;
+	      if (tgt.tagName.toLowerCase() === "i" && tgt.innerHTML !== "menu")
+		  // exception: the context menu button itself
+	          return;
+	      else
+		  this.hideContextMenu()
+	  });
+
 	//
 	//
 	let fSelect = function (f, shift, preserve) {
@@ -97,12 +108,14 @@ class ZoomView extends SVGView {
 	//
 	let fMouseOverHandler = function(f) {
 		if (d3.event.altKey) {
+		    // If user is holding the alt key, select everything touched.
 		    fSelect(f, d3.event.shiftKey, true);
+		    this.highlight();
+		    // Don't register context changes until user has paused for at least 1s.
 		    if (this.timeout) window.clearTimeout(this.timeout);
 		    this.timeout = window.setTimeout(function(){ this.app.contextChanged(); }.bind(this), 1000);
-		    this.highlight();
 		}
-		else if (!d3.event.ctrlKey)
+		else if (!d3.event.ctrlKey) 
 		    this.highlight(f);
 	}.bind(this);
 	//
@@ -110,22 +123,23 @@ class ZoomView extends SVGView {
 	    if (!d3.event.ctrlKey)
 		this.highlight(); 
 	}.bind(this);
-	// Background click in zoom view = unselect all.
-	this.svg
+
+	// 
+        this.svg
 	  .on("click", () => {
 	      let tgt = d3.select(d3.event.target);
 	      let t = tgt[0][0];
 	      if (t.tagName == "rect" && t.classList.contains("feature")) {
+		  // user clicked on a feature
 		  fSelect(t.__data__, d3.event.shiftKey);
 		  this.highlight();
 	          this.app.contextChanged();
 	      }
-	      else {
-		  if (t.tagName == "rect" && t.classList.contains("block") && !d3.event.shiftKey) {
-		      this.hiFeats = {};
-		      this.highlight();
-		      this.app.contextChanged();
-		  }
+	      else if (t.tagName == "rect" && t.classList.contains("block") && !d3.event.shiftKey) {
+		  // user clicked on a synteny block background
+		  this.hiFeats = {};
+		  this.highlight();
+		  this.app.contextChanged();
 	      }
 	  })
 	  .on("mouseover", () => {
@@ -580,8 +594,6 @@ class ZoomView extends SVGView {
         zstrips.exit()
 	    .on(".drag", null)
 	    .remove();
-
-
 
         let sblocks = zstrips.select('[name="sBlocks"]').selectAll('g.sBlock')
 	    .data(d => d.blocks, d => d.blockId);

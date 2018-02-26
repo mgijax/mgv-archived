@@ -3,25 +3,37 @@ import { coordsAfterTransform } from './utils';
 
 // ---------------------------------------------
 class GenomeView extends SVGView {
+    //----------------------------------------------
     constructor (app, elt, width, height) {
         super(app, elt, width, height);
+	this.openWidth = this.outerWidth;
+	this.closedWidth = 140;
 	this.cwidth = 20;        // chromosome width
+	this.tickLength = 10;	 // feature tick mark length
 	this.brushChr = null;	 // which chr has the current brush
 	this.bwidth = this.cwidth/2;  // block width
 	this.currBlocks = null;
 	this.currTicks = null;
-	//
-	this.gSticks  = this.svgMain.append('g').attr("name", "backbones");
-	this.gBlocks  = this.svgMain.append('g').attr("name", "synBlocks");
-	this.gTicks   = this.svgMain.append('g').attr("name", "ticks");
-	this.gLabels  = this.svgMain.append('g').attr("name", "labels");
-	this.gBrushes = this.svgMain.append('g').attr("name", "brushes");
+	this.gChromosomes = this.svgMain.append('g').attr("name", "chromosomes");
 	this.title    = this.svgMain.append('text').attr("class", "title");
+	//
+	this.initDom();
     }
+    //----------------------------------------------
+    fitToWidth (w){
+        super.fitToWidth(w);
+	this.openWidth = this.outerWidth;
+    }
+    //----------------------------------------------
+    initDom () {
+	this.root.select('.button.collapse')
+	    .on('click', () => this.redraw());
+    }
+
+    //----------------------------------------------
     setBrushCoords (coords) {
 	this.clearBrushes();
-	this.gBrushes
-	  .select(`g.brush[name="${ coords.chr }"]`)
+	this.gChromosomes.select(`.chromosome[name="${coords.chr}"] g[name="brush"]`)
 	  .each(function(chr){
 	    chr.brush.extent([coords.start,coords.end]);
 	    chr.brush(d3.select(this));
@@ -50,7 +62,7 @@ class GenomeView extends SVGView {
 
     //----------------------------------------------
     clearBrushes (except){
-	this.gBrushes.selectAll('.brush').each(function(chr){
+	this.gChromosomes.selectAll('[name="brush"]').each(function(chr){
 	    if (chr.brush !== except) {
 		chr.brush.clear();
 		chr.brush(d3.select(this));
@@ -78,91 +90,98 @@ class GenomeView extends SVGView {
 
     //----------------------------------------------
     draw (tickData, blockData) {
-	this.drawTitle();
 	this.drawChromosomes();
 	this.drawBlocks(blockData);
 	this.drawTicks(tickData);
+	this.drawTitle();
     }
 
     // ---------------------------------------------
+    // Draws the chromosomes of the reference genome.
+    // Includes backbones, labels, and brushes.
+    // The backbones are drawn as vertical line sements,
+    // distributed horizontally. Ordering is defined by
+    // the model (Genome object).
+    // Labels are drawn above the backbones.
+    //
+    // Modification:
+    // Draws the scene in one of two states: open or closed.
+    // The open state is as described - all chromosomes shown.
+    // In the closed state: 
+    //     * only one chromosome shows (the current one)
+    //     * drawn horizontally and positioned beside the "Genome View" title
+    //
     drawChromosomes () {
 	let self = this;
-	let gdata = this.app.rGenome;
 
-	//
-	gdata.xscale = d3.scale.ordinal()
-	     .domain(gdata.chromosomes.map(function(x){return x.name;}))
-	     .rangePoints([0, this.width], 0.5);
-	gdata.yscale = d3.scale.linear()
-	     .domain([1,gdata.maxlen])
+	let closed = this.root.classed("closed");
+	this.setSize( closed ? this.closedWidth : this.openWidth );
+
+	let rg = this.app.rGenome; // ref genome
+        let rChrs = rg.chromosomes.filter(c => {
+	    return true;
+	    if (closed)
+		return c.name === this.app.coords.chr;
+	    else
+		return true;
+	});
+
+	// 
+	rg.xscale = d3.scale.ordinal()
+	     .domain(rg.chromosomes.map(function(x){return x.name;}))
+	     .rangePoints([0, this.openWidth], 0.5);
+
+	rg.yscale = d3.scale.linear()
+	     .domain([1,rg.maxlen])
 	     .range([0, this.height]);
 
-	gdata.chromosomes.forEach(chr => {
+	rg.chromosomes.forEach(chr => {
 	    var sc = d3.scale.linear()
 		.domain([1,chr.length])
-		.range([0, gdata.yscale(chr.length)]);
+		.range([0, rg.yscale(chr.length)]);
 	    chr.brush = d3.svg.brush().y(sc)
 	       .on("brushstart", chr => this.brushstart(chr))
 	       .on("brushend", () => this.brushend());
 	  }, this);
 
-	// Chromosome backbones (lines)
-	let xf = function(d){return self.bwidth+gdata.xscale(d.name);};
-	let ccels = this.gSticks.selectAll('line.chr')
-	  .data(gdata.chromosomes, function(x){return x.name;});
-	ccels.exit().transition().duration(this.app.dur)
-	  .attr("y1", this.height)
-	  .attr("y2", this.height)
-	  .remove();
-	ccels.enter().append('line')
-	  .attr('class','chr')
-	  .attr('name', c => c.name)
-	  .attr("x1", xf)
-	  .attr("y1", this.height)
-	  .attr("x2", xf)
-	  .attr("y2", this.height)
-	  ;
-	ccels.transition().duration(this.app.dur)
-	  .attr("x1", xf)
-	  .attr("y1", 0)
-	  .attr("x2", xf)
-	  .attr("y2", function(d){return gdata.yscale(d.length);})
+
+        // Chromosome groups
+	let chrs = this.gChromosomes.selectAll(".chromosome")
+	    .data(rChrs, c => c.name);
+	let newchrs = chrs.enter().append("g")
+	    .attr("class", "chromosome")
+	    .attr("name", c => c.name);
+	
+	newchrs.append("text").attr("name","label");
+	newchrs.append("line").attr("name","backbone");
+	newchrs.append("g").attr("name","synBlocks");
+	newchrs.append("g").attr("name","ticks");
+	newchrs.append("g").attr("name","brush");
+
+	chrs.attr("transform", c => `translate(${this.bwidth+rg.xscale(c.name)}, 0)`);
+
+        chrs.select('[name="label"]')
+	    .text(c=>c.name)
+	    .attr("x", 0) 
+	    .attr("y", -2)
 	    ;
 
-	// Chromosome labels
-	let labels = this.gLabels.selectAll('.chrlabel')
-	  .data(gdata.chromosomes, function(x){return x.name;});
-	labels.exit().transition().duration(this.app.dur)
-	  .attr('y', this.height)
-	  .remove();
-	labels.enter().append('text')
-	  .attr('font-family','sans-serif')
-	  .attr('font-size', 10)
-	  .attr('class','chrlabel')
-	  .attr('x', xf)
-	  .attr('y', this.height);
-	labels
-	  .text(function(d){return d.name;})
-	  .transition().duration(this.app.dur)
-	  .attr('x', xf)
-	  .attr('y', -2) ;
-
-	// Brushes last so they overlay everything
-	let brushes = this.gBrushes.selectAll("g.brush")
-	    .data(gdata.chromosomes, function(x){return x.name;});
-	brushes.exit().remove();
-	brushes.enter().append('g')
-	    .attr('class','brush')
-	    .attr('name',c=>c.name)
+	chrs.select('[name="backbone"]')
+	    .attr("x1", 0)
+	    .attr("y1", 0)
+	    .attr("x2", 0)
+	    .attr("y2", c => rg.yscale(c.length))
+	    ;
+	    
+	chrs.select('[name="brush"]')
 	    .each(function(d){d3.select(this).call(d.brush);})
 	    .selectAll('rect')
 	     .attr('width',10)
-	     .attr('x', this.cwidth/4)
-	     ;
-	brushes
-	    .attr('transform', function(d){return 'translate('+gdata.xscale(d.name)+')';})
-	    .each(function(d){d3.select(this).call(d.brush);})
+	     .attr('x', -5)
 	    ;
+
+	chrs.exit().remove();
+	
     }
 
     // ---------------------------------------------
@@ -186,33 +205,33 @@ class GenomeView extends SVGView {
     // the given genome.
     // Passing null erases all synteny blocks.
     // Args:
-    //    blockData == { ref:Genome, comp:Genome, blocks: list of synteny blocks }
+    //    data == { ref:Genome, comp:Genome, blocks: list of synteny blocks }
     //    Each sblock === { blockId:int, ori:+/-, fromChr, fromStart, fromEnd, toChr, toStart, toEnd }
-    drawBlocks (blockData) {
+    drawBlocks (data) {
 	//
-	this.currBlocks = blockData;
-	//
-	// group to hold the synteny block rectangles
-        let bgrp = this.svg
-	    .select('g[name="synBlocks"]')
-	    .datum(blockData);
-	
-	if (!blockData) {
-	    bgrp.selectAll("rect.sblock").remove();
+        let sbgrps = this.gChromosomes.selectAll(".chromosome").select('[name="synBlocks"]');
+	if (!data || !data.blocks || data.blocks.length === 0) {
+	    this.currBlocks = null;
+	    sbgrps.html('');
+	    this.drawTitle();
 	    return;
 	}
+	this.currBlocks = data;
+	// reorganize data to reflect SVG structure we want, ie, grouped by chromosome
+        let dx = data.blocks.reduce((a,sb) => {
+		if (!a[sb.fromChr]) a[sb.fromChr] = [];
+		a[sb.fromChr].push(sb);
+		return a;
+	    }, {});
+	sbgrps.each(function(c){
+	    d3.select(this).datum({chr: c.name, blocks: dx[c.name] || [] });
+	});
 
-	// now the rects
-	let rects = bgrp.selectAll("rect.sblock")
-	    .data(d => d.blocks, b => b.blockId);
-	rects.enter().append("rect")
-	    .attr("class", "sblock")
-	    ;
-	rects.exit().remove();
-	//
 	let bwidth = 10;
-	rects
-	    .attr("x", b => this.getX(b.fromChr) + bwidth/2 )
+        let sblocks = sbgrps.selectAll('rect.sblock').data(b=>b.blocks);
+        let newbs = sblocks.enter().append('rect').attr('class','sblock');
+	sblocks
+	    .attr("x", -bwidth/2 )
 	    .attr("y", b => this.getY(b.fromStart))
 	    .attr("width", bwidth)
 	    .attr("height", b => Math.max(0,this.getY(b.fromEnd - b.fromStart + 1)))
@@ -226,18 +245,31 @@ class GenomeView extends SVGView {
     // ---------------------------------------------
     drawTicks (features) {
 	this.currTicks = features;
-	let gdata = this.app.rGenome;
+	let rg = this.app.rGenome; // ref genome
 	// feature tick marks
-	let tickLength = 10;
 	if (!features || features.length === 0) {
-	    this.gTicks.selectAll(".feature").remove();
+	    this.gChromosomes.select('[name="ticks"]').selectAll(".feature").remove();
 	    return;
 	}
-	// the tick elements
-        let feats = this.gTicks.selectAll(".feature")
-	    .data(features, d => d.mgpid);
+
 	//
-	let xAdj = f => (f.strand === "+" ? tickLength : -tickLength);
+	let tGrps = this.gChromosomes.selectAll(".chromosome").select('[name="ticks"]');
+
+	// group features by chromosome
+        let fix = features.reduce((a,f) => { 
+	    if (! a[f.chr]) a[f.chr] = [];
+	    a[f.chr].push(f);
+	    return a;
+	}, {})
+	tGrps.each(function(c) {
+	    d3.select(this).datum( { chr: c, features: fix[c.name]  || []} );
+	});
+
+	// the tick elements
+        let feats = tGrps.selectAll(".feature")
+	    .data(d => d.features, d => d.mgpid);
+	//
+	let xAdj = f => (f.strand === "+" ? this.tickLength : -this.tickLength);
 	//
 	let shape = "circle";  // "circle" or "line"
 	//
@@ -247,21 +279,19 @@ class GenomeView extends SVGView {
 	    .append("title")
 	    .text(f=>f.symbol || f.id);
 	if (shape === "line") {
-	    feats.attr("x1", f => gdata.xscale(f.chr) + xAdj(f) + 5)
-	    feats.attr("y1", f => gdata.yscale(f.start))
-	    feats.attr("x2", f => gdata.xscale(f.chr) + xAdj(f) + tickLength + 5)
-	    feats.attr("y2", f => gdata.yscale(f.start))
+	    feats.attr("x1", f => xAdj(f) + 5)
+	    feats.attr("y1", f => rg.yscale(f.start))
+	    feats.attr("x2", f => xAdj(f) + this.tickLength + 5)
+	    feats.attr("y2", f => rg.yscale(f.start))
 	}
 	else {
-	    feats.attr("cx", f => gdata.xscale(f.chr) + xAdj(f) + 10)
-	    feats.attr("cy", f => gdata.yscale(f.start))
-	    feats.attr("r",  tickLength / 2);
+	    feats.attr("cx", f => xAdj(f))
+	    feats.attr("cy", f => rg.yscale(f.start))
+	    feats.attr("r",  this.tickLength / 2);
 	}
 	//
 	feats.exit().remove()
-
     }
-
 } // end class GenomeView
 
 export { GenomeView };
