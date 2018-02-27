@@ -58,12 +58,14 @@ function __main__ () {
     // browser's location. This also registers the change in 
     // the browser history.
     function setHash () {
+	let newHash = mgv.getParamString();
+	if ('#'+newHash === window.location.hash) return;
 	// don't want to trigger an infinite loop here!
 	// temporarily disable popstate handler
 	let f = window.onpopstate;
 	window.onpopstate = null;
 	// now set the hash
-	window.location.hash = mgv.getParamString();
+	window.location.hash = newHash;
 	// re-enable
 	window.onpopstate = f;
     }
