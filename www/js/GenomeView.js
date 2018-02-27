@@ -35,16 +35,9 @@ class GenomeView extends SVGView {
 	    this.scrollWheel(d3.event.deltaY)
 	    d3.event.preventDefault();
 	});
-    }
-
-    //----------------------------------------------
-    // Scroll wheel event handler.
-    scrollWheel (dy) {
-	// Add dy to total scroll amount. Then translate the chromosomes group.
-	this.scrollChromosomesBy(dy);
-	// After a 200 ms pause in scrolling, snap to nearest chromosome
-	this.tout && window.clearTimeout(this.tout);
-	this.tout = window.setTimeout(()=>this.scrollChromosomesSnap(), 200);
+	let sbs = this.root.select('[name="svgcontainer"] > [name="scrollbuttons"]')
+	sbs.select('.button[name="up"]').on("click", () => this.scrollChromosomesUp());
+	sbs.select('.button[name="dn"]').on("click", () => this.scrollChromosomesDown());
     }
 
     //----------------------------------------------
@@ -159,7 +152,9 @@ class GenomeView extends SVGView {
 	    // 
 	    rg.xscale = d3.scale.ordinal()
 		 .domain(rChrs.map(function(x){return x.name;}))
-		 .rangePoints([0, this.closedWidth*rChrs.length]);
+		 // in closed mode, the chromosomes have fixed spacing
+		 .rangePoints([10, this.closedWidth*(rChrs.length-1)]);
+	    //
 	    rg.yscale = d3.scale.linear()
 		 .domain([1,rg.maxlen])
 		 .range([0, this.height]);
@@ -167,7 +162,8 @@ class GenomeView extends SVGView {
 	    // translate each chromosome into position
 	    chrs.attr("transform", c => `translate(${rg.xscale(c.name)}, 0)`);
             // translate the whole group.
-	    this.scrollChromosomesTo(-rg.xscale(this.app.coords.chr) + 10);
+	    this.scrollChromosomesTo(-rg.xscale(this.app.coords.chr));
+	    this.scrollChromosomesSnap();
 	    // turn the whole thing 90 deg
 	    this.svg.style("transform","rotateZ(-90deg)");
 	}
@@ -178,6 +174,7 @@ class GenomeView extends SVGView {
 	    // 
 	    rg.xscale = d3.scale.ordinal()
 		 .domain(rChrs.map(function(x){return x.name;}))
+		 // in closed mode, the chromosomes spread to fill the space
 		 .rangePoints([0, this.openWidth - 30], 0.5);
 	    rg.yscale = d3.scale.linear()
 		 .domain([1,rg.maxlen])
@@ -223,16 +220,33 @@ class GenomeView extends SVGView {
     }
 
     // ---------------------------------------------
+    // Scroll wheel event handler.
+    scrollWheel (dy) {
+	// Add dy to total scroll amount. Then translate the chromosomes group.
+	this.scrollChromosomesBy(dy);
+	// After a 200 ms pause in scrolling, snap to nearest chromosome
+	this.tout && window.clearTimeout(this.tout);
+	this.tout = window.setTimeout(()=>this.scrollChromosomesSnap(), 200);
+    }
     scrollChromosomesTo (x) {
         if (x === undefined) x = this.scrollAmount;
-	this.scrollAmount = Math.max(Math.min(x,15), -this.closedWidth * this.app.rGenome.chromosomes.length);
+	this.scrollAmount = Math.max(Math.min(x,15), -this.closedWidth * (this.app.rGenome.chromosomes.length-1));
 	this.gChromosomes.attr("transform", `translate(${this.scrollAmount},0)`);
     }
     scrollChromosomesBy (dx) {
         this.scrollChromosomesTo(this.scrollAmount + dx);
     }
     scrollChromosomesSnap () {
-        console.log("snap");
+	let i = Math.round(this.scrollAmount / this.closedWidth)
+	this.scrollChromosomesTo(i*this.closedWidth);
+    }
+    scrollChromosomesUp () {
+        this.scrollChromosomesBy(-this.closedWidth);
+	this.scrollChromosomesSnap();
+    }
+    scrollChromosomesDown () {
+        this.scrollChromosomesBy(this.closedWidth);
+	this.scrollChromosomesSnap();
     }
     // ---------------------------------------------
     drawTitle () {

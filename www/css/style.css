@@ -469,9 +469,17 @@ label > i.material-icons {
 }
 #genomeView.closed [name="svgcontainer"] {
     display: block;
-    height: 50px;
+    height: 60px;
     overflow: hidden;
 }
+#genomeView [name="svgcontainer"] [name="scrollbuttons"] {
+    display: none;
+    position: absolute;
+}
+#genomeView.closed [name="svgcontainer"] [name="scrollbuttons"] {
+    display: flex;
+}
+
 #genomeView .chromosome [name="backbone"] {
     stroke: #bbb;
     stroke-width: 1px;
