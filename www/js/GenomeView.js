@@ -17,6 +17,7 @@ class GenomeView extends SVGView {
 	this.currTicks = null;
 	this.gChromosomes = this.svgMain.append('g').attr("name", "chromosomes");
 	this.title    = this.svgMain.append('text').attr("class", "title");
+	this.scrollAmount = 0;
 	//
 	this.initDom();
     }
@@ -29,6 +30,21 @@ class GenomeView extends SVGView {
     initDom () {
 	this.root.select('.button.collapse')
 	    .on('click', () => this.redraw());
+	this.svg.on("wheel", () => {
+	    if (!this.root.classed("closed")) return;
+	    this.scrollWheel(d3.event.deltaY)
+	    d3.event.preventDefault();
+	});
+    }
+
+    //----------------------------------------------
+    // Scroll wheel event handler.
+    scrollWheel (dy) {
+	// Add dy to total scroll amount. Then translate the chromosomes group.
+	this.scrollChromosomesBy(dy);
+	// After a 200 ms pause in scrolling, snap to nearest chromosome
+	this.tout && window.clearTimeout(this.tout);
+	this.tout = window.setTimeout(()=>this.scrollChromosomesSnap(), 200);
     }
 
     //----------------------------------------------
@@ -148,9 +164,11 @@ class GenomeView extends SVGView {
 		 .domain([1,rg.maxlen])
 		 .range([0, this.height]);
 
+	    // translate each chromosome into position
 	    chrs.attr("transform", c => `translate(${rg.xscale(c.name)}, 0)`);
-	    let i = rChrs.map(c => c.name).indexOf(this.app.coords.chr);
-	    this.gChromosomes.attr("transform", `translate(${-rg.xscale(this.app.coords.chr) + 10},0)`);
+            // translate the whole group.
+	    this.scrollChromosomesTo(-rg.xscale(this.app.coords.chr) + 10);
+	    // turn the whole thing 90 deg
 	    this.svg.style("transform","rotateZ(-90deg)");
 	}
 	else {
@@ -166,7 +184,7 @@ class GenomeView extends SVGView {
 		 .range([0, this.height]);
 
 	    chrs.attr("transform", c => `translate(${this.bwidth+rg.xscale(c.name)}, 0)`);
-	    this.gChromosomes.attr("transform", `translate(0,0)`);
+	    this.scrollChromosomesTo(0);
 	    this.svg.style("transform","rotateZ(0deg)");
 	}
 
@@ -205,6 +223,18 @@ class GenomeView extends SVGView {
     }
 
     // ---------------------------------------------
+    scrollChromosomesTo (x) {
+        if (x === undefined) x = this.scrollAmount;
+	this.scrollAmount = Math.max(Math.min(x,15), -this.closedWidth * this.app.rGenome.chromosomes.length);
+	this.gChromosomes.attr("transform", `translate(${this.scrollAmount},0)`);
+    }
+    scrollChromosomesBy (dx) {
+        this.scrollChromosomesTo(this.scrollAmount + dx);
+    }
+    scrollChromosomesSnap () {
+        console.log("snap");
+    }
+    // ---------------------------------------------
     drawTitle () {
 	let refg = this.app.rGenome.label;
 	let blockg = this.currBlocks ? 
@@ -221,8 +251,8 @@ class GenomeView extends SVGView {
 	let lines = [];
 	blockg && lines.push(`Blocks vs. ${blockg}`);
 	lst && lines.push(`Features from list "${lst}"`);
-	let subt = lines.join(" / ");
-	this.root.select("label span.subtitle").text((subt ? "/ " : "") + subt);
+	let subt = lines.join(" :: ");
+	this.root.select("label span.subtitle").text((subt ? ":: " : "") + subt);
     }
 
     // ---------------------------------------------

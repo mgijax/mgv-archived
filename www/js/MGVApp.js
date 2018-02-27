@@ -101,7 +101,7 @@ class MGVApp {
 	        let lc = d3.select("#mgv > .leftcolumn");
 		lc.classed("closed", () => ! lc.classed("closed"));
 		this.resize()
-		this.genomeView.redraw();
+		this.setContext({});
 	    });
 	
 	//

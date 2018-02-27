@@ -1,6 +1,7 @@
 // ---------------------------------------------
 // Something that knows how to translate coordinates between two genomes.
 //
+//
 class BlockTranslator {
     constructor(url, aGenome, bGenome, blocks){
         this.url = url;
