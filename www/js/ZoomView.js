@@ -345,53 +345,6 @@ class ZoomView extends SVGView {
     }
 
     //----------------------------------------------
-    update (coords) {
-	let self = this;
-	let c = this.coords = (coords || this.coords);
-	d3.select("#zoomCoords")[0][0].value = formatCoords(c.chr, c.start, c.end);
-	d3.select("#zoomWSize")[0][0].value = Math.round(c.end - c.start + 1)
-	//
-        let mgv = this.app;
-	// when the translator is ready, we can translate the ref coords to each genome and
-	// issue requests to load the features in those regions.
-	mgv.showBusy(true);
-	mgv.translator.ready().then(function(){
-	    // Now issue requests for features. One request per genome, each request specifies one or more
-	    // coordinate ranges.
-	    // Wait for all the data to become available, then draw.
-	    //
-	    let promises = [];
-
-	    // First request is for the the reference genome. Get all the features in the range.
-	    promises.push(mgv.featureManager.getFeatures(mgv.rGenome, [{
-		// Need to simulate the results from calling the translator. 
-		// 
-		chr    : c.chr,
-		start  : c.start,
-		end    : c.end,
-		fChr   : c.chr,
-		fStart : c.start,
-		fEnd   : c.end,
-		ori    : "+",
-		blockId: mgv.rGenome.name
-		}]));
-	    if (! self.root.classed("closed")) {
-		// Add a request for each comparison genome, using translated coordinates. 
-		mgv.cGenomes.forEach(cGenome => {
-		    let ranges = mgv.translator.translate( mgv.rGenome, c.chr, c.start, c.end, cGenome );
-		    promises.push(mgv.featureManager.getFeatures(cGenome, ranges))
-		});
-	    }
-	    // when everything is ready, call the draw function
-	    Promise.all(promises).then( data => {
-	        self.draw(data);
-		mgv.showBusy(false);
-            });
-	});
-
-    }
-
-    //----------------------------------------------
     clearBrushes () {
 	this.root.selectAll("g.brush")
 	    .each( function (b) {
@@ -501,31 +454,77 @@ class ZoomView extends SVGView {
     }
 
     //----------------------------------------------
+    update (coords) {
+	let self = this;
+	let c = this.coords = (coords || this.coords);
+	d3.select("#zoomCoords")[0][0].value = formatCoords(c.chr, c.start, c.end);
+	d3.select("#zoomWSize")[0][0].value = Math.round(c.end - c.start + 1)
+	//
+        let mgv = this.app;
+	// when the translator is ready, we can translate the ref coords to each genome and
+	// issue requests to load the features in those regions.
+	mgv.showBusy(true);
+	mgv.translator.ready().then(function(){
+	    // Now issue requests for features. One request per genome, each request specifies one or more
+	    // coordinate ranges.
+	    // Wait for all the data to become available, then draw.
+	    //
+	    let promises = [];
+
+	    // First request is for the the reference genome. Get all the features in the range.
+	    promises.push(mgv.featureManager.getFeatures(mgv.rGenome, [{
+		// Need to simulate the results from calling the translator. 
+		// 
+		chr    : c.chr,
+		start  : c.start,
+		end    : c.end,
+		fChr   : c.chr,
+		fStart : c.start,
+		fEnd   : c.end,
+		ori    : "+",
+		blockId: mgv.rGenome.name
+		}]));
+	    if (! self.root.classed("closed")) {
+		// Add a request for each comparison genome, using translated coordinates. 
+		mgv.cGenomes.forEach(cGenome => {
+		    let ranges = mgv.translator.translate( mgv.rGenome, c.chr, c.start, c.end, cGenome );
+		    promises.push(mgv.featureManager.getFeatures(cGenome, ranges))
+		});
+	    }
+	    // when everything is ready, call the draw function
+	    Promise.all(promises).then( data => {
+	        self.draw(data);
+		mgv.showBusy(false);
+            });
+	});
+    }
+
+    //----------------------------------------------
     // Draws the zoom view panel with the given data.
+    //
     // Data is structured as follows:
+    //     data = [ zoomStrip_data ]
+    //     zoomStrip_data = { genome [ zoomBlock_data ] }
+    //     zoomBlock_data = { xscale, chr, start, end, fChr, fStart, fEnd, ori, [ feature_data ] }
+    //     feature_data = { mgpid, mgiid, symbol, chr, start, end, strand, type, biotype }
+    //
+    // Again, in English:
     //  - data is a list of items, one per strip to be displayed. Item[0] is data for the ref genome.
     //    Items[1+] are data for the comparison genome.
     //  - each strip item is an object containing a genome and a list of blocks. Item[0] always has 
     //    a single block.
     //  - each block is an object containing a chromosome, start, end, orientation, etc, and a list of features.
     //  - each feature has chr,start,end,strand,type,biotype,mgpid
+    //
     draw (data) {
 	// 
 	let self = this;
 
-	// data = [ zoomStrip_data ]
-	// zoomStrip_data = { genome [ zoomBlock_data ] }
-	// zoomBlock_data = { xscale, chr, start, end, fChr, fStart, fEnd, ori, [ feature_data ] }
-	// feature_data = { mgpid, mgiid, symbol, chr, start, end, strand, type, biotype }
-	//
-
-	// set the y-coords for each genome in the zoom view
-	//data.forEach( (d,i) => d.genome.zoomY = this.topOffset + (i * (this.stripHeight+this.stripGap)) );
+	let closed = this.root.classed("closed");
 
 	// reset the svg size based on number of strips
 	let totalHeight = (this.stripHeight+this.stripGap) * data.length + 12;
 	this.svg
-	    //.attr("height", Math.max(this.minSvgHeight, totalHeight));
 	    .attr("height", totalHeight);
 
 	// Draw the title on the zoomview position controls
@@ -563,7 +562,6 @@ class ZoomView extends SVGView {
 	let newzs = zstrips.enter()
 	        .append("g")
 		.attr("class","zoomStrip")
-		.classed("reference", d => d.genome === this.app.rGenome)
 		.attr("name", d => d.genome.name)
 		.on("click", function (g) {
 		    self.highlightStrip(g.genome, this);
@@ -578,7 +576,8 @@ class ZoomView extends SVGView {
 	    .attr("font-family","sans-serif")
 	    .attr("font-size", 10)
 	    ;
-	newzs.append("g").attr("name", "sBlocks");
+	newzs.append("g")
+	    .attr("name", "sBlocks");
 	newzs.append("rect")
 	    .attr("name", "zoomStripHandle")
 	    .attr("x", -15)
@@ -588,7 +587,8 @@ class ZoomView extends SVGView {
 	    ;
 
 	zstrips
-	    .attr("transform", g => `translate(0,${g.genome.zoomY})`)
+	    .classed("reference", d => d.genome === this.app.rGenome)
+	    .attr("transform", g => `translate(0,${closed ? this.topOffset : g.genome.zoomY})`)
 	    ;
 
         zstrips.exit()

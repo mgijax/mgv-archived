@@ -7,7 +7,8 @@ class GenomeView extends SVGView {
     constructor (app, elt, width, height) {
         super(app, elt, width, height);
 	this.openWidth = this.outerWidth;
-	this.closedWidth = 140;
+	this.closedWidth = 40;
+	this.openHeight= this.outerHeight;
 	this.cwidth = 20;        // chromosome width
 	this.tickLength = 10;	 // feature tick mark length
 	this.brushChr = null;	 // which chr has the current brush
@@ -94,6 +95,7 @@ class GenomeView extends SVGView {
 	this.drawBlocks(blockData);
 	this.drawTicks(tickData);
 	this.drawTitle();
+	this.setBrushCoords(this.app.coords);
     }
 
     // ---------------------------------------------
@@ -114,36 +116,8 @@ class GenomeView extends SVGView {
     drawChromosomes () {
 	let self = this;
 
-	let closed = this.root.classed("closed");
-	this.setSize( closed ? this.closedWidth : this.openWidth );
-
 	let rg = this.app.rGenome; // ref genome
-        let rChrs = rg.chromosomes.filter(c => {
-	    return true;
-	    if (closed)
-		return c.name === this.app.coords.chr;
-	    else
-		return true;
-	});
-
-	// 
-	rg.xscale = d3.scale.ordinal()
-	     .domain(rg.chromosomes.map(function(x){return x.name;}))
-	     .rangePoints([0, this.openWidth], 0.5);
-
-	rg.yscale = d3.scale.linear()
-	     .domain([1,rg.maxlen])
-	     .range([0, this.height]);
-
-	rg.chromosomes.forEach(chr => {
-	    var sc = d3.scale.linear()
-		.domain([1,chr.length])
-		.range([0, rg.yscale(chr.length)]);
-	    chr.brush = d3.svg.brush().y(sc)
-	       .on("brushstart", chr => this.brushstart(chr))
-	       .on("brushend", () => this.brushend());
-	  }, this);
-
+	let rChrs = rg.chromosomes;
 
         // Chromosome groups
 	let chrs = this.gChromosomes.selectAll(".chromosome")
@@ -158,7 +132,53 @@ class GenomeView extends SVGView {
 	newchrs.append("g").attr("name","ticks");
 	newchrs.append("g").attr("name","brush");
 
-	chrs.attr("transform", c => `translate(${this.bwidth+rg.xscale(c.name)}, 0)`);
+
+	let closed = this.root.classed("closed");
+	if (closed) {
+	    // Reset the SVG size to be 1-chromosome wide.
+	    // Translate the chromosomes group so that the current chromosome appears in the svg area.
+	    // Turn it 90 deg, and fill the available horiz space
+	    // (so set the new height == current width)
+	    this.setSize( this.closedWidth, this.openWidth );
+	    // 
+	    rg.xscale = d3.scale.ordinal()
+		 .domain(rChrs.map(function(x){return x.name;}))
+		 .rangePoints([0, this.closedWidth*rChrs.length]);
+	    rg.yscale = d3.scale.linear()
+		 .domain([1,rg.maxlen])
+		 .range([0, this.height]);
+
+	    chrs.attr("transform", c => `translate(${rg.xscale(c.name)}, 0)`);
+	    let i = rChrs.map(c => c.name).indexOf(this.app.coords.chr);
+	    this.gChromosomes.attr("transform", `translate(${-rg.xscale(this.app.coords.chr) + 10},0)`);
+	    this.svg.style("transform","rotateZ(-90deg)");
+	}
+	else {
+	    // When open, draw all the chromosomes. Each chrom is a vertical line.
+	    // Chroms are distributed evenly across the available horizontal space.
+	    this.setSize( this.openWidth, this.openHeight );
+	    // 
+	    rg.xscale = d3.scale.ordinal()
+		 .domain(rChrs.map(function(x){return x.name;}))
+		 .rangePoints([0, this.openWidth - 30], 0.5);
+	    rg.yscale = d3.scale.linear()
+		 .domain([1,rg.maxlen])
+		 .range([0, this.height]);
+
+	    chrs.attr("transform", c => `translate(${this.bwidth+rg.xscale(c.name)}, 0)`);
+	    this.gChromosomes.attr("transform", `translate(0,0)`);
+	    this.svg.style("transform","rotateZ(0deg)");
+	}
+
+	rChrs.forEach(chr => {
+	    var sc = d3.scale.linear()
+		.domain([1,chr.length])
+		.range([0, rg.yscale(chr.length)]);
+	    chr.brush = d3.svg.brush().y(sc)
+	       .on("brushstart", chr => this.brushstart(chr))
+	       .on("brushend", () => this.brushend());
+	  }, this);
+
 
         chrs.select('[name="label"]')
 	    .text(c=>c.name)
@@ -172,7 +192,7 @@ class GenomeView extends SVGView {
 	    .attr("x2", 0)
 	    .attr("y2", c => rg.yscale(c.length))
 	    ;
-	    
+	   
 	chrs.select('[name="brush"]')
 	    .each(function(d){d3.select(this).call(d.brush);})
 	    .selectAll('rect')
@@ -195,11 +215,16 @@ class GenomeView extends SVGView {
 	    :
 	    null;
 	let lst = this.app.currList ? this.app.currList.name : null;
-	let lines = [`${refg}${(blockg || lst) ? ', showing' : ''}`];
-	blockg && lines.push(`- synteny blocks vs ${blockg}`);
-	lst && lines.push(`- list "${lst}"`);
-	this.drawText( this.width/2, this.height-30, lines, ["title", "subtitle"] );
+
+	this.root.select("label span.title").text(refg);
+
+	let lines = [];
+	blockg && lines.push(`Blocks vs. ${blockg}`);
+	lst && lines.push(`Features from list "${lst}"`);
+	let subt = lines.join(" / ");
+	this.root.select("label span.subtitle").text((subt ? "/ " : "") + subt);
     }
+
     // ---------------------------------------------
     // Draws the outlines of synteny blocks of the ref genome vs.
     // the given genome.

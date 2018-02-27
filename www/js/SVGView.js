@@ -31,21 +31,6 @@ class SVGView extends Component {
         this.setSize(width - r.x)
     }
 
-    //
-    drawText (x, y, lines, classes) {
-	let lineHeight = 14; // FIXME
-	if (typeof(lines) === "string") lines = [lines];
-	if (typeof(classes) === "string")
-	    classes = [classes];
-	else if (!classes)
-	    classes = [];
-        let content = lines.map((s,i) => {
-	    let cls = classes[i] || classes[classes.length-1] || "";
-	    return `<tspan x="${x}" y="${y + i*lineHeight}" class="${cls}">${s}</tspan>`;
-	}).join('');
-	this.title.html(content);
-    }
-
 } // end class SVGView
 
 export { SVGView };

@@ -29,8 +29,8 @@ def getByCoords(datadir, form):
     for c in coords.split(","):
 	chr, rest = c.split(":")
 	s,e   = rest.split("..")
-	start = int(s)
-	end   = int(e)
+	start = int(round(float(s))) if "." in s else int(s)
+	end   = int(round(float(e))) if "." in e else int(e)
 	blocks= lookup(ff, ix, chr, start, end)
 	for b in blocks:
 	    if not b["id"] in allBlocks:

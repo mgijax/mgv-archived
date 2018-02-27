@@ -453,11 +453,24 @@ label > i.material-icons {
  * Genome View
  * -----------------------------------------
  */
+#genomeView > label {
+    align-items: baseline;
+}
+#genomeView > label .subtitle {
+    font-weight: normal;
+    font-size: smaller;
+}
+
 #genomeView svg {
-    height: 250px;
+    transform-origin: 100% 0;
+}
+#genomeView [name="chromosomes"] {
+    transition: transform 0.3s;
 }
 #genomeView.closed [name="svgcontainer"] {
     display: block;
+    height: 50px;
+    overflow: hidden;
 }
 #genomeView .chromosome [name="backbone"] {
     stroke: #bbb;
@@ -465,6 +478,9 @@ label > i.material-icons {
 }
 #genomeView .chromosome [name="label"] {
     text-anchor : middle;
+}
+#genomeView.closed .chromosome [name="label"] {
+    transform: rotateZ(90deg) translate(-6px,6px);
 }
 #genomeView .chromosome [name="ticks"] line.feature {
     stroke: black;
