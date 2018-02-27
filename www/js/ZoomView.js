@@ -83,7 +83,7 @@ class ZoomView extends SVGView {
 	this.root
 	  .on("click.context", () => {
 	      let tgt = d3.event.target;
-	      if (tgt.tagName.toLowerCase() === "i" && tgt.innerHTML !== "menu")
+	      if (tgt.tagName.toLowerCase() === "i" && tgt.innerHTML === "menu")
 		  // exception: the context menu button itself
 	          return;
 	      else
