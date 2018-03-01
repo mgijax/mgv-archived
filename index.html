@@ -21,22 +21,22 @@
     <div id="mgv" class="flexrow" >
 
 	<!-- Left column. -->
-	<div class="leftcolumn flexcolumn">
+	<div name="leftcolumn" class="flexcolumn content-draggable">
 
 	    <!-- Reference strain. -->
-	    <div class="refGenome pagebox flexcolumn collapsible">
+	    <div class="refGenome pagebox flexcolumn closable">
 		<label>Reference genome</label>
 		<select id="refGenome"></select>
 	    </div>
 
 	    <!-- Comparison strains. -->
-	    <div class="compGenomes pagebox flexcolumn collapsible">
+	    <div class="compGenomes pagebox flexcolumn closable">
 		<label>Comparison genomes</label>
 		<select id="compGenomes" size="10"></select>
 	    </div>
 
 	    <!-- Find genes (aka create lists). -->
-	    <div id="findgenes" class="pagebox flexcolumn collapsible">
+	    <div id="findgenes" class="pagebox flexcolumn closable">
 		<label>Find genes</label>
 		<div class="flexcolumn">
 		    <select name="searchtype">
@@ -46,7 +46,7 @@
 	    </div>
 
 	    <!-- My lists -->
-	    <div id="mylists" class="pagebox flexcolumn collapsible">
+	    <div id="mylists" class="pagebox flexcolumn closable">
 		<label>My lists</label>
 
 		<!-- All my lists -->
@@ -67,7 +67,7 @@
 	    </div>
 
 	    <!-- List Editor  -->
-	    <div id="listeditor" class="pagebox flexcolumn collapsible closed">
+	    <div id="listeditor" class="pagebox flexcolumn closable closed">
 		<label>List editor</label>
 		<form name="editform" class="flexcolumn">
 		    <!-- Name -->
@@ -119,39 +119,39 @@
 	    </div>
 
 	    <!-- Facet: feature type -->
-	    <div class="colorKey facet pagebox flexcolumn collapsible">
+	    <div class="colorKey facet pagebox flexcolumn closable">
 		<label>Feature types</label>
 	    </div>
 
 	    <!-- Facet: has MGI id -->
-	    <div class="mgiFacet facet pagebox flexcolumn collapsible">
+	    <div class="mgiFacet facet pagebox flexcolumn closable">
 		<label>Has MGI ID?</label>
-		<div class="flexrow">
+		<div>
 		    <input type="radio" name="mgiFacet" value="yes" />
 		    <span>Yes</span>
 		</div>
-		<div class="flexrow">
+		<div>
 		    <input type="radio" name="mgiFacet" value="no" />
 		    <span>No</span>
 		</div>
-		<div class="flexrow">
+		<div>
 		    <input type="radio" name="mgiFacet" value="" checked />
 		    <span>Don't care</span>
 		</div>
 	    </div>
 
 	    <!-- Facet: is highlighted -->
-	    <div class="hiFacet facet pagebox flexcolumn collapsible">
+	    <div class="hiFacet facet pagebox flexcolumn closable">
 		<label>Is highlighted?</label>
-		<div class="flexrow">
+		<div>
 		    <input type="radio" name="hiFacet" value="yes" />
 		    <span>Yes</span>
 		</div>
-		<div class="flexrow">
+		<div>
 		    <input type="radio" name="hiFacet" value="no" />
 		    <span>No</span>
 		</div>
-		<div class="flexrow">
+		<div>
 		    <input type="radio" name="hiFacet" value="" checked />
 		    <span>Don't care</span>
 		</div>
@@ -159,9 +159,9 @@
 	</div>
 
 	<!-- Middle column -->
-	<div class="middlecolumn flexcolumn spacer1">
+	<div name="middlecolumn" class="flexcolumn spacer1 content-draggable">
 	    <!-- Genome view -->
-	    <div id="genomeView" class="pagebox flexcolumn collapsible">
+	    <div id="genomeView" class="pagebox flexcolumn closable">
 		<label><span class="title">Genome View</span> <span class="subtitle"></span></label>
 		<div name="svgcontainer" class="flexrow">
 		    <div name="scrollbuttons" class="flexcolumn">
@@ -172,12 +172,12 @@
 		</div>
 	    </div>
 	    <!-- Feature details -->
-	    <div id="featureDetails" class="pagebox flexcolumn collapsible">
+	    <div id="featureDetails" class="pagebox flexcolumn closable">
 		<label>Feature details</label>
 		<table></table>
 	    </div>
 	    <!-- Zoom view -->
-	    <div id="zoomView" class="pagebox flexcolumn collapsible">
+	    <div id="zoomView" class="pagebox flexcolumn closable">
 		<!-- Zoom controls -->
 		<div name="zoomcontrols" class="flexrow">
 		    <!-- menu -->

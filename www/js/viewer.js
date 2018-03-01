@@ -83,7 +83,7 @@ function __main__ () {
     cfg.oncontextchange = setHash;
 
     // create the app
-    mgv = new MGVApp(cfg);
+    window.mgv = mgv = new MGVApp(cfg);
     
     // handle resize events
     window.onresize = () => {mgv.resize();mgv.setContext({});}

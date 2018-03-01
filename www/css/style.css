@@ -96,6 +96,23 @@ label > i.material-icons {
  * flexrow and flexcolumn
  * -----------------------------------------
  */
+.flexrow {
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.flexcolumn {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+}
+
 .spacer1 { flex-grow: 1; }
 .spacer2 { flex-grow: 2; }
 .spacer3 { flex-grow: 3; }
@@ -103,50 +120,64 @@ label > i.material-icons {
 .spacer8 { flex-grow: 8; }
 .spacer13 { flex-grow: 13; }
 
-.flexrow {
-    position: relative;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    flex-wrap: nowrap;
-}
-
-.flexcolumn {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    flex-wrap: nowrap;
-}
 
 /* -----------------------------------------
- * collapsible
+ * closable
  * -----------------------------------------
  */
 
-/* in closed state, immediate children are not displayed */
-.collapsible.closed > * {
-    display: none;
-}
-/* ...except for for the first <label> and the open/close button */
-.collapsible.closed > label:first-of-type,
-.collapsible.closed > .button.collapse {
-    display: inherit;
-}
-/* the button */
-.collapsible > .button.collapse {
+/* open/close the button */
+.closable > .button.close {
     position: absolute;
     top: -1px;
     right: -1px;
     border-radius: 10px;
     font-size: 18px;
 }
-.collapsible > .button.collapse::after {
+/* icon to show in the open (default) state */
+.closable > .button.close::after {
     content: "arrow_drop_up"
 }
-.collapsible.closed > .button.collapse::after {
+/* icon to show in the closed state */
+.closable.closed > .button.close::after {
     content: "arrow_drop_down"
 }
+/* in closed state, immediate children are not displayed */
+.closable.closed > * {
+    display: none;
+}
+/* ...except for for the first <label> and the open/close button */
+.closable.closed > label:first-of-type,
+.closable.closed > .button.close {
+    display: inherit;
+}
 
+/* -----------------------------------------
+ * draggable
+ * -----------------------------------------
+ */
+
+/* drag handle */
+.content-draggable > * > .button.draghandle {
+    position: absolute;
+    top: -1px;
+    right: -1px;
+    border-radius: 10px;
+    font-size: 18px;
+    cursor: grab;
+    cursor: -webkit-grab;
+}
+/* icon to show in the open (default) state */
+.content-draggable > * > .button.draghandle::after {
+    content: "menu"
+}
+.content-draggable > .closable.closed > .button.draghandle {
+    display: inherit;
+}
+
+.content-draggable > .closable > .button.close {
+    right: 20px;
+}
 
 /* -----------------------------------------
  * pagebox
@@ -157,15 +188,12 @@ label > i.material-icons {
     padding: 6px;
     margin: 3px;
 }
-
 .pagebox:hover {
     outline: thin solid black;
 }
-
 .pagebox * {
     margin: 2px;
 }
-
 .pagebox > i.busy::before {
     content: "settings";
 }
@@ -199,9 +227,6 @@ label > i.material-icons {
 }
 [name="cxtMenu"].showing {
     display: inherit;
-}
-.menuItem {
-    justify-content: space-between;
 }
 .menuItem label {
     font-weight: normal;
@@ -245,7 +270,6 @@ label > i.material-icons {
 }
 
 #mylists .listInfo {
-    justify-content: space-between;
     margin: 0px;
     flex: 0 0;
     border: 3px solid #ccc;
@@ -299,7 +323,6 @@ label > i.material-icons {
 }
 #mylists [name="tools"] {
     border-top: thin solid #555;
-    justify-content: space-between;
     align-items: flex-start;
 }
 
@@ -315,9 +338,6 @@ label > i.material-icons {
 }
 #listeditor [name="editform"] label {
     font-size: 12px !important;
-}
-#listeditor [name="editform"] [name="title"] > .flexrow:first-child {
-    justify-content: space-between;
 }
 #listeditor [name="editform"] div[name="modified"] * {
     font-size: 10px !important;
@@ -347,9 +367,6 @@ label > i.material-icons {
 #listeditor [name="formulaeditor"] textarea {
     height: 40px;
 }
-#listeditor [name="formulaeditor"] [name="formulaheader"] {
-    justify-content: space-between;
-}
 #listeditor [name="formulaeditor"] * {
     margin-top: 0px;
     margin-bottom: 0px;
@@ -372,7 +389,6 @@ label > i.material-icons {
     background-color: transparent;
 }
 #listeditor [name="idsection"] > .flexrow {
-    justify-content: space-between;
 }
 #listeditor [name="formulaeditor"] [name="formula"] {
     outline-style: none;
@@ -403,7 +419,6 @@ label > i.material-icons {
  * -----------------------------------------
  */
 #header {
-    justify-content: space-between;
     padding: 3px 12px;
     background-color: #557f9e;
     color: #eee;
@@ -421,10 +436,9 @@ label > i.material-icons {
 
 #mgv {
     align-items: flex-start;
-    justify-content: space-between;
 }
 
-#mgv .leftcolumn.closed {
+#mgv [name="leftcolumn"].closed {
     display: none;
 }
 
@@ -432,7 +446,6 @@ label > i.material-icons {
     background-color: #557f9e;
     color: #eee;
     border: none;
-    justify-content: space-between;
 }
 #footer a:link,
 #footer a:visited {
@@ -442,11 +455,8 @@ label > i.material-icons {
     color: gold;
 }
 
-.leftcolumn {
+[name="leftcolumn"] {
     min-width: 220px;
-}
-.rightcolumn {
-    min-width: 200px;
 }
 
 /* -----------------------------------------

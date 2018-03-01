@@ -34,18 +34,21 @@ class MGVApp {
 	this.coords = { chr: "1", start: 1000000, end: 10000000 };
 	//
 	//
-	d3.selectAll(".collapsible")
-	    .append("i")
-	    .attr("class","material-icons button collapse")
-	    .on("click.default", function () {
-		let p = d3.select(this.parentNode);
-		p.classed("closed", ! p.classed("closed"));
-	    });
 	// 
 	d3.selectAll(".pagebox")
 	    .append("i")
 	    .attr("class","material-icons busy rotating")
 	    ;
+	d3.selectAll(".closable")
+	    .append("i")
+	    .attr("class","material-icons button close")
+	    .on("click.default", function () {
+		let p = d3.select(this.parentNode);
+		p.classed("closed", ! p.classed("closed"));
+	    });
+	//d3.selectAll(".content-draggable > *")
+	    //.append("i")
+	    //.attr("class","material-icons button draghandle");
 	//
 	this.genomeView = new GenomeView(this, "#genomeView", 800, 250);
 	this.zoomView   = new ZoomView  (this, "#zoomView", 800, 250, this.coords);
@@ -98,7 +101,7 @@ class MGVApp {
 	// Button: Gear icon to show/hide left column
 	d3.select("#header > .gear.button")
 	    .on("click", () => {
-	        let lc = d3.select("#mgv > .leftcolumn");
+	        let lc = d3.select('#mgv > [name="leftcolumn"]');
 		lc.classed("closed", () => ! lc.classed("closed"));
 		this.resize()
 		this.setContext({});

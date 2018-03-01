@@ -111,7 +111,7 @@ class ListEditor extends Component {
             .on("click", () => this.closeFormulaEditor() );
 	
 	// Clicking the box collapse button should clear the form
-	this.root.select(".button.collapse")
+	this.root.select(".button.close")
 	    .on("click.extra", () => {
 	        this.list = null;
 		this.closeFormulaEditor();

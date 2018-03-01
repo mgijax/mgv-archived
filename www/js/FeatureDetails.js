@@ -10,7 +10,7 @@ class FeatureDetails extends Component {
     //----------------------------------------------
     initDom () {
 	//
-	this.root.select (".button.collapse")
+	this.root.select (".button.close")
 	    .on("click.extra", () => this.update());
     }
 

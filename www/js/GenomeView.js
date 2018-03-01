@@ -7,8 +7,8 @@ class GenomeView extends SVGView {
     constructor (app, elt, width, height) {
         super(app, elt, width, height);
 	this.openWidth = this.outerWidth;
-	this.closedWidth = 40;
 	this.openHeight= this.outerHeight;
+	this.totalChrWidth = 40; // total width of one chromosome (backbone+blocks+feats)
 	this.cwidth = 20;        // chromosome width
 	this.tickLength = 10;	 // feature tick mark length
 	this.brushChr = null;	 // which chr has the current brush
@@ -28,7 +28,7 @@ class GenomeView extends SVGView {
     }
     //----------------------------------------------
     initDom () {
-	this.root.select('.button.collapse')
+	this.root.select('.button.close')
 	    .on('click', () => this.redraw());
 	this.svg.on("wheel", () => {
 	    if (!this.root.classed("closed")) return;
@@ -146,31 +146,31 @@ class GenomeView extends SVGView {
 	if (closed) {
 	    // Reset the SVG size to be 1-chromosome wide.
 	    // Translate the chromosomes group so that the current chromosome appears in the svg area.
-	    // Turn it 90 deg, and fill the available horiz space
-	    // (so set the new height == current width)
-	    this.setSize( this.closedWidth, this.openWidth );
+	    // Turn it 90 deg.
+
+	    // Set the height of the SVG area to 1 chromosome's width
+	    this.setGeom({ height: this.totalChrWidth, rotation: -90, translation: [-this.totalChrWidth/2,30] });
 	    // 
+	    let delta = 10;
 	    rg.xscale = d3.scale.ordinal()
 		 .domain(rChrs.map(function(x){return x.name;}))
 		 // in closed mode, the chromosomes have fixed spacing
-		 .rangePoints([10, this.closedWidth*(rChrs.length-1)]);
+		 .rangePoints([delta, delta+this.totalChrWidth*(rChrs.length-1)]);
 	    //
 	    rg.yscale = d3.scale.linear()
 		 .domain([1,rg.maxlen])
-		 .range([0, this.height]);
+		 .range([0, this.width]);
 
 	    // translate each chromosome into position
 	    chrs.attr("transform", c => `translate(${rg.xscale(c.name)}, 0)`);
-            // translate the whole group.
+            // translate the chromosomes group.
 	    this.scrollChromosomesTo(-rg.xscale(this.app.coords.chr));
 	    this.scrollChromosomesSnap();
-	    // turn the whole thing 90 deg
-	    this.svg.style("transform","rotateZ(-90deg)");
 	}
 	else {
 	    // When open, draw all the chromosomes. Each chrom is a vertical line.
 	    // Chroms are distributed evenly across the available horizontal space.
-	    this.setSize( this.openWidth, this.openHeight );
+	    this.setGeom({ width: this.openWidth, height: this.openHeight, rotation: 0, translation: [0,0] });
 	    // 
 	    rg.xscale = d3.scale.ordinal()
 		 .domain(rChrs.map(function(x){return x.name;}))
@@ -180,9 +180,10 @@ class GenomeView extends SVGView {
 		 .domain([1,rg.maxlen])
 		 .range([0, this.height]);
 
-	    chrs.attr("transform", c => `translate(${this.bwidth+rg.xscale(c.name)}, 0)`);
+	    // translate each chromosome into position
+	    chrs.attr("transform", c => `translate(${rg.xscale(c.name)}, 0)`);
+            // translate the chromosomes group.
 	    this.scrollChromosomesTo(0);
-	    this.svg.style("transform","rotateZ(0deg)");
 	}
 
 	rChrs.forEach(chr => {
@@ -230,22 +231,22 @@ class GenomeView extends SVGView {
     }
     scrollChromosomesTo (x) {
         if (x === undefined) x = this.scrollAmount;
-	this.scrollAmount = Math.max(Math.min(x,15), -this.closedWidth * (this.app.rGenome.chromosomes.length-1));
+	this.scrollAmount = Math.max(Math.min(x,15), -this.totalChrWidth * (this.app.rGenome.chromosomes.length-1));
 	this.gChromosomes.attr("transform", `translate(${this.scrollAmount},0)`);
     }
     scrollChromosomesBy (dx) {
         this.scrollChromosomesTo(this.scrollAmount + dx);
     }
     scrollChromosomesSnap () {
-	let i = Math.round(this.scrollAmount / this.closedWidth)
-	this.scrollChromosomesTo(i*this.closedWidth);
+	let i = Math.round(this.scrollAmount / this.totalChrWidth)
+	this.scrollChromosomesTo(i*this.totalChrWidth);
     }
     scrollChromosomesUp () {
-        this.scrollChromosomesBy(-this.closedWidth);
+        this.scrollChromosomesBy(-this.totalChrWidth);
 	this.scrollChromosomesSnap();
     }
     scrollChromosomesDown () {
-        this.scrollChromosomesBy(this.closedWidth);
+        this.scrollChromosomesBy(this.totalChrWidth);
 	this.scrollChromosomesSnap();
     }
     // ---------------------------------------------

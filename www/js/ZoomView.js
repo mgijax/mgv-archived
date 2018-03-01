@@ -44,7 +44,7 @@ class ZoomView extends SVGView {
 	let r = this.root;
 	let a = this.app;
 	//
-	r.select('.button.collapse')
+	r.select('.button.close')
 	    .on('click', () => this.update());
 
 	// zoom controls
@@ -310,12 +310,13 @@ class ZoomView extends SVGView {
     }
 
     //----------------------------------------------
+    // Returns a dragger (d3.behavior.drag) to be attached to each zoom strip.
+    // Allows strips to be reordered by dragging.
     getDragger () {  
       let self = this;
       return d3.behavior.drag()
 	  .origin(function(d,i){
-	      let bb = this.getBoundingClientRect();
-	      return bb;
+	      return this.getBoundingClientRect();
 	  })
           .on("dragstart", function(g) {
 	      let t = d3.event.sourceEvent.target;
