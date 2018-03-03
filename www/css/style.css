@@ -167,6 +167,16 @@ label > i.material-icons {
     cursor: grab;
     cursor: -webkit-grab;
 }
+.content-draggable > * {
+    position: relative;
+}
+.content-draggable > .dragging {
+    z-index: 100;
+}
+.content-draggable > .dragging > .button.draghandle {
+    cursor: grabbing;
+    cursor: -webkit-grabbing;
+}
 /* icon to show in the open (default) state */
 .content-draggable > * > .button.draghandle::after {
     content: "menu"

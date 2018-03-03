@@ -320,7 +320,7 @@ class ZoomView extends SVGView {
 	  })
           .on("dragstart", function(g) {
 	      let t = d3.event.sourceEvent.target;
-	      if (d3.select(t).attr("name") !== "zoomStripHandle"){
+	      if (!d3.select(t).classed("draghandle")){
 	          return false;
 	      }
 	      let strip = this.closest(".zoomStrip");

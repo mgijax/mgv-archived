@@ -47,12 +47,13 @@ function pqstring (qstring) {
     return cfg;
 }
 
-// Behold, the MGV application object...
-let mgv = null;
 
 // The main program, wherein the app is created and wired to the browser. 
 //
-function __main__ () {
+function __main__ (selector) {
+    // Behold, the MGV application object...
+    let mgv = null;
+
     // Callback to pass into the app to register changes in context.
     // Uses the current app context to set the hash part of the
     // browser's location. This also registers the change in 
@@ -83,11 +84,11 @@ function __main__ () {
     cfg.oncontextchange = setHash;
 
     // create the app
-    window.mgv = mgv = new MGVApp(cfg);
+    window.mgv = mgv = new MGVApp(selector, cfg);
     
     // handle resize events
     window.onresize = () => {mgv.resize();mgv.setContext({});}
 }
 
 
-__main__();
+__main__("#mgv");

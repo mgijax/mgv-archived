@@ -1,5 +1,6 @@
 import { parseCoords, formatCoords, d3tsv, initOptList, same } from './utils';
 import { Genome }          from './Genome';
+import { Component }       from './Component';
 import { FeatureManager }  from './FeatureManager';
 import { QueryManager }    from './QueryManager';
 import { ListManager }     from './ListManager';
@@ -11,8 +12,10 @@ import { FeatureDetails }  from './FeatureDetails';
 import { ZoomView }        from './ZoomView';
 
 // ---------------------------------------------
-class MGVApp {
-    constructor (cfg) {
+class MGVApp extends Component {
+    constructor (selector, cfg) {
+	super(null, selector);
+	this.app = this;
 	//
 	this.initialCfg = cfg;
 	//
@@ -33,9 +36,12 @@ class MGVApp {
 	this.defaultPan  = 0.15;// fraction of current range width
 	this.coords = { chr: "1", start: 1000000, end: 10000000 };
 	//
-	//
+	// TODO: refactor pagebox, draggable, and friends into a framework module,
 	// 
+	this.pbDragging = null;
+	this.pbDragger = this.getContentDragger();
 	d3.selectAll(".pagebox")
+	    .call(this.pbDragger)
 	    .append("i")
 	    .attr("class","material-icons busy rotating")
 	    ;
@@ -46,9 +52,10 @@ class MGVApp {
 		let p = d3.select(this.parentNode);
 		p.classed("closed", ! p.classed("closed"));
 	    });
-	//d3.selectAll(".content-draggable > *")
-	    //.append("i")
-	    //.attr("class","material-icons button draghandle");
+	d3.selectAll(".content-draggable > *")
+	    .append("i")
+	    .attr("class","material-icons button draghandle");
+	//
 	//
 	this.genomeView = new GenomeView(this, "#genomeView", 800, 250);
 	this.zoomView   = new ZoomView  (this, "#zoomView", 800, 250, this.coords);
@@ -101,7 +108,7 @@ class MGVApp {
 	// Button: Gear icon to show/hide left column
 	d3.select("#header > .gear.button")
 	    .on("click", () => {
-	        let lc = d3.select('#mgv > [name="leftcolumn"]');
+	        let lc = this.root.select('[name="leftcolumn"]');
 		lc.classed("closed", () => ! lc.classed("closed"));
 		this.resize()
 		this.setContext({});
@@ -221,6 +228,61 @@ class MGVApp {
     }
     //----------------------------------------------
     initDom () {
+    }
+    //----------------------------------------------
+
+    getContentDragger () {
+      let self = this;
+      // Helper function for the drag behavior. Reorders the contents based on
+      // current screen position of the dragged item.
+      function reorder() {
+	  // Locate the sib whose position is beyond the dragged item by the least amount
+	  let dr = self.dragging.getBoundingClientRect();
+	  let bSib = null;
+	  let xy = d3.select(self.dragParent).classed("flexrow") ? "x" : "y";
+	  for (let s of self.dragSibs) {
+	      let sr = s.getBoundingClientRect();
+	      if (dr[xy] < sr[xy]) {
+		   let dist = sr[xy] - dr[xy];
+		   if (!bSib || dist < bSib[xy] - dr[xy])
+		       bSib = s;
+	      }
+	  }
+	  // Insert the dragged item before the located sib (or append if no sib found)
+	  self.dragParent.insertBefore(self.dragging, bSib);
+      }
+      //
+      return d3.behavior.drag()
+	  .origin(function(d,i){
+	      return this.getBoundingClientRect();
+	  })
+          .on("dragstart", function() {
+	      let t = d3.event.sourceEvent.target;
+	      if (! d3.select(t).classed("draghandle")) return;
+	      //
+	      self.dragging    = this.closest(".pagebox");
+	      self.dragParent  = self.dragging.parentNode;
+	      self.dragSibs    = self.dragParent.children;
+	      //
+	      d3.select(self.dragging).classed("dragging", true);
+	  })
+	  .on("drag", function () {
+	      if (!self.dragging) return;
+	      let dd = d3.select(self.dragging);
+	      let tp = parseInt(dd.style("top"))
+	      dd.style("top", tp + d3.event.dy + "px");
+	  })
+	  .on("dragend", function () {
+	      if (!self.dragging) return;
+	      reorder();
+	      let dd = d3.select(self.dragging);
+	      dd.style("top", "0px");
+	      dd.classed("dragging", false);
+	      self.dragging    = null;
+	      self.dragParent  = null;
+	      self.dragSibs    = null;
+	  })
+	  ;
     }
     //----------------------------------------------
     showBlocks (comp) {
