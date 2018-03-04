@@ -51,6 +51,7 @@ class MGVApp extends Component {
 	    .on("click.default", function () {
 		let p = d3.select(this.parentNode);
 		p.classed("closed", ! p.classed("closed"));
+		self.setPrefsFromUI();
 	    });
 	d3.selectAll(".content-draggable > *")
 	    .append("i")
@@ -114,6 +115,7 @@ class MGVApp extends Component {
 		window.setTimeout(()=>{
 		    this.resize()
 		    this.setContext({});
+		    this.setPrefsFromUI();
 		}, 250);
 	    });
 	
@@ -146,6 +148,9 @@ class MGVApp extends Component {
 	    self.zoomView.highlight();
 	});
 
+
+	//
+	this.setUIFromPrefs();
 
 	// ------------------------------
 	// ------------------------------
@@ -197,6 +202,7 @@ class MGVApp extends Component {
 	}.bind(this))
 	.then(function (data) {
 
+	    //
 	    this.processChromosomes(data);
 
 	    // FINALLY! We are ready to draw the initial scene.
@@ -303,6 +309,7 @@ class MGVApp extends Component {
 	  .on("dragend", function () {
 	      if (!self.dragging) return;
 	      reorderByDom();
+	      self.setPrefsFromUI();
 	      let dd = d3.select(self.dragging);
 	      dd.style("top", "0px");
 	      dd.classed("dragging", false);
@@ -312,6 +319,53 @@ class MGVApp extends Component {
 	      self.dragSibs    = null;
 	  })
 	  ;
+    }
+    //----------------------------------------------
+    setUIFromPrefs () {
+        let prefs = this.userPrefsManager.getAll();
+	console.log("Got prefs from storage", prefs);
+
+	// set open/closed states
+	(prefs.closables || []).forEach( c => {
+	    let id = c[0];
+	    let state = c[1];
+	    d3.select('#'+id).classed('closed', state === "closed" || null);
+	});
+
+	// set draggables' order
+	(prefs.draggables || []).forEach( d => {
+	    let ctrId = d[0];
+	    let contentIds = d[1];
+	    let ctr = d3.select('#'+ctrId);
+	    let contents = ctr.selectAll('#'+ctrId+' > *');
+	    contents[0].sort( (a,b) => {
+	        let ai = contentIds.indexOf(a.getAttribute('id'));
+	        let bi = contentIds.indexOf(b.getAttribute('id'));
+		return ai - bi;
+	    });
+	    contents.order();
+	});
+    }
+    setPrefsFromUI () {
+        // save open/closed states
+	let closables = this.root.selectAll('.closable');
+	let ocData = closables[0].map( c => {
+	    let dc = d3.select(c);
+	    return [dc.attr('id'), dc.classed("closed") ? "closed" : "open"];
+	});
+	// save draggables' order
+	let dragCtrs = this.root.selectAll('.content-draggable');
+	let draggables = dragCtrs.selectAll('.content-draggable > *');
+	let ddData = draggables.map( (d,i) => {
+	    let ctr = d3.select(dragCtrs[0][i]);
+	    return [ctr.attr('id'), d.map( dd => d3.select(dd).attr('id'))];
+	});
+	let prefs = {
+	    closables: ocData,
+	    draggables: ddData
+	}
+	console.log("Saving prefs to storage", prefs);
+	this.userPrefsManager.setAll(prefs);
     }
     //----------------------------------------------
     showBlocks (comp) {

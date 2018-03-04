@@ -477,6 +477,12 @@ label > i.material-icons {
     display: block;
 }
 
+[name="leftcolumn"] > .button {
+    display: none;
+}
+[name="leftcolumn"].closed > .button {
+    display: none;
+}
 
 
 /* -----------------------------------------
