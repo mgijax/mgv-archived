@@ -5,6 +5,7 @@ import { FeatureManager }  from './FeatureManager';
 import { QueryManager }    from './QueryManager';
 import { ListManager }     from './ListManager';
 import { ListEditor }      from './ListEditor';
+import { UserPrefsManager } from './UserPrefsManager';
 import { FacetManager }    from './FacetManager';
 import { BTManager }       from './BTManager';
 import { GenomeView }      from './GenomeView';
@@ -38,7 +39,6 @@ class MGVApp extends Component {
 	//
 	// TODO: refactor pagebox, draggable, and friends into a framework module,
 	// 
-	this.pbDragging = null;
 	this.pbDragger = this.getContentDragger();
 	d3.selectAll(".pagebox")
 	    .call(this.pbDragger)
@@ -102,16 +102,19 @@ class MGVApp extends Component {
 	    template: "",
 	    placeholder: "Disease Ontology (DO) terms/IDs"
 	}];
-	this.queryManager = new QueryManager(this, "#findgenes", searchTypes);
+	this.queryManager = new QueryManager(this, "#findGenesBox", searchTypes);
 	//
-
+	this.userPrefsManager = new UserPrefsManager();
+	//
 	// Button: Gear icon to show/hide left column
 	d3.select("#header > .gear.button")
 	    .on("click", () => {
 	        let lc = this.root.select('[name="leftcolumn"]');
 		lc.classed("closed", () => ! lc.classed("closed"));
-		this.resize()
-		this.setContext({});
+		window.setTimeout(()=>{
+		    this.resize()
+		    this.setContext({});
+		}, 250);
 	    });
 	
 	//
@@ -235,7 +238,7 @@ class MGVApp extends Component {
       let self = this;
       // Helper function for the drag behavior. Reorders the contents based on
       // current screen position of the dragged item.
-      function reorder() {
+      function reorderByDom() {
 	  // Locate the sib whose position is beyond the dragged item by the least amount
 	  let dr = self.dragging.getBoundingClientRect();
 	  let bSib = null;
@@ -251,6 +254,29 @@ class MGVApp extends Component {
 	  // Insert the dragged item before the located sib (or append if no sib found)
 	  self.dragParent.insertBefore(self.dragging, bSib);
       }
+      function reorderByStyle() {
+	  let dd = d3.select(self.dragging);
+	  // Locate the sib that contains the dragged item's origin.
+	  let dr = self.dragging.getBoundingClientRect();
+	  let bSib = null;
+	  let xy = d3.select(self.dragParent).classed("flexrow") ? "x" : "y";
+	  let sz = xy === "x" ? "width" : "height";
+	  let sty= xy === "x" ? "left" : "top";
+	  for (let s of self.dragSibs) {
+	      // skip the dragged item
+	      if (s === self.dragging) continue;
+	      let ds = d3.select(s);
+	      let sr = s.getBoundingClientRect();
+	      // ifw the dragged item's origin is between the start and end of sib, we found it.
+	      if (dr[xy] >= sr[xy] && dr[xy] <= (sr[xy] + sr[sz])) {
+		   // move sib toward the hole, amount = the size of the hole
+		   let amt = self.dragHole[sz] * (self.dragHole[xy] < sr[xy] ? -1 : 1);
+		   ds.style(sty, parseInt(ds.style(sty)) + amt + "px");
+		   self.dragHole[xy] -= amt;
+                   break;
+	      }
+	  }
+      }
       //
       return d3.behavior.drag()
 	  .origin(function(d,i){
@@ -261,6 +287,7 @@ class MGVApp extends Component {
 	      if (! d3.select(t).classed("draghandle")) return;
 	      //
 	      self.dragging    = this.closest(".pagebox");
+	      self.dragHole    = self.dragging.getBoundingClientRect();
 	      self.dragParent  = self.dragging.parentNode;
 	      self.dragSibs    = self.dragParent.children;
 	      //
@@ -271,14 +298,16 @@ class MGVApp extends Component {
 	      let dd = d3.select(self.dragging);
 	      let tp = parseInt(dd.style("top"))
 	      dd.style("top", tp + d3.event.dy + "px");
+	      //reorderByStyle();
 	  })
 	  .on("dragend", function () {
 	      if (!self.dragging) return;
-	      reorder();
+	      reorderByDom();
 	      let dd = d3.select(self.dragging);
 	      dd.style("top", "0px");
 	      dd.classed("dragging", false);
 	      self.dragging    = null;
+	      self.dragHole    = null;
 	      self.dragParent  = null;
 	      self.dragSibs    = null;
 	  })

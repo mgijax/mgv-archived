@@ -13,8 +13,11 @@
     <!-- HEADER -->
     <div id="header" class="pagebox flexrow">
 	<i class="material-icons button gear" title="Show/hide left column.">settings</i>
-        <label class="spacer1">Multi Genome Viewer</label>
-	<a target="_blank" title="Mouse Genome Informatics" href="http://www.informatics.jax.org//"><img name="mgilogo" src="http://www.informatics.jax.org/webshare/images/mgi_logo.gif" /></a>
+	<div class="flexrow">
+	    <a target="_blank" title="Mouse Genome Informatics" href="http://www.informatics.jax.org//"><img name="mgilogo" src="http://www.informatics.jax.org/webshare/images/mgi_logo.gif" /></a>
+	    <label class="spacer1">Multi Genome Viewer</label>
+	</div>    
+	<i class="material-icons button info" title="HEEEEEELP!">info</i>
     </div>
 
     <!-- APPLICATION MAIN -->
@@ -24,19 +27,19 @@
 	<div name="leftcolumn" class="flexcolumn content-draggable">
 
 	    <!-- Reference strain. -->
-	    <div class="refGenome pagebox flexcolumn closable">
+	    <div id="refGenomeBox" class="refGenome pagebox flexcolumn closable">
 		<label>Reference genome</label>
 		<select id="refGenome"></select>
 	    </div>
 
 	    <!-- Comparison strains. -->
-	    <div class="compGenomes pagebox flexcolumn closable">
+	    <div id="compGenomesBox" class="compGenomes pagebox flexcolumn closable">
 		<label>Comparison genomes</label>
 		<select id="compGenomes" size="10"></select>
 	    </div>
 
 	    <!-- Find genes (aka create lists). -->
-	    <div id="findgenes" class="pagebox flexcolumn closable">
+	    <div id="findGenesBox" class="pagebox flexcolumn closable">
 		<label>Find genes</label>
 		<div class="flexcolumn">
 		    <select name="searchtype">
@@ -119,12 +122,12 @@
 	    </div>
 
 	    <!-- Facet: feature type -->
-	    <div class="colorKey facet pagebox flexcolumn closable">
+	    <div id="featureTypeBox" class="colorKey facet pagebox flexcolumn closable">
 		<label>Feature types</label>
 	    </div>
 
 	    <!-- Facet: has MGI id -->
-	    <div class="mgiFacet facet pagebox flexcolumn closable">
+	    <div id="mgiFacetBox" class="mgiFacet facet pagebox flexcolumn closable">
 		<label>Has MGI ID?</label>
 		<div>
 		    <input type="radio" name="mgiFacet" value="yes" />
@@ -141,7 +144,7 @@
 	    </div>
 
 	    <!-- Facet: is highlighted -->
-	    <div class="hiFacet facet pagebox flexcolumn closable">
+	    <div id="hiFacetBox" class="hiFacet facet pagebox flexcolumn closable">
 		<label>Is highlighted?</label>
 		<div>
 		    <input type="radio" name="hiFacet" value="yes" />

@@ -13,7 +13,7 @@ class SVGView extends Component {
 	this.width = 100;
 	this.outerHeight = 100;
 	this.height = 100;
-	this.margins = {top: 12, right: 12, bottom: 12, left: 12};
+	this.margins = {top: 18, right: 12, bottom: 12, left: 12};
 	this.rotation = 0;
 	this.translation = [0,0];
 	//

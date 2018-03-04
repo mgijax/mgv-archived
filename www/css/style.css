@@ -433,6 +433,10 @@ label > i.material-icons {
     background-color: #557f9e;
     color: #eee;
 }
+#header .flexrow label {
+    position: relative;
+    top: 4px;
+}
 #header .button:hover {
     color :rgb(31, 119, 180);
     background-color: white;
@@ -446,10 +450,6 @@ label > i.material-icons {
 
 #mgv {
     align-items: flex-start;
-}
-
-#mgv [name="leftcolumn"].closed {
-    display: none;
 }
 
 #footer {
@@ -466,8 +466,18 @@ label > i.material-icons {
 }
 
 [name="leftcolumn"] {
+    transition: min-width 0.25s, opacity 0.25s;
     min-width: 220px;
+    opacity: 1;
 }
+[name="leftcolumn"].closed {
+    min-width: 0px;
+    width: 0px;
+    opacity: 0;
+    display: block;
+}
+
+
 
 /* -----------------------------------------
  * Genome View
