@@ -170,6 +170,7 @@ class ListManager extends Component {
         let lst = this.get(name);
 	delete this.name2list[name];
 	this._save();
+	// FIXME: use events!!
 	if (lst === this.app.currentList) this.app.currentList = null;
 	if (lst === this.app.listEditor.list) this.app.listEditor.list = null;
 	return lst;

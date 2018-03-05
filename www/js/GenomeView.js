@@ -318,7 +318,7 @@ class GenomeView extends SVGView {
 	let rg = this.app.rGenome; // ref genome
 	// feature tick marks
 	if (!features || features.length === 0) {
-	    this.gChromosomes.select('[name="ticks"]').selectAll(".feature").remove();
+	    this.gChromosomes.selectAll('[name="ticks"]').selectAll(".feature").remove();
 	    return;
 	}
 

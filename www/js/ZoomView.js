@@ -596,6 +596,11 @@ class ZoomView extends SVGView {
 	    .on(".drag", null)
 	    .remove();
 
+        // -----------------------------------------------------
+	// synteny blocks. Eachzoom strip has a list of 1 or more sblocks.
+	// The reference genome always has just 1. The comp genomes many have
+	// 1 or more (and in rare cases, 0).
+        // -----------------------------------------------------
         let sblocks = zstrips.select('[name="sBlocks"]').selectAll('g.sBlock')
 	    .data(d => d.blocks, d => d.blockId);
 	let newsbs = sblocks.enter()
@@ -618,8 +623,8 @@ class ZoomView extends SVGView {
 
 	sblocks.exit().remove();
 
-	// To line each chunk up with the corresponding chunk in the reference genome,
-	// create the appropriate x scales and transforms.
+	// By default, the sblocks in a comp genome strip are ordered to match the ref genome
+	// order.
 	let offset = []; // offset of start  position of next block, by strip index (0===ref)
 	sblocks.each( function (b,i,j) { // b=block, i=index within strip, j=strip index
 	    let blen = ppb * (b.end - b.start + 1); // total screen width of this sblock

@@ -593,7 +593,15 @@ label > i.material-icons {
 #zoomView svg .sBlock.translocation [name="layer0"] rect.block {
     fill: blue;
 }
+#zoomView svg .sBlock.translocation [name="layer0"] text.blockLabel {
+    font-style: italic;
+    fill: blue;
+}
 #zoomView svg .sBlock.minus.translocation [name="layer0"] rect.block {
+    fill: yellow;
+}
+#zoomView svg .sBlock.minus.translocation [name="layer0"] text.blockLabel {
+    font-style: italic;
     fill: yellow;
 }
 #zoomView svg .sBlock text {
