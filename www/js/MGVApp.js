@@ -288,9 +288,10 @@ class MGVApp extends Component {
 	  .origin(function(d,i){
 	      return this.getBoundingClientRect();
 	  })
-          .on("dragstart", function() {
+          .on("dragstart.m", function() {
 	      let t = d3.event.sourceEvent.target;
 	      if (! d3.select(t).classed("draghandle")) return;
+	      d3.event.sourceEvent.stopPropagation();
 	      //
 	      self.dragging    = this.closest(".pagebox");
 	      self.dragHole    = self.dragging.getBoundingClientRect();
@@ -299,14 +300,14 @@ class MGVApp extends Component {
 	      //
 	      d3.select(self.dragging).classed("dragging", true);
 	  })
-	  .on("drag", function () {
+	  .on("drag.m", function () {
 	      if (!self.dragging) return;
 	      let dd = d3.select(self.dragging);
 	      let tp = parseInt(dd.style("top"))
 	      dd.style("top", tp + d3.event.dy + "px");
 	      //reorderByStyle();
 	  })
-	  .on("dragend", function () {
+	  .on("dragend.m", function () {
 	      if (!self.dragging) return;
 	      reorderByDom();
 	      self.setPrefsFromUI();

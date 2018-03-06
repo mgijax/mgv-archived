@@ -5,7 +5,8 @@
 #
 # 1. create- Creates an index of the features in specified file. The feature file is a tab-delimied 
 # GFF-like (but simpler) file. See prepGenomeFile.py. The generated index is also a tsv file,
-# and comprises a sequence of "blocks" where each block:
+# and comprises a sequence of "index blocks".
+# Each IndexBlock:
 #   i. covers a contiguous region of a single chromosome (has a chr+start+end),
 #   ii. wholly contains some number of features.
 #   iii. points to a contiguous block of characters in the feature file (has start/end byte offsets)
@@ -27,13 +28,13 @@ import re
 import argparse
 import json
 
-class Block:
+class IndexBlock:
     MAXBLKSIZE = 5000000
     blockCount = 0
     def __init__(self, si, ei, c, start, end, count=1):
         # offsets into file spanning range of lines for these features
-        self.startIndex = si    # position in file of first byte of first list
-        self.endIndex = ei      # position in file of last byte ("\n") of last line
+        self.fileStart = si    # position in file of first byte of first list
+        self.fileEnd = ei      # position in file of last byte ("\n") of last line
         # 
         self.chr = c          # the chromosome
         self.start = start
@@ -49,7 +50,7 @@ class Block:
             canExtend = False
         elif other.start <= self.end:
             canExtend = True
-        elif other.start - self.start + 1 <= Block.MAXBLKSIZE:
+        elif other.start - self.start + 1 <= IndexBlock.MAXBLKSIZE:
             canExtend = True
         else:
             canExtend = False
@@ -59,7 +60,7 @@ class Block:
 
         #
         self.count += 1
-        self.endIndex = other.endIndex # file position
+        self.fileEnd = other.fileEnd # file position
         self.end = max(self.end, other.end)
         #
         return True
@@ -74,7 +75,7 @@ class Block:
 	}
 
     def tuple(self):
-        return (self.startIndex,self.endIndex,self.chr,self.start,self.end,self.count)
+        return (self.fileStart,self.fileEnd,self.chr,self.start,self.end,self.count)
 
     def rowString(self):
         return '\t'.join([str(x) for x in self.tuple()])
@@ -90,7 +91,7 @@ class Block:
 # requirement is that every feature in a block must be wholly contained 
 # within its boundaries. In other words, the end coord of the last
 # feature in a block must the max end coord of any feature in that block.
-# UPDATE: close the gaps between blocks. These gaps contain no features,
+# UPDATE: closes the gaps between blocks. These gaps contain no features,
 # but we want those regions "covered" by blocks. In fact, what we really
 # want (to put it more simply) is that the blocks partition the chromosome.
 #
@@ -105,7 +106,7 @@ def buildIndex(fin, fout):
         if i == 0: continue # skip header line
         fields = line[:-1].split('\t')
         start = int(fields[1])
-        blk = Block(index-lineLen, index-1, fields[0], int(fields[1]), int(fields[2]))
+        blk = IndexBlock(index-lineLen, index-1, fields[0], int(fields[1]), int(fields[2]))
         if currBlk:
             if not currBlk.extend(blk):
 		if currBlk.chr == blk.chr:
@@ -149,7 +150,7 @@ def readIndexFile(xf) :
         cs = int(toks[3])
         ce = int(toks[4])
         n = int(toks[5])
-        blk = Block(s, e, c, cs, ce, n)
+        blk = IndexBlock(s, e, c, cs, ce, n)
         # sanity check
         if blk.end != ce:
             raise RuntimeError("End coordinates disagree.")
@@ -162,8 +163,8 @@ def validate(ff, ix) :
     items.sort()
     for (c,blocks) in items:
         for b in blocks:
-            ff.seek(b.startIndex)
-            x = ff.read(b.endIndex-b.startIndex+1)
+            ff.seek(b.fileStart)
+            x = ff.read(b.fileEnd-b.fileStart+1)
             lines = x[:-1].split('\n')
             if len(lines) != b.count:
                 print "Crap",
@@ -202,8 +203,8 @@ def lookup(ff, ix, chr, start, end):
     answer = []
     for b in cblocks:
 	# read the features
-        ff.seek(b.startIndex)
-        s = ff.read(b.endIndex-b.startIndex+1)
+        ff.seek(b.fileStart)
+        s = ff.read(b.fileEnd-b.fileStart+1)
 	feats = map(lambda l: l.split("\t"), s[:-1].split("\n"))
 	feats = map(lambda f: makeFeature(f, colnames), feats)
 	# add block to answer

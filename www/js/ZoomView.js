@@ -318,22 +318,23 @@ class ZoomView extends SVGView {
 	  .origin(function(d,i){
 	      return this.getBoundingClientRect();
 	  })
-          .on("dragstart", function(g) {
+          .on("dragstart.z", function(g) {
 	      let t = d3.event.sourceEvent.target;
-	      if (!d3.select(t).classed("draghandle")){
+	      if (d3.select(t).attr("name") !== 'zoomStripHandle'){
 	          return false;
 	      }
+	      d3.event.sourceEvent.stopPropagation();
 	      let strip = this.closest(".zoomStrip");
 	      self.dragging = d3.select(strip).classed("dragging", true);
 	  })
-	  .on("drag", function (g) {
+	  .on("drag.z", function (g) {
 	      if (!self.dragging) return;
 	      let my = d3.mouse(self.svgMain[0][0])[1];
 	      self.dragging.attr("transform", `translate(0, ${my})`);
 	      self.setGenomeYOrder(self.getGenomeYOrder());
 	      self.highlight();
 	  })
-	  .on("dragend", function (g) {
+	  .on("dragend.z", function (g) {
 	      if (!self.dragging) return;
 	      //
 	      self.dragging.classed("dragging", false);
