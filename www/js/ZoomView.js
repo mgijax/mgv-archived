@@ -479,9 +479,11 @@ class ZoomView extends SVGView {
 		chr    : c.chr,
 		start  : c.start,
 		end    : c.end,
+		index  : 0,
 		fChr   : c.chr,
 		fStart : c.start,
 		fEnd   : c.end,
+		fIndex  : 0,
 		ori    : "+",
 		blockId: mgv.rGenome.name
 		}]));
@@ -498,6 +500,23 @@ class ZoomView extends SVGView {
 		mgv.showBusy(false);
             });
 	});
+    }
+
+    //----------------------------------------------
+    orderSBlocks () {
+	let sblocks = this.stripsGrp.selectAll('g.zoomStrip').select('[name="sBlocks"]').selectAll('g.sBlock')
+	// By default, the sblocks in a comp genome strip are ordered to match the ref genome
+	// order.
+	let ppb = this.width / (this.coords.end - this.coords.start + 1);
+	let offset = []; // offset of start  position of next block, by strip index (0===ref)
+	sblocks.each( function (b,i,j) { // b=block, i=index within strip, j=strip index
+	    let blen = ppb * (b.end - b.start + 1); // total screen width of this sblock
+	    b.xscale = d3.scale.linear().domain([b.start, b.end]).range([0, blen]);
+	    let dx = i === 0 ? 0 : offset[j];
+	    d3.select(this).attr("transform", `translate(${dx},0)`);
+	    offset[j] = dx + blen + 2;
+	});
+	//
     }
 
     //----------------------------------------------
@@ -539,9 +558,6 @@ class ZoomView extends SVGView {
 	this.xscale = d3.scale.linear()
 	    .domain([rBlock.start,rBlock.end])
 	    .range([0,this.width]);
-	//
-	// conversion: pixels per base
-	let ppb = this.width / (rBlock.end - rBlock.start + 1);
 
         // -----------------------------------------------------
 	// draw the axis
@@ -602,11 +618,14 @@ class ZoomView extends SVGView {
 	// 1 or more (and in rare cases, 0).
         // -----------------------------------------------------
         let sblocks = zstrips.select('[name="sBlocks"]').selectAll('g.sBlock')
-	    .data(d => d.blocks, d => d.blockId);
+	    .data(d => {
+		//d.blocks.sort( (a,b) => a.index-b.index );
+	        return d.blocks;
+	    }, d => d.blockId);
 	let newsbs = sblocks.enter()
 	    .append("g")
 	    .attr("class", b => "sBlock" + (b.ori==="+" ? " plus" : " minus") + (b.chr !== b.fChr ? " translocation" : ""))
-	    .attr("name", b=>b.blockId)
+	    .attr("name", b=>b.index)
 	    ;
 	let l0 = newsbs.append("g").attr("name", "layer0");
 	let l1 = newsbs.append("g").attr("name", "layer1");
@@ -623,17 +642,7 @@ class ZoomView extends SVGView {
 
 	sblocks.exit().remove();
 
-	// By default, the sblocks in a comp genome strip are ordered to match the ref genome
-	// order.
-	let offset = []; // offset of start  position of next block, by strip index (0===ref)
-	sblocks.each( function (b,i,j) { // b=block, i=index within strip, j=strip index
-	    let blen = ppb * (b.end - b.start + 1); // total screen width of this sblock
-	    b.xscale = d3.scale.linear().domain([b.start, b.end]).range([0, blen]);
-	    let dx = i === 0 ? 0 : offset[j];
-	    d3.select(this).attr("transform", `translate(${dx},0)`);
-	    offset[j] = dx + blen + 2;
-	});
-	//
+	this.orderSBlocks(sblocks);
 
 	// synteny block labels
 	sblocks.select("text.blockLabel")

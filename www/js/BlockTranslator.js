@@ -53,9 +53,11 @@ class BlockTranslator {
 	let fromC = from+"Chr";
 	let fromS = from+"Start";
 	let fromE = from+"End";
+	let fromI = from+"Index";
 	let toC = to+"Chr";
 	let toS = to+"Start";
 	let toE = to+"End";
+	let toI = to+"Index";
 	let mapper = from+to+"Map";
 	// 
 	let blks = this.blocks
@@ -74,10 +76,12 @@ class BlockTranslator {
 		    start: Math.min(s2,e2),
 		    end:   Math.max(s2,e2),
 		    ori:   blk.blockOri,
+		    index: blk[toI],
 		    // also return the fromGenome coordinates corresponding to this piece of the translation
 		    fChr:   blk[fromC],
 		    fStart: s,
 		    fEnd:   e,
+		    fIndex: blk[fromI],
 		    // include the block id and full block coords
 		    blockId: blk.blockId,
 		    blockStart: blk[toS],
