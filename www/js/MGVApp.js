@@ -719,6 +719,17 @@ class MGVApp extends Component {
 	window.open(linkUrl, "_blank");
     }
     //----------------------------------------------
+    linkToMgiQTLs () {
+	let c        = this.getContext();
+	let urlBase  = 'http://www.informatics.jax.org/allele/summary';
+	let chrArg   = `chromosome=${c.chr}`;
+	let coordArg = `coordinate=${c.start}-${c.end}`;
+	let unitArg  = 'coordUnit=bp';
+	let typeArg  = 'alleleType=QTL';
+	let linkUrl  = `${urlBase}?${chrArg}&${coordArg}&${unitArg}&${typeArg}`;
+	window.open(linkUrl, "_blank");
+    }
+    //----------------------------------------------
     linkToMgiJBrowse () {
 	let c = this.getContext();
 	let urlBase = 'http://jbrowse.informatics.jax.org/';

@@ -71,8 +71,13 @@ class ZoomView extends SVGView {
 	this.initContextMenu([{
             label: "MGI SNPs", 
 	    icon: "open_in_new",
-	    tooltip: "Get SNPs from MGI for the current strains in the current region. (Some strains not available.)",
+	    tooltip: "View SNPs at MGI for the current strains in the current region. (Some strains not available.)",
 	    handler: ()=> this.app.linkToMgiSnpReport()
+	},{
+            label: "MGI QTLs", 
+	    icon:  "open_in_new",
+	    tooltip: "View QTL at MGI that overlap the current region.",
+	    handler: ()=> this.app.linkToMgiQTLs()
 	},{
             label: "MGI JBrowse", 
 	    icon: "open_in_new",
