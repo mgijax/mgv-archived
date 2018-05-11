@@ -309,6 +309,8 @@ class GenomeView extends SVGView {
 	    .classed("translocation", b => b.fromChr !== b.toChr)
 	    ;
 
+        sblocks.exit().remove();
+
 	this.drawTitle();
     }
 
