@@ -447,6 +447,10 @@ label > i.material-icons {
 #header [name="mgilogo"] {
     height: 40px;
 }
+#header a:link,
+#header a:visited {
+    color: white;
+}
 
 #mgv {
     align-items: flex-start;

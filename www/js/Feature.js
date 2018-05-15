@@ -26,16 +26,19 @@ class Feature {
     //----------------------------------------------
     getMungedType () {
 	return this.type === "gene" ?
-	    this.biotype === "protein_coding" ?
+	    (this.biotype === "protein_coding" || this.biotype === "protein coding gene") ?
 		"protein_coding_gene"
 		:
 		this.biotype.indexOf("pseudogene") >= 0 ?
 		    "pseudogene"
 		    :
-		    this.biotype.indexOf("RNA") >= 0 ?
+		    (this.biotype.indexOf("RNA") >= 0 || this.biotype.indexOf("antisense") >= 0) ?
 			"ncRNA_gene"
 			:
-			"other_gene"
+			this.biotype.indexOf("segment") >= 0 ?
+			    "gene_segment"
+			    :
+			    "other_gene"
 	    :
 	    this.type === "pseudogene" ?
 		"pseudogene"
