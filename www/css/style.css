@@ -629,6 +629,16 @@ label > i.material-icons {
     transition: transform 0.3s;
 }
 
+/* R/N toggle - for showing/changing drawing mode between reference order and comparison (native) order */
+#zoomView div[name="zoomDmode"] label.button {
+    padding: 3px;
+}
+#zoomView.comparison div[name="zoomDmode"] label[name="R"] {
+    display: none;
+}
+#zoomView.reference div[name="zoomDmode"] label[name="C"] {
+    display: none;
+}
 
 
 #zoomView svg rect.feature {

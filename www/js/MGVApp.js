@@ -444,17 +444,20 @@ class MGVApp extends Component {
 	    chr: c.chr,
 	    start: c.start,
 	    end: c.end,
-	    highlight: Object.keys(this.zoomView.hiFeats)
+	    highlight: Object.keys(this.zoomView.hiFeats),
+	    dmode: this.zoomView.dmode
 	}
     }
     //----------------------------------------------
     // Returns a sanitized version of the argument configuration object.
     // The sanitized version:
-    //     - has a setting for every parameter. Parameters not specified in the argument are (generally) filled
-    //     in with their current values.
+    //     - has a setting for every parameter. Parameters not specified in 
+    //       the argument are (generally) filled in with their current values.
     //     - is always valid, eg
     //     	- has a list of 1 or more valid genomes, with one of them designated as the ref
     //     	- has a valid coordinate range
+    //     	    - start and end are integers with start <= end
+    //     	    - valid chromosome for ref genome
     //
     // The sanitized version is also "compiled":
     //     - it has actual Genome objects, where the argument just has names
@@ -507,7 +510,7 @@ class MGVApp extends Component {
 	//     with fallback to the current start
 	//        with fallback to 1
 	//           with a min value of 1
-	cfg.start = Math.max( 1, typeof(c.start) === "number" ? c.start : this.coords ? this.coords.start : 1 );
+	cfg.start = Math.floor(Math.max( 1, typeof(c.start) === "number" ? c.start : this.coords ? this.coords.start : 1 ));
 
 	// Set cfg.end to be the specified end
 	//     with fallback to the current end
@@ -520,12 +523,19 @@ class MGVApp extends Component {
 		:
 		cfg.start;
 	// clip at chr end
-	cfg.end = cfg.chr ? Math.min(cfg.end,   cfg.chr.length) : cfg.end;
+	cfg.end = Math.floor(cfg.chr ? Math.min(cfg.end,   cfg.chr.length) : cfg.end);
 
 	// Set cfg.highlight
 	//    with fallback to current highlight
 	//        with fallback to []
 	cfg.highlight = c.highlight || this.zoomView.highlighted || [];
+
+	// Set the drawing mode for the ZoonView.
+	//     with fallback to the current value
+	if (c.dmode === 'comparison' || c.dmode === 'reference') 
+	    cfg.dmode = c.dmode;
+	else
+	    cfg.dmode = this.zoomView.dmode || 'comparison';
 
 	//
 	return cfg;
@@ -547,6 +557,7 @@ class MGVApp extends Component {
     //            start     (int) Coordinate range start position
     //            end       (int) Coordinate range end position
     //            highlight (list o strings) IDs of features to highlight
+    //            dmode     (string) either 'comparison' or 'reference'
     //
     // Returns:
     //    Nothing
@@ -567,7 +578,9 @@ class MGVApp extends Component {
 	//
 	this.zoomView.highlighted = cfg.highlight;
 	this.zoomView.genomes = this.vGenomes;
-	this.zoomView.update(this.coords)
+	this.zoomView.update(this.coords);
+	//
+	this.zoomView.dmode = cfg.dmode;
 	//
 	this.contextChanged();
     }
@@ -586,7 +599,8 @@ class MGVApp extends Component {
         let genomes = `genomes=${c.genomes.join("+")}`;
 	let coords = `chr=${c.chr}&start=${c.start}&end=${c.end}`;
 	let hls = `highlight=${c.highlight.join("+")}`;
-	return `${ref}&${genomes}&${coords}&${hls}`;
+	let dmode = `dmode=${c.dmode}`;
+	return `${dmode}&${ref}&${genomes}&${coords}&${hls}`;
     }
 
     //----------------------------------------------

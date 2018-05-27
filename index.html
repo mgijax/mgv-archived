@@ -180,12 +180,12 @@
 		<table></table>
 	    </div>
 	    <!-- Zoom view -->
-	    <div id="zoomView" class="pagebox flexcolumn closable">
+	    <div id="zoomView" class="reference pagebox flexcolumn closable">
 		<!-- Zoom controls -->
 		<div name="zoomcontrols" class="flexrow">
 		    <!-- menu -->
 		    <div class = "menu flexrow">
-			<i class="material-icons button" title="More functions...">menu</i>
+			<i class="material-icons button" title="More functions...">more_vert</i>
 			<div name="cxtMenu" class="flexcolumn">
 			    <div class="menuItem flexrow">
 			    </div>
@@ -201,6 +201,11 @@
 			<label>Showing</label>
 			<input id="zoomWSize" size="10" type="text"></input>
 			<span>bp</span>
+		    </div>
+		    <!-- drawing mode -->
+		    <div name="zoomDmode" class="flexrow">
+			<label name="R" class="button" title="Currently showing comparison genome fragments in Reference genome order. Click to switch to Comparison genome (native) order.">R</label>
+			<label name="C" class="button" title="Currently showing comparison genome fragments in Comparison genome (native) order. Click to switch to Reference genome order.">C</label>
 		    </div>
 		    <!-- zoom buttons -->
 		    <div class="zoomBtns flexrow">
