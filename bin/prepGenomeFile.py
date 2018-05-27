@@ -183,15 +183,6 @@ class Prep:
 
     #
     def processMgiFeature(self, f):
-	xrx = {}
-	xrs = f.attributes.get('Dbxref', [])
-	if type(xrs) is types.StringType:
-	    xrs = [xrs]
-	for xr in xrs:
-	    src,accid = xr.split(':')
-	    xrx[src] = accid
-	f.attributes['ID'] = xrx.get('miRBase', xrx.get('ENSEMBL', xrx.get('NCBI_Gene', '.')))
-
 	f.attributes['biotype'] = f.attributes.get('mgi_type','.')
 	f.attributes['symbol'] = f.attributes.get('Name','.')
 	f.attributes['mgiid'] = f.attributes.get('curie','.')

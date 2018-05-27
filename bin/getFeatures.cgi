@@ -9,6 +9,7 @@ cgitb.enable()
 from indexFeatures import lookup, idlookup, readIndexFile
 
 #----------------------------------------------------------
+# Returns features with the specified coordinate range(s) within the specified genome.
 def getByCoords(datadir, form):
     # get the coords
     genome = form['genome'].value
@@ -40,6 +41,7 @@ def getByCoords(datadir, form):
     return answer
 
 #----------------------------------------------------------
+# Returns features by ID from a specified genome.
 def getByIds(datadir, form):
     #
     genome = form['genome'].value
@@ -50,6 +52,12 @@ def getByIds(datadir, form):
     #
     return idlookup(ff, ids)
 
+
+#----------------------------------------------------------
+# Given either an MGI id or strain specific id, returns genologs from all genomes. 
+# 
+def getGenologs(datadir, form):
+    pass
 
 #----------------------------------------------------------
 def main (form) :
