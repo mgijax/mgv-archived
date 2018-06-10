@@ -1,5 +1,12 @@
+import sys
+
 TAB = '\t'
 NL  = '\n'
+
+#-------------------------------------------------------------------------
+def log(msg):
+    sys.stderr.write(msg)
+    sys.stderr.write(NL)
 
 #-------------------------------------------------------------------------
 # A region is a contiguous stretch of a chromosome in a genome.
@@ -11,8 +18,13 @@ class Region:
 	self.start = int(start)
 	self.end = int(end)
 	if self.start > self.end:
-	    raise RuntimeError("Illegal arguments: start > end. %s %s:%d..%d"%(self.genome.name, self.chr, self.start, self.end))
+	    raise RuntimeError("Illegal arguments: start > end. %s %s:%d..%d"% \
+	        (self.genome.name, self.chr, self.start, self.end))
 	self.strand = strand
+
+    @property
+    def length(self):
+        return self.end - self.start + 1
 
     # Returns true iff the Region overlaps the other Region by at least 1 base.
     def overlaps(self, other):
@@ -56,14 +68,20 @@ class Feature (Region):
 # Features can be added to the block and long as they continue to form a contiguous sublist (ie you can 
 # add negighboring features/blocks).
 class Block (Region):
-    def __init__(self, f):
+    def __init__(self, f, update=False):
 	Region.__init__(self, f.genome, f.chr, f.start, f.end)
+	self.index = -1	# index in my genome
+	self.partners = set() # join partners in other genome
+	#
 	if isinstance(f, Feature):
 	    self.fStart = f.index
 	    self.nFeats = 1
+	    if update: f.block = self
 	elif isinstance(f, Block):
 	    self.fStart = f.fStart
 	    self.nFeats = f.nFeats
+	    self.index = f.index
+	    if update: self.stealPartners(f)
 	else:
 	    raise RuntimeError("Cannot create a Block from this object: " + str(f))
 
@@ -73,7 +91,12 @@ class Block (Region):
 
     def __repr__ (self):
         return str(self)
-     
+
+    # Marks the features in this block. as belonging to this block.
+    def markFeatures(self):
+	for f in self.features():
+	    setattr(f, 'block', self)
+
     def addFeature(self, f):
 	#
 	if f.chr != self.chr:
@@ -107,13 +130,32 @@ class Block (Region):
 	    return "-"
 	return None
 
+    def stealPartners(self, other):
+	for op in other.partners:
+	    op.partners.remove(other)
+	    op.partners.add(self)
+	    self.partners.add(op)
+
     def merge(self, other, update=False):
 	newBlk = self if update else Block(self)
 	newBlk.fStart = min(self.fStart, other.fStart)
 	newBlk.nFeats = self.nFeats + other.nFeats
 	newBlk.start  = min(self.start, other.start)
 	newBlk.end    = max(self.end, other.end)
+	if update:
+	    self.stealPartners(other)
 	return newBlk
+
+    def getCC(self):
+        def _(b, i, cc):
+	    if b in cc[i]: return
+	    cc[i].add(b)
+	    for p in b.partners:
+	        _(p, 1-i, cc)
+	    return cc
+
+	return _(self, 0, (set(), set()))
+
 # end class Block
 
 #-------------------------------------------------------------------------
@@ -121,6 +163,8 @@ class Block (Region):
 # Specifically:
 # - blocks in a cover do not overlap
 # - every feature is covered by exactly one block
+# A BlockCover in one genome may be joined with a BlockCover in another.
+#
 class BlockCover:
     COUNT = 0
     def __init__(self, genome, blocks=None):
@@ -128,18 +172,27 @@ class BlockCover:
 	BlockCover.COUNT += 1
 	self.genome = genome
         self.blocks = [] if blocks is None else blocks
+	self.joinedTo = None
 
-    # 
+    # Numbers the blocks 0..n.
+    # Resets the index attribute in each block
+    def renumber(self):
+        for i,b in enumerate(self.blocks):
+	    b.index = i
+
+    # Raises an exception if this is not a valid block cover.
     def validate (self):
 	n = 0
         for i,b in enumerate(self.blocks):
 	    n += b.nFeats
 	    if i == 0:
+		# first block must start at 0
 	        if b.fStart != 0: raise RuntimeError("Cover does not start at 0.")
 	    else:
+		# each successive block must start right after the previous
 		bb = self.blocks[i-1]
 	        if b.fStart != bb.fStart + bb.nFeats: raise RuntimeError("Invalid cover.")
-	#
+	# Number of features in the cover must equal the number of features in the genome.
 	if n != len(self.genome.feats):
 	    raise RuntimeError("Incomplete cover.")
 	#
@@ -151,12 +204,7 @@ class BlockCover:
     # and whose value is the block.
     def markFeatures(self):
         for b in self.blocks:
-	    self._markFeatures(b)
-
-    # Marks the features in one block. Helper function. Not for external use.
-    def _markFeatures(self, block):
-	for f in block.features():
-	    setattr(f, self.id, block)
+	    b.markFeatures(b)
 
     # Finds the block in this cover containing the given feature, or None
     # if no such block exists. (This should only happen if the feature is is not
@@ -169,9 +217,9 @@ class BlockCover:
     #	i (integer) index of starting feature. Must be >= 0 and < len(self.blocks)
     #   n (integer) number of features to merge. Must be >= 1 and <= (len(self.blocks) - i)
     def mergeRange(self, i, n):
-	merged = Block(self.blocks[i])
+	merged = Block(self.blocks[i], update=True)
 	for j in range(1,n):
-	    merged = merged.merge(self.blocks[i+j])
+	    merged = merged.merge(self.blocks[i+j], update=True)
 	    if merged is None: raise RuntimeError("Cannot merge this block.")
 	return merged
         
@@ -190,7 +238,8 @@ class BlockCover:
 	ranges.sort(lambda a,b: a[0]-b[0])
 	# make sure they're valid
 	for i in range(len(ranges)-1):
-	    if ranges[i][0] + ranges[i][1] >= ranges[i+1][0]: raise RuntimeError("Overlapping ranges.")
+	    if ranges[i][0] + ranges[i][1] > ranges[i+1][0]: 
+	        raise RuntimeError("Overlapping ranges: %s" % str(ranges))
 	# Take the current list of blocks in a series of slices, defined by the ranges.
 	newbs = []
 	i = 0
@@ -202,11 +251,12 @@ class BlockCover:
 	    newbs.append(merged)
 	    i = r[0] + r[1]
 	    #
-	    self._markFeatures(merged)
+	    merged.markFeatures()
 	#
 	newbs += self.blocks[i:] # the end chunk
 	# update self
 	self.blocks = newbs
+	self.renumber()
 
     # Joins the blocks in this block cover with those in other.
     # Two blocks join iff they contain features that join.
@@ -214,6 +264,10 @@ class BlockCover:
     # The result of the join is that each block is given the set
     # of its join partners from other side.
     def join(self, other):
+	if self.joinedTo: self.unjoin()
+	if other.joinedTo: other.unjoin()
+	self.joinedTo = other
+	other.joinedTo = self
 	# initializes and indexes the list of blocks. Returns the index.
 	def _(blocks):
 	    index = {}
@@ -235,12 +289,25 @@ class BlockCover:
 		for o in oblks:
 		    o.partners.add(b)
 
+    # 
+    def unjoin(self):
+        if not self.joinedTo:
+	    return
+	def _(x):
+	    for b in x.blocks:
+	       b.partners.clear()
+	    x.joinedTo = None   
+	_(self.joinedTo)
+	_(self)
+
     # After joining with another BlockCover, there may be blocks left that did not join with
     # any partner. This step merges such blocks with their neighbors until only blocks having 
     # partners remain. (Another way to think of this: blocks that do have partners expand and
     # "swallow up" any unattached neighbors.)
     #
     def mergeUnattached(self):
+	if not self.joinedTo:
+	    raise RuntimeError("Invalid operation: BlockCover is not joined.")
 	newbs = []
 	cb = None
         for b in self.blocks:
@@ -268,24 +335,59 @@ class BlockCover:
 
     # Iterator that yields all connected components of blocks in this genome
     # and their partner blocks in the other.
+    # Yields a sequence of tuples (aBlocks,bBlocks), each containing the A 
+    # and B genome blocks (aBlocks and bBlocks, respectively) in the cc.
     def enumerateCCs(self):
-	def _(blk, i, cc):
-	   if blk in cc[i]:
-	      return
-	   cc[i].add(blk)
-	   for p in blk.partners:
-	      _(p, 1-i, cc)
+	if not self.joinedTo:
+	    raise RuntimeError("Invalid operation: BlockCover is not joined.")
 	seen = set()
         for b in self.blocks:
 	   if not b in seen:
-	      cc = (set(), set())
-	      _(b, 0, cc)
+	      cc = b.getCC()
 	      seen.update(cc[0])
 	      yield cc
-    #
+
+    # Divides a sorted list of blocks into a series of runs. Each run
+    # is a sub-list containing blocks that are sequential in the genome
+    def findRuns(self, blocks):
+        runs = []
+	lastb = None
+	for i,b in enumerate(blocks):
+	    if lastb is None or not lastb.hasNeighbor(b):
+		runs.append([i,1])
+	    else:
+	        runs[-1][1] += 1
+	    lastb = b
+	return runs
+
+    # Looks for CCs that have multiple A blocks and/or multiple B blocks,
+    # and tries to merge them. What we want is all cc's to have 1 of each.
     def collapseCCs(self):
-        pass
-        
+	if not self.joinedTo:
+	    raise RuntimeError("Invalid operation: BlockCover is not joined.")
+	#
+	def _(blocks, orders):
+	    if len(blocks) < 2: return True
+	    blocks = list(blocks)
+	    blocks.sort(lambda x,y: x.fStart - y.fStart)
+	    runs = self.findRuns(blocks)
+	    merges = map(lambda r: [blocks[r[0]].index, r[1]], filter(lambda r: r[1]>1, runs))
+	    orders += merges
+	    return len(runs) == 1
+	#
+	self.renumber()
+	self.joinedTo.renumber()
+	mergeOrders = [ [], [] ]
+	for cc in self.enumerateCCs():
+	    aok = _(cc[0], mergeOrders[0])
+	    bok = _(cc[1], mergeOrders[1])
+	    if not aok or not bok:
+	        log("Uncollapsible connected component.")
+		log(str(cc))
+	#
+	self.mergeRanges ( mergeOrders[0] )
+	self.joinedTo.mergeRanges( mergeOrders[1] )
+
 # end class BlockCover
 
 #-------------------------------------------------------------------------
@@ -293,9 +395,13 @@ class BlockCover:
 # deemed to be equivalent.
 #
 class SyntenyBlock:
+    COUNT = 0
     def __init__(self, aBlock, bBlock):
+	self.id = SyntenyBlock.COUNT
+	SyntenyBlock.COUNT += 1
         self.a = Block(aBlock)
 	self.b = Block(bBlock)
+	self.count = 1
 
     def __str__(self):
         return '<%s, %s>' % (str(self.a), str(self.b))
@@ -309,7 +415,47 @@ class SyntenyBlock:
     def extend(self, aNew, bNew):
         self.a.merge(aNew, update=True)
         self.b.merge(bNew, update=True)
+	self.count += 1
 
+    def asRow(self, colNames=False, formatted=False):
+	if colNames:
+	    r = [
+	      "blockId",
+	      "blockCount",
+	      "blockOri",
+	      "blockRatio",
+	      "aIndex",
+	      "aChr",
+	      "aStart",
+	      "aEnd",
+	      "aLength",
+	      "bIndex",
+	      "bChr",
+	      "bStart",
+	      "bEnd",
+	      "bLength",
+	    ]
+        else:
+            r = [
+		self.id,
+		self.count,
+		"+", #FIXME
+		"%1.2f" % (float(self.a.length) / self.b.length),
+		self.a.index,
+		self.a.chr,
+		self.a.start,
+		self.a.end,
+		self.a.length,
+		self.b.index,
+		self.b.chr,
+		self.b.start,
+		self.b.end,
+		self.b.length
+	    ]
+	if formatted:
+	    return TAB.join(map(lambda x: str(x), r))
+	else:
+	    return r
 # end class SyntenyBlock
 
 #-------------------------------------------------------------------------
@@ -381,26 +527,43 @@ class Genome:
 #-------------------------------------------------------------------------
 # Iterator that yields SyntenyBlocks for the two genomes, a and b
 # Args:
-#    a (Genome object)
-#    b (Genome object)
+#    a (Genome object) - assumes a has been initialized and an initial
+#		contig cover has been created.
+#    b (Genome object) - same assumption for b
 # Yields:
 #    SyntenyBlock objects in genome A order.
 #
 def generate(a, b):
+	# join blocks in genome a to blocks in genome b (based on features
+	# with shared canonical ids).
 	a.contigs.join(b.contigs)
+	# merge any block without a partner into its neighbors
 	a.contigs.mergeUnattached()
 	b.contigs.mergeUnattached()
+	# for each connected component (cc) where the number of A blocks or
+	# the number of B blocks is > 1, try to merge them into 1 block.
+	# (Want every cc to be 1:1)
 	a.contigs.collapseCCs()
+	# sanity check: make sure covers are still valid
+	a.contigs.validate()
+	b.contigs.validate()
 	#
+	for cc in a.contigs.enumerateCCs():
+	    if len(cc[0]) > 1 or len(cc[1]) > 1:
+	        log("UNCOLLAPSED:" + str(cc)) 
+	#
+	# OK, here we go...
 	csb = None # current synteny block
 	for aBlk in a.contigs.blocks:
-	    bBlk = list(aBlk.partners)[0]
+	    bBlk = list(aBlk.partners)[0] #FIXME
 	    if csb and csb.canExtend(aBlk, bBlk):
 	        csb.extend(aBlk, bBlk)
 	    else:
 	        if csb: yield csb
 		csb = SyntenyBlock(aBlk, bBlk)
-	if csb: yield csb
+	#
+	if csb: 
+	    yield csb
 
 # Iterator that yields SyntenyBlocks for two genomes.
 # Args:
@@ -425,4 +588,9 @@ if __name__ == "__main__":
     bName = "AKR/J"
     bFile = "../data/genomedata/mus_musculus_akrj-features.tsv"
     sbg = generateFromFiles(aName, aFile, bName, bFile)
+    for i,sb in enumerate(sbg):
+        if i == 0:
+	    sys.stdout.write( sb.asRow(colNames=True, formatted=True) + NL )
+	sys.stdout.write( sb.asRow(formatted=True) + NL )
+
 
