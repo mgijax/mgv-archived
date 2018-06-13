@@ -1,4 +1,5 @@
 import sys
+import argparse
 
 TAB = '\t'
 NL  = '\n'
@@ -63,6 +64,72 @@ class Feature (Region):
 # end class Feature
     
 #-------------------------------------------------------------------------
+# A Genome represents one actual genome, such as an inbred mouse strain.
+# A Genome has a name and a list of features. The feature list is sorted by
+# chromosome, than by start position. Features are also indexed by id and
+# by canonical id.
+#
+class Genome:
+    def __init__(self, name):
+        self.name = name
+	self.feats = None	# all the features sorted by chr,start
+	self.id2feat = {}	# index by feature id
+	self.cid2feats = {}	# index by canonical (eg MGI) id
+
+    # Returns the feature having that id, or None if no such feature exists.
+    def getFeatureById(self, id):
+        return self.id2feat.get(id, None)
+
+    # Returns a list of all features having the given canonical id.
+    def getFeaturesByCanonicalId(self, cid):
+        fs = self.cid2feats.get(cid, None)
+	return [] if fs is None else fs[:]
+
+    # Contigs have been precomputed and each feature tagged with its contig index
+    # Build a block cover from this information.
+    def buildContigCover(self):
+	b = None
+	c = None
+	blocks = []
+        for f in self.feats:
+	    if f.contig != c:
+	        b = Block(f)
+		c = f.contig
+		blocks.append(b)
+	    else:
+	        b.addFeature(f)
+	return BlockCover(self, blocks)
+
+    # Reads the features for this genome from the given file and stores them in self.feats.
+    # Also builds indexes (1) from feature id to feature and (2) from canonical id to feature(s).
+    # Also builds an initial set of Blocks from contigs (sequences of overlapping features).
+    # Contigs have already been computed. 
+    # Each feature is tagged with the id of the contig it belongs to.
+    #
+    # Columns in *-features.tsv files:
+    # chromosome      start   end     strand  contig  lane    type    biotype id      mgiid   symbol
+    #
+    # Mapped to these names:
+    # chr      start   end     strand  contig  lane    type    biotype id      canonical   symbol
+    # 
+    def	readFromFile(self, fname):
+	self.feats = []
+	fd = open(fname, 'r')
+	colNames = fd.readline()[:-1].replace('chromosome','chr').replace('mgiid','canonical').split(TAB)
+	count = 0
+	for i,line in enumerate(fd):
+	    r = line[:-1].split(TAB)
+	    f = Feature(self, colNames, r)
+	    f.index = count
+	    count += 1
+	    self.feats.append(f)
+	    self.id2feat[f.id] = f
+	    self.cid2feats.setdefault(f.canonical, []).append(f)
+	self.contigs = self.buildContigCover()
+	return self;
+# end class Genome
+
+#-------------------------------------------------------------------------
 # A Block is a region defined by the outer limits of a contiguous sublist of one or more features
 # from the genome's feature list. A block may be initialized with a single feature or another block.
 # Features can be added to the block and long as they continue to form a contiguous sublist (ie you can 
@@ -97,6 +164,8 @@ class Block (Region):
 	for f in self.features():
 	    setattr(f, 'block', self)
 
+    # Adds a feature to the block. Features must form contiguous blocks (ie, you have to add
+    # features at the ends).
     def addFeature(self, f):
 	#
 	if f.chr != self.chr:
@@ -110,16 +179,20 @@ class Block (Region):
 	self.end    = max(self.end, f.end)
 	return self
 
+    # Returns the list of feature indices in this block.
     def getFeatureIndices(self):
         return range(self.fStart, self.fStart + self.nFeats)
 
+    # Returns the list of features in this block
     def getFeatures(self):
         return self.genome.feats[self.fStart:self.fStart+self.nFeats]
 
+    # Iterator that yields the features in this block
     def features (self):
         for i in range(self.fStart, self.fStart+self.nFeats):
 	    yield self.genome.feats[i] 
 
+    # 
     def hasNeighbor(self, other):
 	if self.genome != other.genome \
         or self.chr != other.chr:
@@ -130,12 +203,15 @@ class Block (Region):
 	    return "-"
 	return None
 
+    # Helper function for merge(). Takes other's partners and makes them pertners of self.
     def stealPartners(self, other):
 	for op in other.partners:
 	    op.partners.remove(other)
 	    op.partners.add(self)
 	    self.partners.add(op)
 
+    # Merges this block with other. If update is False, returns a new Block.
+    # If update is True, merges other into self.
     def merge(self, other, update=False):
 	newBlk = self if update else Block(self)
 	newBlk.fStart = min(self.fStart, other.fStart)
@@ -146,6 +222,9 @@ class Block (Region):
 	    self.stealPartners(other)
 	return newBlk
 
+    # Returns the connected component of partner blocks containing this block.
+    # This is a cc in a bipartite graph, so the it is represented as two sets
+    # of Blocks.
     def getCC(self):
         def _(b, i, cc):
 	    if b in cc[i]: return
@@ -383,7 +462,7 @@ class BlockCover:
 	    bok = _(cc[1], mergeOrders[1])
 	    if not aok or not bok:
 	        log("Uncollapsible connected component.")
-		log(str(cc))
+		#log(str(cc))
 	#
 	self.mergeRanges ( mergeOrders[0] )
 	self.joinedTo.mergeRanges( mergeOrders[1] )
@@ -391,17 +470,18 @@ class BlockCover:
 # end class BlockCover
 
 #-------------------------------------------------------------------------
-# A SyntenyBlock is a pair of Blocks, one from genome A and one from genome B,
+# A SyntenyBloc is a pair of Blocks, one from genome A and one from genome B,
 # deemed to be equivalent.
 #
-class SyntenyBlock:
+class SyntenyBloc:
     COUNT = 0
-    def __init__(self, aBlock, bBlock):
-	self.id = SyntenyBlock.COUNT
-	SyntenyBlock.COUNT += 1
-        self.a = Block(aBlock)
-	self.b = Block(bBlock)
+    def __init__(self, cc):
+	self.id = SyntenyBloc.COUNT
+	SyntenyBloc.COUNT += 1
+        self.a = [ Block(x) for x in cc[0] ]
+	self.b = [ Block(x) for x in cc[1] ]
 	self.count = 1
+	self.ori = '+' # FIXME
 
     def __str__(self):
         return '<%s, %s>' % (str(self.a), str(self.b))
@@ -409,17 +489,22 @@ class SyntenyBlock:
     def __repr__(self):
         return str(self)
 
-    def canExtend(self, aNew, bNew):
-        return self.a.hasNeighbor(aNew) and self.b.hasNeighbor(bNew)
+    def canExtend(self, cc):
+	if not (len(self.a) == 1 and len(self.b) == 1 and len(cc[0]) == 1 and len(cc[1]) == 1):
+	    return False
+        if not ( self.a[0].hasNeighbor(cc[0][0]) and self.b[0].hasNeighbor(cc[1][0])):
+	    return False
+	return True
 
-    def extend(self, aNew, bNew):
-        self.a.merge(aNew, update=True)
-        self.b.merge(bNew, update=True)
+    def extend(self, cc):
+        self.a[0].merge(cc[0][0], update=True)
+        self.b[0].merge(cc[1][0], update=True)
 	self.count += 1
 
-    def asRow(self, colNames=False, formatted=False):
-	if colNames:
-	    r = [
+
+    #
+    def getColNames(self):
+	return [
 	      "blockId",
 	      "blockCount",
 	      "blockOri",
@@ -435,103 +520,38 @@ class SyntenyBlock:
 	      "bEnd",
 	      "bLength",
 	    ]
-        else:
+    #
+    def getRows(self):
+	rows = []
+	for aa in self.a:
+	  for bb in aa.partners:
             r = [
 		self.id,
 		self.count,
-		"+", #FIXME
-		"%1.2f" % (float(self.a.length) / self.b.length),
-		self.a.index,
-		self.a.chr,
-		self.a.start,
-		self.a.end,
-		self.a.length,
-		self.b.index,
-		self.b.chr,
-		self.b.start,
-		self.b.end,
-		self.b.length
+		self.ori,
+		"%1.2f" % (float(aa.length) / bb.length),
+		aa.index,
+		aa.chr,
+		aa.start,
+		aa.end,
+		aa.length,
+		bb.index,
+		bb.chr,
+		bb.start,
+		bb.end,
+		bb.length
 	    ]
-	if formatted:
-	    return TAB.join(map(lambda x: str(x), r))
-	else:
-	    return r
-# end class SyntenyBlock
+	    rows.append( r )
+	return rows
 
 #-------------------------------------------------------------------------
-# A Genome represents one actual genome, such as an inbred mouse strain.
-# A Genome has a name and a list of features. The feature list is sorted by
-# chromosome, than by start position. Features are also indexed by id and
-# by canonical id.
-#
-class Genome:
-    def __init__(self, name):
-        self.name = name
-	self.feats = None	# all the features sorted by chr,start
-	self.id2feat = {}	# index by feature id
-	self.cid2feats = {}	# index by canonical (eg MGI) id
-
-    # Returns the feature having that id, or None if no such feature exists.
-    def getFeatureById(self, id):
-        return self.id2feat.get(id, None)
-
-    # Returns a list of all features having the given canonical id.
-    def getFeaturesByCanonicalId(self, cid):
-        fs = self.cid2feats.get(cid, None)
-	return [] if fs is None else fs[:]
-
-    # Contigs have been precomputed and each feature tagged with its contig index
-    # Build a block cover from this information.
-    def buildContigCover(self):
-	b = None
-	c = None
-	blocks = []
-        for f in self.feats:
-	    if f.contig != c:
-	        b = Block(f)
-		c = f.contig
-		blocks.append(b)
-	    else:
-	        b.addFeature(f)
-	return BlockCover(self, blocks)
-
-    # Reads the features for this genome from the given file and stores them in self.feats.
-    # Also builds indexes (1) from feature id to feature and (2) from canonical id to feature(s).
-    # Also builds an initial set of Blocks from contigs (sequences of overlapping features).
-    # Contigs have already been computed. 
-    # Each feature is tagged with the id of the contig it belongs to.
-    #
-    # Columns in *-features.tsv files:
-    # chromosome      start   end     strand  contig  lane    type    biotype id      mgiid   symbol
-    #
-    # Mapped to these names:
-    # chr      start   end     strand  contig  lane    type    biotype id      canonical   symbol
-    # 
-    def	readFromFile(self, fname):
-	self.feats = []
-	fd = open(fname, 'r')
-	colNames = fd.readline()[:-1].replace('chromosome','chr').replace('mgiid','canonical').split(TAB)
-	count = 0
-	for i,line in enumerate(fd):
-	    r = line[:-1].split(TAB)
-	    f = Feature(self, colNames, r)
-	    f.index = count
-	    count += 1
-	    self.feats.append(f)
-	    self.id2feat[f.id] = f
-	    self.cid2feats.setdefault(f.canonical, []).append(f)
-	self.contigs = self.buildContigCover()
-	return self;
-# end class Genome
-
-#-------------------------------------------------------------------------
-# Iterator that yields SyntenyBlocks for the two genomes, a and b
+# Iterator that yields SyntenyBlocs for the two genomes, a and b
 # Args:
 #    a (Genome object) - assumes a has been initialized and an initial
 #		contig cover has been created.
 #    b (Genome object) - same assumption for b
 # Yields:
-#    SyntenyBlock objects in genome A order.
+#    SyntenyBloc objects in genome A order.
 #
 def generate(a, b):
 	# join blocks in genome a to blocks in genome b (based on features
@@ -543,29 +563,26 @@ def generate(a, b):
 	# for each connected component (cc) where the number of A blocks or
 	# the number of B blocks is > 1, try to merge them into 1 block.
 	# (Want every cc to be 1:1)
+	# CCs that cannot be turned into 1:1 are reported
 	a.contigs.collapseCCs()
 	# sanity check: make sure covers are still valid
 	a.contigs.validate()
 	b.contigs.validate()
 	#
+	csb = None # current synteny block
 	for cc in a.contigs.enumerateCCs():
+	    cc = [list(cc[0]),list(cc[1])]
 	    if len(cc[0]) > 1 or len(cc[1]) > 1:
 	        log("UNCOLLAPSED:" + str(cc)) 
-	#
-	# OK, here we go...
-	csb = None # current synteny block
-	for aBlk in a.contigs.blocks:
-	    bBlk = list(aBlk.partners)[0] #FIXME
-	    if csb and csb.canExtend(aBlk, bBlk):
-	        csb.extend(aBlk, bBlk)
+	    if csb and csb.canExtend(cc):
+	        csb.extend(cc)
 	    else:
 	        if csb: yield csb
-		csb = SyntenyBlock(aBlk, bBlk)
-	#
-	if csb: 
+		csb = SyntenyBloc(cc)
+	if csb:
 	    yield csb
 
-# Iterator that yields SyntenyBlocks for two genomes.
+# Iterator that yields SyntenyBloc for two genomes.
 # Args:
 #    aName (string) Name of genome A, e.g. "A/J"
 #    aFile (string) Path to file of genome A features
@@ -577,20 +594,62 @@ def generateFromFiles(aName, aFile, bName, bFile):
     global b
     a = Genome(aName).readFromFile(aFile)
     b = Genome(bName).readFromFile(bFile)
-    for sblock in generate(a, b):
-        yield sblock
+    for sbloc in generate(a, b):
+        yield sbloc
+
+#
+def format(lst):
+    return TAB.join(map(lambda x: str(x), lst))
 
 #-------------------------------------------------------------------------
+def getArgs ():
+    """
+    Sets up the parser for the command line args.
+    """
+    parser = argparse.ArgumentParser(description='Generate synteny blocks.')
+
+    parser.add_argument(
+	'--afile',
+	dest="afile",
+	required=True,
+	metavar='FILE', 
+	help='GFF3 file of features from genome A.')
+
+    parser.add_argument(
+	'--aname',
+	dest="aname",
+	required=True,
+	metavar='NAME', 
+	help='Name of genome A.')
+
+    parser.add_argument(
+	'--bfile',
+	dest="bfile",
+	required=True,
+	metavar='FILE', 
+	help='GFF3 file of features from genome B.')
+
+    parser.add_argument(
+	'--bname',
+	dest="bname",
+	required=True,
+	metavar='NAME', 
+	help='Name of genome B.')
+
+    return parser.parse_args()
+
 if __name__ == "__main__":
     global sbg
-    aName = "A/J"
-    aFile = "../data/genomedata/mus_musculus_aj-features.tsv"
-    bName = "AKR/J"
-    bFile = "../data/genomedata/mus_musculus_akrj-features.tsv"
-    sbg = generateFromFiles(aName, aFile, bName, bFile)
+    args = getArgs()
+    #aName = "A/J"
+    #aFile = "../data/genomedata/mus_musculus_aj-features.tsv"
+    #bName = "AKR/J"
+    #bFile = "../data/genomedata/mus_musculus_akrj-features.tsv"
+    sbg = generateFromFiles(args.aname, args.afile, args.bname, args.bfile)
     for i,sb in enumerate(sbg):
         if i == 0:
-	    sys.stdout.write( sb.asRow(colNames=True, formatted=True) + NL )
-	sys.stdout.write( sb.asRow(formatted=True) + NL )
+	    sys.stdout.write( format(sb.getColNames()) + NL )
+	for r in sb.getRows():
+	    sys.stdout.write( format(r) + NL )
 
 

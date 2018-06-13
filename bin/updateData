@@ -62,8 +62,6 @@ function download {
 cat ${SDIR}/*features.tsv | grep -v ^chromosome | cut -f 9,10,1-4 | sort -k 5,5 > ${SDIR}/byGenologId.tsv 
 sort -k 6,6 ${SDIR}/byGenologId.tsv | grep -v '[.]$' > ${SDIR}/byCanonicalId.tsv
 
-exit
-
 # main loop
 for sn in "${ALL_GENOME_NAMES[@]}"
 do : 

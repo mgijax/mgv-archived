@@ -89,6 +89,7 @@ class BTManager {
     // Translates the given coordinate range from the specified fromGenome to the specified toGenome.
     // Returns a list of zero or more coordinate ranges in the toGenome.
     //
+    // FIXME is this code even used? looks out of place. copy/paste error?
     translate (fromGenome, chr, start, end, toGenome) {
 	// get the right block file
 	let blkTrans = this.rcBlocks[fromGenome.name][toGenome.name];
