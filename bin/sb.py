@@ -213,6 +213,9 @@ class Block (Region):
     # Merges this block with other. If update is False, returns a new Block.
     # If update is True, merges other into self.
     def merge(self, other, update=False):
+	# quich sanity check
+	if self.chr != other.chr:
+	    raise RuntimeError("Cannot merge these blocks:\n\t%s\n\t%s"%(str(self), str(other)))
 	newBlk = self if update else Block(self)
 	newBlk.fStart = min(self.fStart, other.fStart)
 	newBlk.nFeats = self.nFeats + other.nFeats
@@ -232,8 +235,11 @@ class Block (Region):
 	    for p in b.partners:
 	        _(p, 1-i, cc)
 	    return cc
-
-	return _(self, 0, (set(), set()))
+	cc = _(self, 0, (set(), set()))
+	skey = lambda x: x.fStart
+	cc = (sorted(cc[0],key=skey), sorted(cc[1], key=skey))
+	edges = [ [i, cc[1].index(b)] for i,a in enumerate(cc[0]) for b in a.partners ]
+	return (cc[0], cc[1], edges)
 
 # end class Block
 
@@ -382,7 +388,8 @@ class BlockCover:
     # After joining with another BlockCover, there may be blocks left that did not join with
     # any partner. This step merges such blocks with their neighbors until only blocks having 
     # partners remain. (Another way to think of this: blocks that do have partners expand and
-    # "swallow up" any unattached neighbors.)
+    # "swallow up" any unattached neighbors.) Note that merging only happens between blocks on
+    # the same chromosome.
     #
     def mergeUnattached(self):
 	if not self.joinedTo:
@@ -402,6 +409,8 @@ class BlockCover:
 	        if len(b.partners):
 		    # new block also has partners, can't merge
 		    cb = b
+		elif cb.chr != b.chr:
+		    cb = b
 		else:
 		    # merge new block into current
 		    cb = cb.merge(b, update=True)
@@ -412,7 +421,7 @@ class BlockCover:
 	#
 	self.blocks = newbs
 
-    # Iterator that yields all connected components of blocks in this genome
+    # Iterator that yields all connected components, ie, blocks in this genome
     # and their partner blocks in the other.
     # Yields a sequence of tuples (aBlocks,bBlocks), each containing the A 
     # and B genome blocks (aBlocks and bBlocks, respectively) in the cc.
@@ -447,8 +456,6 @@ class BlockCover:
 	#
 	def _(blocks, orders):
 	    if len(blocks) < 2: return True
-	    blocks = list(blocks)
-	    blocks.sort(lambda x,y: x.fStart - y.fStart)
 	    runs = self.findRuns(blocks)
 	    merges = map(lambda r: [blocks[r[0]].index, r[1]], filter(lambda r: r[1]>1, runs))
 	    orders += merges
@@ -480,6 +487,7 @@ class SyntenyBloc:
 	SyntenyBloc.COUNT += 1
         self.a = [ Block(x) for x in cc[0] ]
 	self.b = [ Block(x) for x in cc[1] ]
+	self.edges = cc[2]
 	self.count = 1
 	self.ori = '+' # FIXME
 
@@ -492,13 +500,14 @@ class SyntenyBloc:
     def canExtend(self, cc):
 	if not (len(self.a) == 1 and len(self.b) == 1 and len(cc[0]) == 1 and len(cc[1]) == 1):
 	    return False
-        if not ( self.a[0].hasNeighbor(cc[0][0]) and self.b[0].hasNeighbor(cc[1][0])):
+        if not (self.a[0].hasNeighbor(cc[0][0]) and self.b[0].hasNeighbor(cc[1][0])):
 	    return False
 	return True
 
     def extend(self, cc):
         self.a[0].merge(cc[0][0], update=True)
         self.b[0].merge(cc[1][0], update=True)
+	# should be no need to update edges since there's still only 1
 	self.count += 1
 
 
@@ -523,10 +532,11 @@ class SyntenyBloc:
     #
     def getRows(self):
 	rows = []
-	for aa in self.a:
-	  for bb in aa.partners:
+	for i,e in enumerate(self.edges):
+	    aa = self.a[e[0]]
+	    bb = self.b[e[1]]
             r = [
-		self.id,
+		"%s_%d" % (self.id, i),
 		self.count,
 		self.ori,
 		"%1.2f" % (float(aa.length) / bb.length),
@@ -571,7 +581,6 @@ def generate(a, b):
 	#
 	csb = None # current synteny block
 	for cc in a.contigs.enumerateCCs():
-	    cc = [list(cc[0]),list(cc[1])]
 	    if len(cc[0]) > 1 or len(cc[1]) > 1:
 	        log("UNCOLLAPSED:" + str(cc)) 
 	    if csb and csb.canExtend(cc):
@@ -640,11 +649,16 @@ def getArgs ():
 
 if __name__ == "__main__":
     global sbg
-    args = getArgs()
-    #aName = "A/J"
-    #aFile = "../data/genomedata/mus_musculus_aj-features.tsv"
-    #bName = "AKR/J"
-    #bFile = "../data/genomedata/mus_musculus_akrj-features.tsv"
+    if len(sys.argv) == 1:
+	class FakeArgs:
+	    pass
+        args = FakeArgs()
+	args.aname = "A/J"
+	args.afile = "../data/genomedata/mus_musculus_aj-features.tsv"
+	args.bname = "AKR/J"
+	args.bfile = "../data/genomedata/mus_musculus_akrj-features.tsv"
+    else:
+	args = getArgs()
     sbg = generateFromFiles(args.aname, args.afile, args.bname, args.bfile)
     for i,sb in enumerate(sbg):
         if i == 0:

@@ -62,7 +62,9 @@ class FeatureManager {
     //   nothing
     //
     _registerBlock (genome, blk) {
+	// genome cache
         let gc = this.cache[genome.name] = (this.cache[genome.name] || {});
+	// chromosome cache (w/in genome)
 	let cc = gc[blk.chr] = (gc[blk.chr] || []);
 	if (cc.filter(b => b.id === blk.id).length === 0) {
 	    blk.features = this.processFeatures( blk.features, genome );
