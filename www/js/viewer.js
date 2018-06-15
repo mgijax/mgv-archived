@@ -44,6 +44,10 @@ function pqstring (qstring) {
     start && (cfg.start = parseInt(start));
     end   && (cfg.end = parseInt(end));
     //
+    // ----- drawing mode -------------
+    let dmode = prms.get("dmode");
+    dmode && (cfg.dmode = dmode);
+    //
     return cfg;
 }
 

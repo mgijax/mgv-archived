@@ -194,7 +194,6 @@ class FeatureManager {
     }
     //----------------------------------------------
     // Returns a promise for the features having the specified ids from the specified genome.
-    // Fulfillment data = 
     getFeaturesById (genome, ids) {
         return this._ensureFeaturesById(genome, ids).then( () => {
 	    let feats = [];

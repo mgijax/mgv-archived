@@ -18,6 +18,7 @@ class ZoomView extends SVGView {
       this.laneHeight = this.featHeight + this.laneGap;
       this.stripHeight = 70;    // height per genome in the zoom view
       this.stripGap = 20;	// space between strips
+      this.dmode = 'reference';	// drawing mode. 'comparison' or 'reference'
 
       //
       this.coords = initialCoords;// curr zoom view coords { chr, start, end }
@@ -169,6 +170,7 @@ class ZoomView extends SVGView {
 	      let cx = d3.event.clientX;
 	      let cy = d3.event.clientY;
 	      let bb = d3.select(this)[0][0].getBoundingClientRect();
+	      d3.event.stopPropagation();
 	      self.showContextMenu(cx-bb.left,cy-bb.top);
 	  });
 	// zoom coordinates box
@@ -205,7 +207,15 @@ class ZoomView extends SVGView {
 		    });
 		}
 	    });
-
+	// zoom drawing mode 
+	this.root.selectAll('div[name="zoomDmode"] .button')
+	    .on("click", function() {
+		let r = self.root;
+		let isC = r.classed('comparison');
+		r.classed('comparison', !isC);
+		r.classed('reference', isC);
+		self.app.setContext({dmode: r.classed('comparison') ? 'comparison' : 'reference'});
+	    });
     }
     //----------------------------------------------
     // Args:
@@ -511,13 +521,19 @@ class ZoomView extends SVGView {
     //----------------------------------------------
     orderSBlocks () {
 	let sblocks = this.stripsGrp.selectAll('g.zoomStrip').select('[name="sBlocks"]').selectAll('g.sBlock')
-	// By default, the sblocks in a comp genome strip are ordered to match the ref genome
-	// order.
+	// Sort the sblocks in each strip according to the current drawing mode.
+	let cmpField = this.dmode === 'comparison' ? 'index' : 'fIndex';
+	let cmpFunc = (a,b) => a.__data__[cmpField]-b.__data__[cmpField];
+	sblocks.forEach( strip => strip.sort( cmpFunc ) );
+	//
 	let ppb = this.width / (this.coords.end - this.coords.start + 1);
 	let offset = []; // offset of start  position of next block, by strip index (0===ref)
+	let self = this;
 	sblocks.each( function (b,i,j) { // b=block, i=index within strip, j=strip index
 	    let blen = ppb * (b.end - b.start + 1); // total screen width of this sblock
-	    b.xscale = d3.scale.linear().domain([b.start, b.end]).range([0, blen]);
+	    b.flip = b.ori === '-' && self.dmode === 'reference';
+	    //b.xscale = d3.scale.linear().domain(b.flip ? [b.end,b.start] : [b.start, b.end]).range( [0, blen] );
+	    b.xscale = d3.scale.linear().domain([b.start, b.end]).range( b.flip ? [blen, 0] : [0, blen] );
 	    let dx = i === 0 ? 0 : offset[j];
 	    d3.select(this).attr("transform", `translate(${dx},0)`);
 	    offset[j] = dx + blen + 2;
@@ -619,7 +635,7 @@ class ZoomView extends SVGView {
 	    .remove();
 
         // -----------------------------------------------------
-	// synteny blocks. Eachzoom strip has a list of 1 or more sblocks.
+	// synteny blocks. Each zoom strip has a list of 1 or more sblocks.
 	// The reference genome always has just 1. The comp genomes many have
 	// 1 or more (and in rare cases, 0).
         // -----------------------------------------------------
@@ -655,10 +671,7 @@ class ZoomView extends SVGView {
 	    .text( b => {
 		// only show chromosome label for ref genome and for any sblock
 		// whose chromosome differs from the ref
-		if (b.genome === this.app.rGenome || b.chr !== this.coords.chr)
-		    return b.chr;
-		else
-		    return "";
+		return b.chr;
 	    })
 	    .attr("x", b => (b.xscale(b.start) + b.xscale(b.end))/2 )
 	    .attr("y", this.blockHeight / 2 + 10)
@@ -666,9 +679,9 @@ class ZoomView extends SVGView {
 
 	// synteny block rects
 	sblocks.select("rect.block")
-	  .attr("x",     b => b.xscale(b.start))
+	  .attr("x",     b => b.xscale(b.flip ? b.end : b.start))
 	  .attr("y",     b => -this.blockHeight / 2)
-	  .attr("width", b=>b.xscale(b.end)-b.xscale(b.start))
+	  .attr("width", b => Math.abs(b.xscale(b.end)-b.xscale(b.start)))
 	  .attr("height",this.blockHeight);
 
 	// synteny block axis lines
@@ -712,7 +725,8 @@ class ZoomView extends SVGView {
     //----------------------------------------------
     // Draws the features (rectangles) for the specified synteny blocks.
     // Args:
-    //     sblocks (D3 selection of g.sblock nodes)
+    //     sblocks (D3 selection of g.sblock nodes) - multilevel selection.
+    //        Array (corresponding to strips) of arrays of synteny blocks.
     //
     drawFeatures (sblocks) {
         let self = this;
@@ -738,20 +752,41 @@ class ZoomView extends SVGView {
 	    ;
 
 	// draw the rectangles
+
+	// returns the synteny block containing this feature
 	let fBlock = function (featElt) {
 	    let blkElt = featElt.parentNode;
 	    return blkElt.__data__;
 	}
-	feats
-	  .attr("x", function (f) { return fBlock(this).xscale(f.start) })
-	  .attr("width", function (f) { return fBlock(this).xscale(f.end)-fBlock(this).xscale(f.start)+1 })
-	  .attr("y", function (f) {
-	       if (f.strand == "+")
-		   return -self.laneHeight*f.lane;
-	       else
+	let fx = function(f) {
+	    let b = fBlock(this);
+	    return b.xscale(f.start)
+	};
+	let fw = function (f) {
+	    let b = fBlock(this);
+	    return Math.abs(b.xscale(f.end) - b.xscale(f.start)) + 1;
+	};
+	let fy = function (f) {
+	       let b = fBlock(this);
+	       if (f.strand == "+"){
+		   if (b.flip) 
+		       return self.laneHeight*f.lane - self.featHeight; 
+		   else 
+		       return -self.laneHeight*f.lane;
+	       }
+	       else {
 		   // f.lane is negative for "-" strand
-	           return -self.laneHeight*f.lane - self.featHeight; 
-	       })
+		   if (b.flip) 
+		       return self.laneHeight*f.lane;
+		   else
+		       return -self.laneHeight*f.lane - self.featHeight; 
+	       }
+	   };
+
+	feats
+	  .attr("x", fx)
+	  .attr("width", fw)
+	  .attr("y", fy)
 	  .attr("height", this.featHeight)
 	  ;
     }
