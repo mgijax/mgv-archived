@@ -18,7 +18,7 @@ class ZoomView extends SVGView {
       this.laneHeight = this.featHeight + this.laneGap;
       this.stripHeight = 70;    // height per genome in the zoom view
       this.stripGap = 20;	// space between strips
-      this.dmode = 'reference';	// drawing mode. 'comparison' or 'reference'
+      this.dmode = 'comparison';// drawing mode. 'comparison' or 'reference'
 
       //
       this.coords = initialCoords;// curr zoom view coords { chr, start, end }
@@ -519,8 +519,8 @@ class ZoomView extends SVGView {
     }
 
     //----------------------------------------------
-    orderSBlocks () {
-	let sblocks = this.stripsGrp.selectAll('g.zoomStrip').select('[name="sBlocks"]').selectAll('g.sBlock')
+    orderSBlocks (sblocks) {
+	//let sblocks = this.stripsGrp.selectAll('g.zoomStrip').select('[name="sBlocks"]').selectAll('g.sBlock')
 	// Sort the sblocks in each strip according to the current drawing mode.
 	let cmpField = this.dmode === 'comparison' ? 'index' : 'fIndex';
 	let cmpFunc = (a,b) => a.__data__[cmpField]-b.__data__[cmpField];
@@ -639,14 +639,25 @@ class ZoomView extends SVGView {
 	// The reference genome always has just 1. The comp genomes many have
 	// 1 or more (and in rare cases, 0).
         // -----------------------------------------------------
+	let uniqify = blocks => {
+	    // helper function. When sblock relationship between genomes is confused, requesting one
+	    // region in genome A can end up requesting the same region in genome B twice. This function
+	    // avoids drawing the same sblock twice. (NB: Really not sure where this check is best done.
+	    // Could push it parther upstream.)
+	    let seen = new Set();
+	    return blocks.filter( b => { 
+	        if (seen.has(b.index)) return false;
+		seen.add(b.index);
+		return true;
+	    });
+	};
         let sblocks = zstrips.select('[name="sBlocks"]').selectAll('g.sBlock')
 	    .data(d => {
-		//d.blocks.sort( (a,b) => a.index-b.index );
-	        return d.blocks;
-	    }, d => d.blockId);
+	        return uniqify(d.blocks);
+	    }, b => b.blockId);
 	let newsbs = sblocks.enter()
 	    .append("g")
-	    .attr("class", b => "sBlock" + (b.ori==="+" ? " plus" : " minus") + (b.chr !== b.fChr ? " translocation" : ""))
+	    .attr("class", b => "sBlock " + (b.ori==="+" ? "plus" : b.ori==="-" ? "minus": "confused") + (b.chr !== b.fChr ? " translocation" : ""))
 	    .attr("name", b=>b.index)
 	    ;
 	let l0 = newsbs.append("g").attr("name", "layer0");
