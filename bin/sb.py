@@ -139,6 +139,7 @@ class Block (Region):
 	Region.__init__(self, f.genome, f.chr, f.start, f.end)
 	self.index = -1	# index in my genome
 	self.partners = set() # join partners in other genome
+	self.pOri = ""        # orientation of self/partners, "+", "-", or "" (unset)
 	#
 	if isinstance(f, Feature):
 	    self.fStart = f.index
@@ -203,7 +204,7 @@ class Block (Region):
 	    return "-"
 	return None
 
-    # Helper function for merge(). Takes other's partners and makes them pertners of self.
+    # Helper function for merge(). Takes other's partners and makes them partners of self.
     def stealPartners(self, other):
 	for op in other.partners:
 	    op.partners.remove(other)
@@ -489,7 +490,7 @@ class SyntenyBloc:
 	self.b = [ Block(x) for x in cc[1] ]
 	self.edges = cc[2]
 	self.count = 1
-	self.ori = '+' # FIXME
+	self.ori = self.getOrientation()
 
     def __str__(self):
         return '<%s, %s>' % (str(self.a), str(self.b))
@@ -497,10 +498,21 @@ class SyntenyBloc:
     def __repr__(self):
         return str(self)
 
+    def getOrientation(self):
+        if not(len(self.a) == len(self.b) == 1):
+	    return '?'
+	for af in self.a[0].getFeatures():
+	    if not af.canonical or af.canonical == '.':
+	        continue
+	    for bf in self.b[0].getFeatures():
+	        if af.canonical == bf.canonical:
+		    return '+' if af.strand == bf.strand else '-'
+	raise RuntimeError("Cannot get orientation. Blocks do not join.")
+
     def canExtend(self, cc):
 	if not (len(self.a) == 1 and len(self.b) == 1 and len(cc[0]) == 1 and len(cc[1]) == 1):
 	    return False
-        if not (self.a[0].hasNeighbor(cc[0][0]) and self.b[0].hasNeighbor(cc[1][0])):
+        if not (self.a[0].hasNeighbor(cc[0][0])=='+' and self.b[0].hasNeighbor(cc[1][0])==self.ori):
 	    return False
 	return True
 
