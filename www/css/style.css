@@ -177,9 +177,8 @@ label > i.material-icons {
     cursor: grabbing;
     cursor: -webkit-grabbing;
 }
-/* icon to show in the open (default) state */
 .content-draggable > * > .button.draghandle::after {
-    content: "menu"
+    content: "drag_indicator"
 }
 .content-draggable > .closable.closed > .button.draghandle {
     display: inherit;
@@ -598,18 +597,16 @@ label > i.material-icons {
     fill: red;
 }
 #zoomView svg .sBlock.translocation [name="layer0"] rect.block {
-    fill: blue;
+    fill: orange;
 }
 #zoomView svg .sBlock.translocation [name="layer0"] text.blockLabel {
     font-style: italic;
-    fill: blue;
 }
 #zoomView svg .sBlock.minus.translocation [name="layer0"] rect.block {
     fill: yellow;
 }
 #zoomView svg .sBlock.minus.translocation [name="layer0"] text.blockLabel {
     font-style: italic;
-    fill: yellow;
 }
 #zoomView svg .sBlock text {
    font-size: 12px;
