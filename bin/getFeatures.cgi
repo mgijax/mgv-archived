@@ -6,7 +6,7 @@ import json
 import cgi 
 import cgitb
 cgitb.enable()
-from indexFeatures import lookup, idlookup, readIndexFile
+from indexFeatures import lookup, idlookup, readIndexFile, iterFeatFile
 
 #----------------------------------------------------------
 # Returns features with the specified coordinate range(s) within the specified genome.
@@ -52,6 +52,16 @@ def getByIds(datadir, form):
     #
     return idlookup(ff, ids)
 
+#----------------------------------------------------------
+# Returns all features from a specified genome.
+def getByGenome(datadir, form):
+    #
+    genome = form['genome'].value
+    # open the feature file
+    featfile = os.path.join(datadir, '%s-features.tsv' % genome)
+    ff = open(featfile,'r')
+    #
+    return [ f for f in iterFeatFile(ff) ]
 
 #----------------------------------------------------------
 # Given either an MGI id or strain specific id, returns genologs from all genomes. 
@@ -70,7 +80,7 @@ def main (form) :
     elif 'ids' in form:
         ans = getByIds(datadir, form)
     else:
-        ans = []
+        ans = getByGenome(datadir, form)
     #
     print "Content-type: application/json"
     print
@@ -96,8 +106,8 @@ def test ():
 	    return item in self.entries
     #
     form = FakeForm()
-    form.add( "genome", "mus_musculus")
-    form.add( "coords", "1:10000000..20000000")
+    form.add( "genome", "mus_musculus_aj")
+    #form.add( "coords", "1:10000000..20000000")
     #form.add( "ids"   , "MGI:99677 MGI:97490")
     #
     main(form)

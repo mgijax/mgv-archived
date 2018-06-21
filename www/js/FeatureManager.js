@@ -15,8 +15,8 @@ class FeatureManager {
         this.featCache = {};     // index from mgpid -> feature
 	this.mgiCache = {};	 // index from mgiid -> [ features ]
 	this.cache = {};         // {genome.name -> {chr.name -> list of blocks}}
-
 	this.mineFeatureCache = {}; // auxiliary info pulled from MouseMine 
+	this.loadedGenomes = new Set(); // the set of Genomes that have been fully loaded
     }
  
     //----------------------------------------------
@@ -126,40 +126,21 @@ class FeatureManager {
 	let dataString = `genome=${genome.name}&coords=${coordsArg}`;
 	let url = "./bin/getFeatures.cgi?" + dataString;
 	let self = this;
-	//console.log("Requesting:", genome.name, newranges);
+	console.log("Requesting:", genome.name, newranges);
 	return d3json(url).then(function(blocks){
 	    blocks.forEach( b => self._registerBlock(genome, b) );
 	    return true;
 	});
     }
+ 
     //----------------------------------------------
-    // Ensures that all features with the given IDs in the specified genome
-    // are in the cache. Returns a promise that resolves to true when the condition is met.
-    _ensureFeaturesById (genome, ids) {
-	// subtract ids of features already in the cache
-	let needids = ids.filter(i => {
-	    if (i in this.featCache) {
-	        return false;
-	    }
-	    else if (i in this.mgiCache) {
-		let fs = this.mgiCache[i].filter(f => f.genome === genome);
-		return fs.length === 0;
-	    }
-	    else
-		return true;
+    _ensureFeaturesByGenome (genome) {
+	if( this.loadedGenomes.has(genome) )
+	    return Promise.resolve(true);
+        let ranges = genome.chromosomes.map(c => { 
+	    return { chr: c.name, start: 1, end: c.length };
 	});
-	let dataString = `genome=${genome.name}&ids=${needids.join("+")}`;
-	let url = "./bin/getFeatures.cgi?" + dataString;
-	let self = this;
-	//console.log("Requesting IDs:", genome.name, needids);
-	return d3json(url).then(function(data){
-	    data.forEach((item) => {
-	        let id = item[0];
-		let feats = item[1];
-		this.processFeatures(feats, genome);
-	    });
-	    return true;
-	}.bind(this));
+	return this._ensureFeaturesByRange(genome, ranges).then(x=>{ this.loadedGenomes.add(genome); return true;});
     }
 
     //----------------------------------------------
@@ -184,7 +165,7 @@ class FeatureManager {
     // This is what the user calls. Returns a promise for the features in 
     // the specified ranges of the specified genome.
     getFeatures (genome, ranges) {
-	return this._ensureFeaturesByRange(genome, ranges).then(function() {
+	return this._ensureFeaturesByGenome(genome).then(function() {
             ranges.forEach( r => {
 	        r.features = this._getCachedFeatures(genome, r) 
 		r.genome = genome;
@@ -195,7 +176,7 @@ class FeatureManager {
     //----------------------------------------------
     // Returns a promise for the features having the specified ids from the specified genome.
     getFeaturesById (genome, ids) {
-        return this._ensureFeaturesById(genome, ids).then( () => {
+        return this._ensureFeaturesByGenome(genome).then( () => {
 	    let feats = [];
 	    let seen = new Set();
 	    let addf = (f) => {

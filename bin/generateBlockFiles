@@ -43,7 +43,6 @@ for i in `seq 0 ${lim}`; do
             ofn="${afn%-features}-${bfn%-features}.tsv"
             # here we go...
             echo "python generate.py -A ${a} -B ${b} > ${outdir}/${ofn}"
-            #python generate.py -A ${a} -B ${b} > ${outdir}/${ofn}
 	    python sb.py --af ${a} --an ${afn} --bf ${b} --bn ${bfn} > ${outdir}/${ofn}
         done
     fi

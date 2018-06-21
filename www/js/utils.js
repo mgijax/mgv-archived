@@ -142,7 +142,7 @@ function overlaps (a, b) {
 // The result is a list of 0, 1 or 2 new ranges, depending on a and b.
 function subtract(a, b) {
     if (a.chr !== b.chr) return [ a ];
-    let abLeft = { chr:a.chr, start:a.start,                  end:Math.min(a.end, b.start-1) };
+    let abLeft = { chr:a.chr, start:a.start,                    end:Math.min(a.end, b.start-1) };
     let abRight= { chr:a.chr, start:Math.max(a.start, b.end+1), end:a.end };
     let ans = [ abLeft, abRight ].filter( r => r.start <= r.end );
     return ans;

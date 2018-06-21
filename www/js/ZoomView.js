@@ -520,19 +520,17 @@ class ZoomView extends SVGView {
 
     //----------------------------------------------
     orderSBlocks (sblocks) {
-	//let sblocks = this.stripsGrp.selectAll('g.zoomStrip').select('[name="sBlocks"]').selectAll('g.sBlock')
 	// Sort the sblocks in each strip according to the current drawing mode.
 	let cmpField = this.dmode === 'comparison' ? 'index' : 'fIndex';
 	let cmpFunc = (a,b) => a.__data__[cmpField]-b.__data__[cmpField];
 	sblocks.forEach( strip => strip.sort( cmpFunc ) );
-	//
+	// pixels per base
 	let ppb = this.width / (this.coords.end - this.coords.start + 1);
-	let offset = []; // offset of start  position of next block, by strip index (0===ref)
+	let offset = []; // offset of start position of next block, by strip index (0===ref)
 	let self = this;
 	sblocks.each( function (b,i,j) { // b=block, i=index within strip, j=strip index
 	    let blen = ppb * (b.end - b.start + 1); // total screen width of this sblock
 	    b.flip = b.ori === '-' && self.dmode === 'reference';
-	    //b.xscale = d3.scale.linear().domain(b.flip ? [b.end,b.start] : [b.start, b.end]).range( [0, blen] );
 	    b.xscale = d3.scale.linear().domain([b.start, b.end]).range( b.flip ? [blen, 0] : [0, blen] );
 	    let dx = i === 0 ? 0 : offset[j];
 	    d3.select(this).attr("transform", `translate(${dx},0)`);
@@ -643,7 +641,7 @@ class ZoomView extends SVGView {
 	    // helper function. When sblock relationship between genomes is confused, requesting one
 	    // region in genome A can end up requesting the same region in genome B twice. This function
 	    // avoids drawing the same sblock twice. (NB: Really not sure where this check is best done.
-	    // Could push it parther upstream.)
+	    // Could push it farther upstream.)
 	    let seen = new Set();
 	    return blocks.filter( b => { 
 	        if (seen.has(b.index)) return false;
@@ -679,11 +677,7 @@ class ZoomView extends SVGView {
 
 	// synteny block labels
 	sblocks.select("text.blockLabel")
-	    .text( b => {
-		// only show chromosome label for ref genome and for any sblock
-		// whose chromosome differs from the ref
-		return b.chr;
-	    })
+	    .text( b => b.chr )
 	    .attr("x", b => (b.xscale(b.start) + b.xscale(b.end))/2 )
 	    .attr("y", this.blockHeight / 2 + 10)
 	    ;
