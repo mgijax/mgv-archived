@@ -277,7 +277,7 @@ class BlockCover:
 	    else:
 		# each successive block must start right after the previous
 		bb = self.blocks[i-1]
-	        if b.fStart != bb.fStart + bb.nFeats: raise RuntimeError("Invalid cover.")
+	        if b.fStart != bb.fStart + bb.nFeats: raise RuntimeError("Invalid cover. [%s][%s]"%(str(bb),str(b)))
 	# Number of features in the cover must equal the number of features in the genome.
 	if n != len(self.genome.feats):
 	    raise RuntimeError("Incomplete cover.")
@@ -395,30 +395,22 @@ class BlockCover:
     def mergeUnattached(self):
 	if not self.joinedTo:
 	    raise RuntimeError("Invalid operation: BlockCover is not joined.")
-	newbs = []
-	cb = None
+	newbs = [] # new blocks
+	cb = None  # current block
+	cchr = None# current chromosome
         for b in self.blocks:
-	    # new blocks are all (and only) the one that have partners
-	    if len(b.partners):
+	    if b.chr != cchr:
+		# changed chromosomes (or very first block). start new cb.
+		cchr = b.chr
 	        newbs.append(b)
-	    #
-	    if not cb:
-		# no current block. start one with b.
-	        cb = b
-	    elif len(cb.partners):
-		# current block exists and has partners
-	        if len(b.partners):
-		    # new block also has partners, can't merge
-		    cb = b
-		elif cb.chr != b.chr:
-		    cb = b
-		else:
-		    # merge new block into current
-		    cb = cb.merge(b, update=True)
+		cb = b
+	    elif len(cb.partners) and len(b.partners):
+		# same chromosome, but they both have partners. cannot merge.
+		newbs.append(b)
+		cb = b
 	    else:
-		# current block exists and has no partners.
-		# only happens at the start of the list.
-		cb = b.merge(cb, update=True)
+		# same chromosome, and at least one has no partners, merge.
+		cb = cb.merge(b, update=True)
 	#
 	self.blocks = newbs
 
