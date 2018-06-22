@@ -14,6 +14,7 @@ class BTManager {
 
     //----------------------------------------------
     registerBlocks (url, aGenome, bGenome, blocks) {
+	console.log("Registering blocks from: " + url, blocks);
 	let aname = aGenome.name;
 	let bname = bGenome.name;
 	let blkFile = new BlockTranslator(url,aGenome,bGenome,blocks);

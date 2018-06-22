@@ -12,10 +12,11 @@ import {Feature} from './Feature';
 class FeatureManager {
     constructor (app) {
         this.app = app;
-        this.featCache = {};     // index from mgpid -> feature
-	this.mgiCache = {};	 // index from mgiid -> [ features ]
-	this.cache = {};         // {genome.name -> {chr.name -> list of blocks}}
-	this.mineFeatureCache = {}; // auxiliary info pulled from MouseMine 
+        this.id2feat = {};		// index from  feature ID to feature
+	this.canonical2feats = {};	// index from canonical ID -> [ features tagged with that id ]
+	this.symbol2feats = {}		// index from symbol -> [ features having that symbol ]
+	this.cache = {};		// {genome.name -> {chr.name -> list of blocks}}
+	this.mineFeatureCache = {};	// auxiliary info pulled from MouseMine 
 	this.loadedGenomes = new Set(); // the set of Genomes that have been fully loaded
     }
  
@@ -29,15 +30,19 @@ class FeatureManager {
     processFeatures (feats, genome) {
 	return feats.map(d => {
 	    // If we've already got this one in the cache, return it.
-	    let f = this.featCache[d.mgpid];
+	    let f = this.id2feat[d.mgpid];
 	    if (f) return f;
 	    // Create a new Feature
 	    d.genome = genome
 	    f = new Feature(d);
 	    // Register it.
-	    this.featCache[f.mgpid] = f;
-	    if (f.mgiid) {
-		let lst = this.mgiCache[f.mgiid] = (this.mgiCache[f.mgiid] || []);
+	    this.id2feat[f.mgpid] = f;
+	    if (f.mgiid && f.mgiid !== '.') {
+		let lst = this.canonical2feats[f.mgiid] = (this.canonical2feats[f.mgiid] || []);
+		lst.push(f);
+	    }
+	    if (f.symbol && f.symbol !== '.') {
+		let lst = this.symbol2feats[f.symbol] = (this.symbol2feats[f.symbol] || []);
 		lst.push(f);
 	    }
 	    // here y'go.
@@ -158,11 +163,21 @@ class FeatureManager {
 
     //----------------------------------------------
     getCachedFeaturesByMgiId (mgiid) {
-        return this.mgiCache[mgiid] || [];
+        return this.canonical2feats[mgiid] || [];
     }
 
     //----------------------------------------------
-    // This is what the user calls. Returns a promise for the features in 
+    // Returns a list of features that match the given label.
+    // First tries matching on feature ID, then on canonical ID, and then on symbol.
+    // 
+    getCachedFeaturesByLabel (label) {
+	let f = this.id2feat[label]
+	if (f) return [f];
+	return this.canonical2feats[label] || this.symbol2feats[label] || []
+    }
+
+    //----------------------------------------------
+    // Returns a promise for the features in 
     // the specified ranges of the specified genome.
     getFeatures (genome, ranges) {
 	return this._ensureFeaturesByGenome(genome).then(function() {
@@ -192,7 +207,7 @@ class FeatureManager {
 		    addf(f);
 	    };
 	    for (let i of ids){
-		let f = this.mgiCache[i] || this.featCache[i];
+		let f = this.canonical2feats[i] || this.id2feat[i];
 		f && add(f);
 	    }
 	    return feats;

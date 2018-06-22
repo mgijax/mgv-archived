@@ -24,6 +24,10 @@ class Feature {
         return this.symbol || this.mgpid;
     }
     //----------------------------------------------
+    get length () {
+        return this.end - this.start + 1;
+    }
+    //----------------------------------------------
     getMungedType () {
 	return this.type === "gene" ?
 	    (this.biotype === "protein_coding" || this.biotype === "protein coding gene") ?

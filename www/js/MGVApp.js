@@ -83,11 +83,6 @@ class MGVApp extends Component {
 	this.featureManager = new FeatureManager(this);
 	//
 	let searchTypes = [{
-	    method: "featuresById",
-	    label: "...by symbol/ID",
-	    template: "",
-	    placeholder: "MGI symbols/IDs"
-	},{
 	    method: "featuresByFunction",
 	    label: "...by cellular function",
 	    template: "",
@@ -102,6 +97,11 @@ class MGVApp extends Component {
 	    label: "...by disease implication",
 	    template: "",
 	    placeholder: "Disease Ontology (DO) terms/IDs"
+	},{
+	    method: "featuresById",
+	    label: "...by nomenclature",
+	    template: "",
+	    placeholder: "MGI names, synonyms, etc."
 	}];
 	this.queryManager = new QueryManager(this, "#findGenesBox", searchTypes);
 	//
@@ -388,7 +388,7 @@ class MGVApp extends Component {
     //   g  (string) genome name (eg "mus_caroli") or label (eg "CAROLI/EiJ") 
     // Returns:
     //   true iff the ref genome was actually changed
-    setRefGenome (g) {
+    setRefGenomeSelection (g) {
 	//
 	if (!g) return false;
 	//
@@ -407,7 +407,7 @@ class MGVApp extends Component {
     //   glist (list of strings) genome name or labels
     // Returns:
     //   true iff comp genomes actually changed
-    setCompGenomes (glist) {
+    setCompGenomesSelection (glist) {
         //
         if (!glist) return false;
 	// 
@@ -571,6 +571,8 @@ class MGVApp extends Component {
 	this.vGenomes = cfg.genomes;
 	this.rGenome  = cfg.ref;
 	this.cGenomes = cfg.genomes.filter(g => g !== cfg.ref);
+	this.setRefGenomeSelection(cfg.ref.name);
+	this.setCompGenomesSelection(cfg.genomes.map(g=>g.name));
 	this.coords   = { chr: cfg.chr.name, start: cfg.start, end: cfg.end };
 	//
 	this.genomeView.redraw();

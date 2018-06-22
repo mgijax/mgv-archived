@@ -85,15 +85,23 @@ class ZoomView extends SVGView {
 	    tooltip: "Open MGI JBrowse (C57BL/6J GRCm38) with the current coordinate range.",
 	    handler: ()=> this.app.linkToMgiJBrowse()
 	}]);
-	// click on background => hide context menu
 	this.root
-	  .on("click.context", () => {
+	  .on("click", () => {
+	      // click on background => hide context menu
 	      let tgt = d3.event.target;
 	      if (tgt.tagName.toLowerCase() === "i" && tgt.innerHTML === "menu")
 		  // exception: the context menu button itself
 	          return;
 	      else
 		  this.hideContextMenu()
+	      
+	  })
+	  .on('contextmenu', function(){
+	      // right-click on a feature => feature context menu
+	      let tgt = d3.event.target;
+	      if (!tgt.classList.contains("feature")) return;
+	      d3.event.preventDefault();
+	      d3.event.stopPropagation();
 	  });
 
 	//
@@ -163,7 +171,7 @@ class ZoomView extends SVGView {
 	      }
 	  });
 
-	// Button: Menu in zoom view
+	// Button: Drop down menu in zoom view
 	this.root.select(".menu > .button")
 	  .on("click", function () {
 	      // show context menu at mouse event coordinates
@@ -176,18 +184,36 @@ class ZoomView extends SVGView {
 	// zoom coordinates box
 	this.root.select("#zoomCoords")
 	    .call(zcs => zcs[0][0].value = formatCoords(this.coords))
+	    .on("click", function () { this.select(); })
 	    .on("change", function () {
 		let coords = parseCoords(this.value);
 		if (! coords) {
-		    alert("Please enter a coordinate range formatted as 'chr:start..end'. " +
-		          "For example, '5:10000000..50000000'.");
-		    this.value = "";
-		    return;
+		    let feats = self.app.featureManager.getCachedFeaturesByLabel(this.value);
+		    let feats2 = feats.filter(f=>f.genome == self.app.rGenome);
+		    let f = feats2[0] || feats[0];
+		    if (f) {
+		        coords = {
+			    ref: f.genome.name,
+			    chr: f.chr,
+			    start: f.start - 5*f.length,
+			    end: f.end + 5*f.length,
+			    highlight: f.id
+			}
+		    }
+		    else {
+			alert("Please enter a valid identifier or a coordinate range formatted as 'chr:start..end'. " +
+			      "For example, '5:10000000..50000000'.");
+			this.value = formatCoords(self.coords.chr, self.coords.start, self.coords.end);
+			return;
+		    }
+
+
 		}
 		self.app.setContext(coords);
 	    });
 	// zoom window size box
 	this.root.select("#zoomWSize")
+	    .on("click", function () { this.select(); })
 	    .on("change", function() {
 	        let ws = parseInt(this.value);
 		let c = self.coords;
