@@ -15,10 +15,13 @@ class AuxDataManager {
     //----------------------------------------------
     // do a LOOKUP query for SequenceFeatures from MouseMine
     featuresByLookup (qryString) {
-	let q = `<query name="" model="genomic" view="SequenceFeature.primaryIdentifier SequenceFeature.symbol" longDescription="" constraintLogic="A and B and C">
-	    <constraint code="A" path="SequenceFeature" op="LOOKUP" value="${qryString}"/>
-	    <constraint code="B" path="SequenceFeature.organism.taxonId" op="=" value="10090"/>
-	    <constraint code="C" path="SequenceFeature.sequenceOntologyTerm.name" op="!=" value="transgene"/>
+	let q = `<query name="" model="genomic" 
+	    view="SequenceFeature.primaryIdentifier SequenceFeature.symbol" 
+	    longDescription="" 
+	    constraintLogic="A and B and C">
+		<constraint code="A" path="SequenceFeature" op="LOOKUP" value="${qryString}"/>
+		<constraint code="B" path="SequenceFeature.organism.taxonId" op="=" value="10090"/>
+		<constraint code="C" path="SequenceFeature.sequenceOntologyTerm.name" op="!=" value="transgene"/>
 	    </query>`;
 	return this.getAuxData(q);
     }

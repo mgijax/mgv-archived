@@ -185,32 +185,8 @@ class ZoomView extends SVGView {
 	this.root.select("#zoomCoords")
 	    .call(zcs => zcs[0][0].value = formatCoords(this.coords))
 	    .on("click", function () { this.select(); })
-	    .on("change", function () {
-		let coords = parseCoords(this.value);
-		if (! coords) {
-		    let feats = self.app.featureManager.getCachedFeaturesByLabel(this.value);
-		    let feats2 = feats.filter(f=>f.genome == self.app.rGenome);
-		    let f = feats2[0] || feats[0];
-		    if (f) {
-		        coords = {
-			    ref: f.genome.name,
-			    chr: f.chr,
-			    start: f.start - 5*f.length,
-			    end: f.end + 5*f.length,
-			    highlight: f.id
-			}
-		    }
-		    else {
-			alert("Please enter a valid identifier or a coordinate range formatted as 'chr:start..end'. " +
-			      "For example, '5:10000000..50000000'.");
-			this.value = formatCoords(self.coords.chr, self.coords.start, self.coords.end);
-			return;
-		    }
+	    .on("change", function () { self.app.setCoordinates(this.value); });
 
-
-		}
-		self.app.setContext(coords);
-	    });
 	// zoom window size box
 	this.root.select("#zoomWSize")
 	    .on("click", function () { this.select(); })

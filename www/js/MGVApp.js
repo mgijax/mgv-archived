@@ -586,6 +586,31 @@ class MGVApp extends Component {
 	//
 	this.contextChanged();
     }
+ 
+    //----------------------------------------------
+    setCoordinates (str) {
+	let coords = parseCoords(str);
+	if (! coords) {
+	    let feats = this.featureManager.getCachedFeaturesByLabel(str);
+	    let feats2 = feats.filter(f=>f.genome == this.rGenome);
+	    let f = feats2[0] || feats[0];
+	    if (f) {
+		coords = {
+		    ref: f.genome.name,
+		    chr: f.chr,
+		    start: f.start - 5*f.length,
+		    end: f.end + 5*f.length,
+		    highlight: f.id
+		}
+	    }
+	    else {
+		alert("Unable to set coordinates with this value: " + str);
+		return;
+	    }
+	}
+	this.setContext(coords);
+    }
+
     //----------------------------------------------
     resize () {
 	let w = window.innerWidth - 24;
@@ -611,22 +636,32 @@ class MGVApp extends Component {
     }
     set currentList (lst) {
     	//
+	let prevList = this.currList;
 	this.currList = lst;
 	//
 	let lists = d3.select('#mylists').selectAll('.listInfo');
 	lists.classed("current", d => d === lst);
+	//
 	if (lst) {
+	    if (lst === prevList)
+	        this.currListCounter = (this.currListCounter + 1) % this.currList.ids.length;
+	    else
+	        this.currListCounter = 0;
+	    let currId = lst.ids[this.currListCounter];
 	    // make this list the current selection in the zoom view
-	    this.zoomView.hiFeats = lst.ids.reduce((a,v) => { a[v]=v; return a; }, {})
-	    this.zoomView.update();
+	    //this.zoomView.hiFeats = lst.ids.reduce((a,v) => { a[v]=v; return a; }, {})
+	    //this.zoomView.update();
 	    // show this list as tick marks in the genome view
 	    this.featureManager.getFeaturesById(this.rGenome, lst.ids)
 		.then( feats => {
 		    this.genomeView.drawTicks(feats);
 		    this.genomeView.drawTitle();
+		    this.setCoordinates(currId);
 		});
 	}
 	else {
+	    this.currListCounter = 0;
+	    //
 	    this.zoomView.hiFeats = {};
 	    this.zoomView.update();
 	    //
