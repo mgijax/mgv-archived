@@ -35,42 +35,45 @@ class MGVApp extends Component {
 	this.defaultZoom = 2;	// multiplier of current range width. Must be >= 1. 1 == no zoom.
 				// (zooming in uses 1/this amount)
 	this.defaultPan  = 0.15;// fraction of current range width
-	this.coords = { chr: "1", start: 1000000, end: 10000000 };
+	this.coords = { chr: '1', start: 1000000, end: 10000000 };
 	//
 	// TODO: refactor pagebox, draggable, and friends into a framework module,
 	// 
 	this.pbDragger = this.getContentDragger();
-	d3.selectAll(".pagebox")
+	d3.selectAll('.pagebox')
 	    .call(this.pbDragger)
-	    .append("i")
-	    .attr("class","material-icons busy rotating")
+	    .append('i')
+	    .attr('class','material-icons busy rotating')
 	    ;
-	d3.selectAll(".closable")
-	    .append("i")
-	    .attr("class","material-icons button close")
-	    .on("click.default", function () {
+	d3.selectAll('.closable')
+	    .append('i')
+	    .attr('class','material-icons button close')
+	    .attr('title','Click to open/close.')
+	    .on('click.default', function () {
 		let p = d3.select(this.parentNode);
-		p.classed("closed", ! p.classed("closed"));
+		p.classed('closed', ! p.classed('closed'));
+		d3.select(this).attr('title','Click to ' +  (p.classed('closed') ? 'open' : 'close') + '.')
 		self.setPrefsFromUI();
 	    });
-	d3.selectAll(".content-draggable > *")
-	    .append("i")
-	    .attr("class","material-icons button draghandle");
+	d3.selectAll('.content-draggable > *')
+	    .append('i')
+	    .attr('title','Drag up/down to reorder boxes.')
+	    .attr('class','material-icons button draghandle');
 	//
 	//
-	this.genomeView = new GenomeView(this, "#genomeView", 800, 250);
-	this.zoomView   = new ZoomView  (this, "#zoomView", 800, 250, this.coords);
+	this.genomeView = new GenomeView(this, '#genomeView', 800, 250);
+	this.zoomView   = new ZoomView  (this, '#zoomView', 800, 250, this.coords);
 	this.resize();
         //
-	this.featureDetails = new FeatureDetails(this, "#featureDetails");
+	this.featureDetails = new FeatureDetails(this, '#featureDetails');
 
 	this.cscale = d3.scale.category10().domain([
-	    "protein_coding_gene",
-	    "pseudogene",
-	    "ncRNA_gene",
-	    "gene_segment",
-	    "other_gene",
-	    "other_feature_type"
+	    'protein_coding_gene',
+	    'pseudogene',
+	    'ncRNA_gene',
+	    'gene_segment',
+	    'other_gene',
+	    'other_feature_type'
 	]);
 	//
 	//
@@ -382,6 +385,7 @@ class MGVApp extends Component {
     showBusy (isBusy) {
         d3.select("#header > .gear.button")
 	    .classed("rotating", isBusy);
+        d3.select("#zoomView").classed("busy", isBusy);
     }
     //----------------------------------------------
     // Args:
@@ -530,7 +534,7 @@ class MGVApp extends Component {
 	//        with fallback to []
 	cfg.highlight = c.highlight || this.zoomView.highlighted || [];
 
-	// Set the drawing mode for the ZoonView.
+	// Set the drawing mode for the ZoomView.
 	//     with fallback to the current value
 	if (c.dmode === 'comparison' || c.dmode === 'reference') 
 	    cfg.dmode = c.dmode;
@@ -567,6 +571,7 @@ class MGVApp extends Component {
     //
     setContext (c) {
         let cfg = this.sanitizeCfg(c);
+	if (!cfg) return;
 	//
 	this.vGenomes = cfg.genomes;
 	this.rGenome  = cfg.ref;

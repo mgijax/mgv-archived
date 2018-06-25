@@ -8,7 +8,7 @@ class BlockTranslator {
 	this.aGenome = aGenome;
 	this.bGenome = bGenome;
 	this.blocks = blocks.map(b => this.processBlock(b))
-	this.currentSort = "a";
+	this.currentSort = "a"; // either 'a' or 'b'
     }
     processBlock (blk) { 
         blk.aIndex = parseInt(blk.aIndex);
@@ -77,7 +77,7 @@ class BlockTranslator {
 		    end:   Math.max(s2,e2),
 		    ori:   blk.blockOri,
 		    index: blk[toI],
-		    // also return the fromGenome coordinates corresponding to this piece of the translation
+		    // also return the fromGenome coords for this piece of the translation
 		    fChr:   blk[fromC],
 		    fStart: s,
 		    fEnd:   e,
