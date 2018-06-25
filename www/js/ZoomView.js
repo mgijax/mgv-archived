@@ -141,8 +141,8 @@ class ZoomView extends SVGView {
 	// 
         this.svg
 	  .on("click", () => {
-	      let tgt = d3.select(d3.event.target);
-	      let t = tgt[0][0];
+	      let t = d3.event.target;
+	      let tgt = d3.select(t);
 	      if (t.tagName == "rect" && t.classList.contains("feature")) {
 		  // user clicked on a feature
 		  fSelect(t.__data__, d3.event.shiftKey);
@@ -154,6 +154,9 @@ class ZoomView extends SVGView {
 		  this.hiFeats = {};
 		  this.highlight();
 		  this.app.contextChanged();
+	      }
+	      else if (t.tagName == "rect" && tgt.attr('name') === 'zoomStripHandle' && d3.event.shiftKey) {
+	          this.app.setContext({ref:t.__data__.genome.name});
 	      }
 	  })
 	  .on("mouseover", () => {
@@ -337,7 +340,7 @@ class ZoomView extends SVGView {
 	  })
           .on("dragstart.z", function(g) {
 	      let t = d3.event.sourceEvent.target;
-	      if (d3.select(t).attr("name") !== 'zoomStripHandle'){
+	      if (d3.event.sourceEvent.shiftKey || d3.select(t).attr("name") !== 'zoomStripHandle'){
 	          return false;
 	      }
 	      d3.event.sourceEvent.stopPropagation();
@@ -473,7 +476,7 @@ class ZoomView extends SVGView {
     }
 
     //----------------------------------------------
-    update (coords) {
+    update0 (coords) {
 	let self = this;
 	let c = this.coords = (coords || this.coords);
 	d3.select("#zoomCoords")[0][0].value = formatCoords(c.chr, c.start, c.end);
@@ -514,10 +517,16 @@ class ZoomView extends SVGView {
 	    }
 	    // when everything is ready, call the draw function
 	    Promise.all(promises).then( data => {
-	        self.draw(data);
 		mgv.showBusy(false);
+	        self.draw(data);
             });
 	});
+    }
+    update1 (feature, flank) {
+        let self = this;
+    }
+    update () {
+        this.update0.apply(this, arguments);
     }
 
     //----------------------------------------------
@@ -528,17 +537,37 @@ class ZoomView extends SVGView {
 	sblocks.forEach( strip => strip.sort( cmpFunc ) );
 	// pixels per base
 	let ppb = this.width / (this.coords.end - this.coords.start + 1);
-	let offset = []; // offset of start position of next block, by strip index (0===ref)
+	let pstart = []; // offset of start position of next block, by strip index (0===ref)
+	let bstart = []; // block start pos assoc with pstart
+	let cchr = null;
 	let self = this;
+	let dx;
+	let pend;
 	sblocks.each( function (b,i,j) { // b=block, i=index within strip, j=strip index
 	    let blen = ppb * (b.end - b.start + 1); // total screen width of this sblock
 	    b.flip = b.ori === '-' && self.dmode === 'reference';
 	    b.xscale = d3.scale.linear().domain([b.start, b.end]).range( b.flip ? [blen, 0] : [0, blen] );
-	    let dx = i === 0 ? 0 : offset[j];
+	    //
+	    if (i===0) {
+		// first block in each strip inits
+		pstart[j] = 0;
+		bstart[j] = b.start;
+		dx = 0;
+		cchr = b.chr;
+	    }
+	    else if (b.chr === cchr) {
+		// Next block on current chr
+		dx = pstart[j] + ppb * (b.start - bstart[j]);
+	    }
+	    else {
+		// Changed chr
+		pstart[j] = pend + 4;
+		bstart[j] = b.start;
+		dx = pstart[j];
+	    }
 	    d3.select(this).attr("transform", `translate(${dx},0)`);
-	    offset[j] = dx + blen + 2;
+	    pend = dx + blen;
 	});
-	//
     }
 
     //----------------------------------------------
