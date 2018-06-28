@@ -21,7 +21,6 @@ class ZoomView extends SVGView {
       this.dmode = 'comparison';// drawing mode. 'comparison' or 'reference'
 
       //
-      this.coords = initialCoords;// curr zoom view coords { chr, start, end }
       // IDs of Features we're highlighting. May be mgpid  or mgiId
       // hiFeats is an obj whose keys are the IDs
       this.hiFeats = (initialHi || []).reduce( (a,v) => { a[v]=v; return a; }, {} );
@@ -106,9 +105,9 @@ class ZoomView extends SVGView {
 
 	//
 	//
-	let fSelect = function (f, shift, preserve) {
+	let fClickHandler = function (f, evt, preserve) {
 	    let id = f.mgiid || f.mgpid;
-	    if (shift) {
+	    if (evt.shiftKey) {
 		if (this.hiFeats[id])
 		    delete this.hiFeats[id]
 		else
@@ -118,12 +117,15 @@ class ZoomView extends SVGView {
 		if (!preserve) this.hiFeats = {};
 		this.hiFeats[id] = id;
 	    }
+	    if (evt.metaKey) {
+	        this.app.setContext({landmark:f.mgiid, delta:0})
+	    }
 	}.bind(this);
 	//
 	let fMouseOverHandler = function(f) {
 		if (d3.event.altKey) {
 		    // If user is holding the alt key, select everything touched.
-		    fSelect(f, d3.event.shiftKey, true);
+		    fClickHandler(f, d3.event, true);
 		    this.highlight();
 		    // Don't register context changes until user has paused for at least 1s.
 		    if (this.timeout) window.clearTimeout(this.timeout);
@@ -145,7 +147,7 @@ class ZoomView extends SVGView {
 	      let tgt = d3.select(t);
 	      if (t.tagName == "rect" && t.classList.contains("feature")) {
 		  // user clicked on a feature
-		  fSelect(t.__data__, d3.event.shiftKey);
+		  fClickHandler(t.__data__, d3.event);
 		  this.highlight();
 	          this.app.contextChanged();
 	      }
@@ -186,7 +188,7 @@ class ZoomView extends SVGView {
 	  });
 	// zoom coordinates box
 	this.root.select("#zoomCoords")
-	    .call(zcs => zcs[0][0].value = formatCoords(this.coords))
+	    .call(zcs => zcs[0][0].value = formatCoords(this.app.coords))
 	    .on("click", function () { this.select(); })
 	    .on("change", function () { self.app.setCoordinates(this.value); });
 
@@ -195,7 +197,7 @@ class ZoomView extends SVGView {
 	    .on("click", function () { this.select(); })
 	    .on("change", function() {
 	        let ws = parseInt(this.value);
-		let c = self.coords;
+		let c = self.app.coords;
 		if (isNaN(ws) || ws < 100) {
 		    alert("Invalid window size. Please enter an integer >= 100.");
 		    this.value = Math.round(c.end - c.start + 1);
@@ -207,8 +209,8 @@ class ZoomView extends SVGView {
 		    self.app.setContext({
 		        chr: c.chr,
 			start: news,
-			end: newe
-
+			end: newe,
+			length: newe-news+1
 		    });
 		}
 	    });
@@ -449,19 +451,19 @@ class ZoomView extends SVGView {
 	  let w = cxt.end - cxt.start + 1;
 	  r.start -= w/2;
 	  r.end += w/2;
+	  this.app.setContext(r);
       }
       else if (se.shiftKey) {
           // zoom out
-	  let currWidth = this.coords.end - this.coords.start + 1;
+	  let currWidth = this.app.coords.end - this.app.coords.start + 1;
 	  let brushWidth = r.end - r.start + 1;
 	  let factor = currWidth / brushWidth;
-	  let newWidth = factor * currWidth;
-	  let ds = ((r.start - this.coords.start + 1)/currWidth) * newWidth;
-	  r.start = this.coords.start - ds;
-	  r.end = r.start + newWidth - 1;
+	  this.app.zoom(factor);
       }
-      this.app.setContext(r);
-    }
+      else {
+          this.app.setContext(r);
+      }
+  }
 
     //----------------------------------------------
     highlightStrip (g, elt) {
@@ -476,16 +478,18 @@ class ZoomView extends SVGView {
     }
 
     //----------------------------------------------
-    update0 (coords) {
+    // Updates the ZoomView to show the given coordinate range from the reg genome and the corresponding
+    // range(s) in each comparison genome.
+    //
+    updateViaMappedCoordinates (coords) {
 	let self = this;
-	let c = this.coords = (coords || this.coords);
+	let c = (coords || this.app.coords);
 	d3.select("#zoomCoords")[0][0].value = formatCoords(c.chr, c.start, c.end);
 	d3.select("#zoomWSize")[0][0].value = Math.round(c.end - c.start + 1)
 	//
         let mgv = this.app;
 	// when the translator is ready, we can translate the ref coords to each genome and
 	// issue requests to load the features in those regions.
-	mgv.showBusy(true);
 	mgv.translator.ready().then(function(){
 	    // Now issue requests for features. One request per genome, each request specifies one or more
 	    // coordinate ranges.
@@ -512,21 +516,74 @@ class ZoomView extends SVGView {
 		// Add a request for each comparison genome, using translated coordinates. 
 		mgv.cGenomes.forEach(cGenome => {
 		    let ranges = mgv.translator.translate( mgv.rGenome, c.chr, c.start, c.end, cGenome );
-		    promises.push(mgv.featureManager.getFeatures(cGenome, ranges))
+		    let p = mgv.featureManager.getFeatures(cGenome, ranges);
+		    promises.push(p);
 		});
 	    }
 	    // when everything is ready, call the draw function
 	    Promise.all(promises).then( data => {
-		mgv.showBusy(false);
 	        self.draw(data);
             });
 	});
     }
-    update1 (feature, flank) {
+    // Updates the ZoomView to show the region around a landmark in each genome.
+    //
+    // coords = {
+    //     landmark : id of a feature to use as a reference
+    //     flank|width : specify one of flank or width. 
+    //         flank = amount of flanking region (bp) to include at both ends of the landmark, 
+    //         so the total viewing region = flank + length(landmark) + flank.
+    //         width = total viewing region width. If both width and flank are specified, flank is ignored.
+    //     delta : amount to shift the view left/right
+    // }
+    // 
+    // The landmark must exist in the current reference genome. 
+    //
+    updateViaLandmarkCoordinates (coords) {
+	let c = coords;
+	let mgv = this.app;
         let self = this;
+	let feats = mgv.featureManager.getCachedFeaturesByLabel(c.landmark);
+	let rf = null;
+	let delta = coords.delta || 0;
+	let ranges = feats.map(f => {
+	    let flank = c.width ? (c.width - f.length) / 2 : c.flank;
+	    let range = {
+		genome:	f.genome,
+		chr:	f.chr,
+		start:	f.start - flank + delta,
+		end:	f.end + flank + delta
+	    } ;
+	    if (f.genome === mgv.rGenome) {
+	        rf = f;
+		let c = this.app.coords = range;
+		d3.select("#zoomCoords")[0][0].value = formatCoords(c.chr, c.start, c.end);
+		d3.select("#zoomWSize")[0][0].value = Math.round(c.end - c.start + 1)
+	    }
+	    return range;
+	});
+	if (!rf) {
+	    alert(`Landmark ${c.landmark} does not exist in genome ${mgv.rGenome.name}.`)
+	    return;
+	}
+	let promises = ranges.map(r => {
+            let rrs;
+	    if (r.genome === mgv.rGenome)
+	        rrs = [r];
+	    else { 
+	        rrs = mgv.translator.translate(r.genome, r.chr, r.start, r.end, mgv.rGenome, true);
+	    }
+	    return mgv.featureManager.getFeatures(r.genome, rrs);
+	});
+	Promise.all(promises).then( data => {
+	    self.draw(data);
+	});
     }
-    update () {
-        this.update0.apply(this, arguments);
+    update (coords) {
+	if (this.app.cmode === 'mapped')
+	    this.updateViaMappedCoordinates(this.app.coords);
+	else
+	    this.updateViaLandmarkCoordinates(this.app.lcoords);
     }
 
     //----------------------------------------------
@@ -536,7 +593,7 @@ class ZoomView extends SVGView {
 	let cmpFunc = (a,b) => a.__data__[cmpField]-b.__data__[cmpField];
 	sblocks.forEach( strip => strip.sort( cmpFunc ) );
 	// pixels per base
-	let ppb = this.width / (this.coords.end - this.coords.start + 1);
+	let ppb = this.width / (this.app.coords.end - this.app.coords.start + 1);
 	let pstart = []; // offset of start position of next block, by strip index (0===ref)
 	let bstart = []; // block start pos assoc with pstart
 	let cchr = null;

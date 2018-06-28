@@ -221,6 +221,25 @@ label > i.material-icons {
 }
 
 /* -----------------------------------------
+ * Status message
+ * -----------------------------------------
+ */
+#statusMessage {
+    background-color: #ddd;
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    z-index: 100;
+    padding: 4px;
+    border: thin solid black;
+    border-radius: 2px;
+    display: none;
+}
+#statusMessage.showing {
+    display: flex;
+}
+
+/* -----------------------------------------
  * Context menu
  * -----------------------------------------
  */

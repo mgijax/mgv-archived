@@ -35,7 +35,16 @@ class MGVApp extends Component {
 	this.defaultZoom = 2;	// multiplier of current range width. Must be >= 1. 1 == no zoom.
 				// (zooming in uses 1/this amount)
 	this.defaultPan  = 0.15;// fraction of current range width
-	this.coords = { chr: '1', start: 1000000, end: 10000000 };
+
+	// Coordinates may be specified in one of two ways: mapped or landmark. 
+	// Mapped coordinates are specified as chromosome+start+end. This coordinate range is defined relative to 
+	// the current reference genome, and is mapped to the corresponding range(s) in each comparison genome.
+	// Landmark coordinates are specified as landmark+[flank|width]+delta
+	// 
+	this.cmode = 'mapped' // 'mapped' or 'landmark'
+	this.coords = { chr: '1', start: 1000000, end: 10000000 };  // mapped
+	this.lcoords = { landmark: 'Pax6', flank: 500000, delta:0 };// landmark
+
 	//
 	// TODO: refactor pagebox, draggable, and friends into a framework module,
 	// 
@@ -57,8 +66,13 @@ class MGVApp extends Component {
 	    });
 	d3.selectAll('.content-draggable > *')
 	    .append('i')
-	    .attr('title','Drag up/down to reorder boxes.')
+	    .attr('title','Drag up/down to reposition.')
 	    .attr('class','material-icons button draghandle');
+
+	// 
+        d3.select('#statusMessage')
+	    .on('click', () => { this.showStatus(false); });
+	
 	//
 	//
 	this.genomeView = new GenomeView(this, '#genomeView', 800, 250);
@@ -241,8 +255,8 @@ class MGVApp extends Component {
     //----------------------------------------------
     initDom () {
     }
-    //----------------------------------------------
 
+    //----------------------------------------------
     getContentDragger () {
       let self = this;
       // Helper function for the drag behavior. Reorders the contents based on
@@ -382,11 +396,24 @@ class MGVApp extends Component {
 	});
     }
     //----------------------------------------------
-    showBusy (isBusy) {
+    showBusy (isBusy, message) {
         d3.select("#header > .gear.button")
 	    .classed("rotating", isBusy);
         d3.select("#zoomView").classed("busy", isBusy);
+	if (isBusy && message) this.showStatus(message);
+	if (!isBusy) this.showStatus('')
     }
+    //----------------------------------------------
+    showStatus (msg) {
+	if (msg)
+	    d3.select('#statusMessage')
+		.classed('showing', true)
+		.select('span')
+		    .text(msg);
+	else
+	    d3.select('#statusMessage').classed('showing', false);
+    }
+
     //----------------------------------------------
     // Args:
     //   g  (string) genome name (eg "mus_caroli") or label (eg "CAROLI/EiJ") 
@@ -441,15 +468,29 @@ class MGVApp extends Component {
     // Returns the current context as an object.
     // Current context = ref genome + comp genomes + current range (chr,start,end)
     getContext () {
-        let c = this.zoomView.coords;
-        return {
-	    ref : this.rGenome.label,
-	    genomes: this.vGenomes.map(g=>g.label),
-	    chr: c.chr,
-	    start: c.start,
-	    end: c.end,
-	    highlight: Object.keys(this.zoomView.hiFeats),
-	    dmode: this.zoomView.dmode
+	if (this.cmode === 'mapped') {
+	    let c = this.coords;
+	    return {
+		ref : this.rGenome.label,
+		genomes: this.vGenomes.map(g=>g.label),
+		chr: c.chr,
+		start: c.start,
+		end: c.end,
+		highlight: Object.keys(this.zoomView.hiFeats),
+		dmode: this.zoomView.dmode
+	    }
+	} else {
+	    let c = this.lcoords;
+	    return {
+		ref : this.rGenome.label,
+		genomes: this.vGenomes.map(g=>g.label),
+		landmark: c.landmark,
+		flank: c.flank,
+		length: c.length,
+		delta: c.delta,
+		highlight: Object.keys(this.zoomView.hiFeats),
+		dmode: this.zoomView.dmode
+	    }
 	}
     }
     //----------------------------------------------
@@ -473,11 +514,12 @@ class MGVApp extends Component {
 
 	// Sanitize the input.
 
-	// 
-	if (c.width || c.height) {
+	// window size -----------------------------------------------------------------
+	if (c.width) {
 	    cfg.width = c.width
 	}
 
+	// ref genome ------------------------------------------------------------------
 	//
 	// Set cfg.ref to specified genome, 
 	//   with fallback to current ref genome, 
@@ -485,6 +527,7 @@ class MGVApp extends Component {
 	// FIXME: final fallback should be a config setting.
 	cfg.ref = (c.ref ? this.nl2genome[c.ref] || this.rGenome : this.rGenome) || this.nl2genome['C57BL/6J'];
 
+	// comparison genomes ----------------------------------------------------------
 	// Set cfg.genomes to be the specified genomes,
 	//     with fallback to the current genomes
 	//        with fallback to [ref] (1st time thru)
@@ -496,13 +539,14 @@ class MGVApp extends Component {
 	if (cfg.genomes.indexOf(cfg.ref) === -1)
 	    cfg.genomes.unshift(cfg.ref);
 	
+	// absolute coordinates -----------------------------------------------------------------
+	//
 	// Set cfg.chr to be the specified chromosome
 	//     with fallback to the current chr
 	//         with fallback to the 1st chromosome in the ref genome
 	cfg.chr = cfg.ref.getChromosome(c.chr);
 	if (!cfg.chr) cfg.chr = cfg.ref.getChromosome( this.coords ? this.coords.chr : "1" );
 	if (!cfg.chr) cfg.chr = cfg.ref.getChromosome(0);
-	//if (!cfg.chr) console.log("warning: no chromosome");
 	
 	// Ensure start <= end
 	if (typeof(c.start) === "number" && typeof(c.end) === "number" && c.start > c.end ) {
@@ -523,17 +567,45 @@ class MGVApp extends Component {
 	    c.end
 	    :
 	    this.coords ?
-	        (cfg.start + this.coords.end - this.coords.start + 1)
+		(cfg.start + this.coords.end - this.coords.start + 1)
 		:
 		cfg.start;
 	// clip at chr end
 	cfg.end = Math.floor(cfg.chr ? Math.min(cfg.end,   cfg.chr.length) : cfg.end);
 
+	// landmark coordinates --------------------------------------------------------
+	cfg.landmark = c.landmark || this.lcoords.landmark;
+	cfg.delta    = c.delta    || this.lcoords.delta || 0;
+	if (c.flank && c.length) {
+	    cfg.flank = c.flank;
+	    cfg.length = 0;
+	}
+	else if (!c.flank && !c.length) {
+	    cfg.flank = this.lcoords.flank;
+	    cfg.length = this.lcoords.length;
+	    if (!cfg.flank && !cfg.length) cfg.flank = 10000; // just in case
+	}
+	else {
+	    cfg.flank = c.flank;
+	    cfg.length = c.length;
+	}
+
+	// cmode -----------------------------------------------------------------------
+	if (c.cmode && c.cmode !== 'mapped' && c.cmode !== 'landmark') c.cmode = null;
+	cfg.cmode = c.cmode || 
+	    (('chr' in c || 'start' in c || 'end' in c) ?
+	        'mapped' : 
+		('landmark' in c || 'flank' in c || 'length' in c || 'delta' in c) ?
+		    'landmark' : 
+		    this.cmode || 'mapped');
+
+	// highlighting ----------------------------------------------------------------
 	// Set cfg.highlight
 	//    with fallback to current highlight
 	//        with fallback to []
 	cfg.highlight = c.highlight || this.zoomView.highlighted || [];
 
+	// drawing mode ----------------------------------------------------------------
 	// Set the drawing mode for the ZoomView.
 	//     with fallback to the current value
 	if (c.dmode === 'comparison' || c.dmode === 'reference') 
@@ -557,11 +629,25 @@ class MGVApp extends Component {
     //            genomes   (list o strings) All the genomes you want to see, in top-to-bottom order. 
     //               May use internal names or display labels, eg, "mus_musculus_129s1svimj" or "129S1/SvImJ".
     //            ref       (string) The genome to use as the reference. May be name or label.
-    //            chr       (string) Chromosome for coordinate range
-    //            start     (int) Coordinate range start position
-    //            end       (int) Coordinate range end position
     //            highlight (list o strings) IDs of features to highlight
     //            dmode     (string) either 'comparison' or 'reference'
+    //
+    //            Coordinates are specified in one of 2 forms.
+    //              chr       (string) Chromosome for coordinate range
+    //              start     (int) Coordinate range start position
+    //              end       (int) Coordinate range end position
+    //
+    //              Displays this coordinate range from the current reference geneoms, and the equivalent (mapped)
+    //              coordinate range(s) in each comparison genome.
+    //
+    //            or:
+    //              landmark  (string) ID, canonical ID, or symbol, identifying a feature.
+    //              flank|length (int) If flank, viewing region size = flank + len(landmark) + flank. 
+    //                 If length, viewing region size = length. In either case, the landmark is centered in
+    //                 the viewing area, +/- any specified delta.
+    //              delta     (int) Amount in bp to shift the region left (<0) or right (>0).
+    //
+    //              Displays the region around the specified landmark in each genome where it exists.
     //
     // Returns:
     //    Nothing
@@ -578,18 +664,26 @@ class MGVApp extends Component {
 	this.cGenomes = cfg.genomes.filter(g => g !== cfg.ref);
 	this.setRefGenomeSelection(cfg.ref.name);
 	this.setCompGenomesSelection(cfg.genomes.map(g=>g.name));
+	//
+	this.cmode = cfg.cmode;
 	this.coords   = { chr: cfg.chr.name, start: cfg.start, end: cfg.end };
-	//
-	this.genomeView.redraw();
-	this.genomeView.setBrushCoords(this.coords);
-	//
-	this.zoomView.highlighted = cfg.highlight;
-	this.zoomView.genomes = this.vGenomes;
-	this.zoomView.update(this.coords);
-	//
-	this.zoomView.dmode = cfg.dmode;
-	//
-	this.contextChanged();
+	this.lcoords  = { landmark: cfg.landmark, flank: cfg.flank, length: cfg.length, delta: cfg.delta };
+	this.showBusy(true, 'Requesting data...');
+	this.featureManager.loadGenomes(this.vGenomes).then(() => this.translator.ready())
+	.then(() => {
+	    //
+	    this.contextChanged();
+	    //
+	    this.zoomView.highlighted = cfg.highlight;
+	    this.zoomView.genomes = this.vGenomes;
+	    this.zoomView.dmode = cfg.dmode;
+	    this.zoomView.update(this.cmode === 'mapped' ? this.coords : this.lcoords);
+	    //
+	    this.genomeView.redraw();
+	    this.genomeView.setBrushCoords(this.coords);
+
+	    this.showBusy(false);
+	});
     }
  
     //----------------------------------------------
@@ -602,9 +696,7 @@ class MGVApp extends Component {
 	    if (f) {
 		coords = {
 		    ref: f.genome.name,
-		    chr: f.chr,
-		    start: f.start - 5*f.length,
-		    end: f.end + 5*f.length,
+		    landmark: str,
 		    highlight: f.id
 		}
 	    }
@@ -630,9 +722,11 @@ class MGVApp extends Component {
         let ref = `ref=${c.ref}`;
         let genomes = `genomes=${c.genomes.join("+")}`;
 	let coords = `chr=${c.chr}&start=${c.start}&end=${c.end}`;
+	let lflf = c.flank ? '&flank='+c.flank : '&length='+c.length;
+	let lcoords = `landmark=${c.landmark}&delta=${c.delta}${lflf}`;
 	let hls = `highlight=${c.highlight.join("+")}`;
 	let dmode = `dmode=${c.dmode}`;
-	return `${dmode}&${ref}&${genomes}&${coords}&${hls}`;
+	return `${this.cmode==='mapped'?coords:lcoords}&${dmode}&${ref}&${genomes}&${hls}`;
     }
 
     //----------------------------------------------
@@ -676,29 +770,18 @@ class MGVApp extends Component {
     }
 
     //----------------------------------------------
-    sanitizeCoords(coords) {
-	if (typeof(coords) === "string") 
-	    coords = parseCoords(coords);
-	let chromosome = this.rGenome.chromosomes.filter(c => c.name === coords.chr)[0];
-	if (! chromosome) return null;
-	if (coords.start > coords.end) {
-	    let tmp = coords.start; coords.start = coords.end; coords.end = tmp;
-	}
-	coords.start = Math.max(1, Math.floor(coords.start))
-	coords.end   = Math.min(chromosome.length, Math.floor(coords.end))
-        return coords;
-    }
-
-    //----------------------------------------------
-    // Zooms in/out by factor. New zoom width is factor * the current zoom width.
+    // Zooms in/out by factor. New zoom width is factor * the current width.
     // Factor > 1 zooms out, 0 < factor < 1 zooms in.
     zoom (factor) {
-
-	let len = this.coords.end - this.coords.start + 1;
-	let newlen = Math.round(factor * len);
-	let x = (this.coords.start + this.coords.end)/2;
-	let newstart = Math.round(x - newlen/2);
-	this.setContext({ chr: this.coords.chr, start: newstart, end: newstart + newlen - 1 });
+	if (this.cmode === 'mapped') {
+	    let len = this.coords.end - this.coords.start + 1;
+	    let newlen = Math.round(factor * len);
+	    let x = (this.coords.start + this.coords.end)/2;
+	    let newstart = Math.round(x - newlen/2);
+	    this.setContext({ chr: this.coords.chr, start: newstart, end: newstart + newlen - 1 });
+	}
+	else {
+	}
     }
 
     //----------------------------------------------
@@ -706,29 +789,19 @@ class MGVApp extends Component {
     // Negative values pan left. Positive values pan right. (Note that panning moves the "camera". Panning to the
     // right makes the objects in the scene appear to move to the left, and vice versa.)
     //
-    pan (factor, animate) {
-	let width = this.coords.end - this.coords.start + 1;
-	let panDist = factor * (this.zoomView.xscale.range()[1]);
-	let d = Math.round(factor * width);
-	let ns;
-	let ne;
-	if (d < 0) {
-	    ns = Math.max(1, this.coords.start+d);
-	    ne = ns + width - 1;
+    pan (factor) {
+	let c = this.coords;
+	let chr = this.rGenome.chromosomes.filter(c => c.name === this.coords.chr)[0];
+	let width = c.end - c.start + 1;
+	let minD = -(c.start-1);
+	let maxD = chr.length - c.end;
+	let d = Math.max(minD, Math.min(maxD, Math.round(factor * width)));
+	if (this.cmode === 'mapped') {
+	    this.setContext({ chr: c.chr, start: c.start+d, end: c.end+d });
 	}
-	else if (d > 0) {
-	    let chromosome = this.rGenome.chromosomes.filter(c => c.name === this.coords.chr)[0];
-	    ne = Math.min(chromosome.length, this.coords.end+d)
-	    ns = ne - width + 1;
+	else {
+	    this.setContext({ delta: this.lcoords.delta + d });
 	}
-	// this probably doesn't belong here but for now...
-	// To get a smooth panning effect: initialize the translation to the same as
-	// the pan distance, but in the opposite direction...
-	//this.zoomView.svg
-	    //.style("transition", "transform 0s")
-	    //.style("transform", `translate(${-panDist}px,0px)`);
-	// ...then the zoom draw will transition the vector back to (0,0)
-	this.setContext({ chr: this.coords.chr, start: ns, end: ne });
     }
 
     //----------------------------------------------

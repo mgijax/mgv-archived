@@ -39,7 +39,7 @@ class BlockTranslator {
     }
     // Given a genome (either the a or b genome) and a coordinate range,
     // returns the equivalent coordinate range(s) in the other genome
-    translate (fromGenome, chr, start, end) {
+    translate (fromGenome, chr, start, end, invert) {
 	//
 	end = end === undefined ? start : end;
 	// from = "a" or "b", depending on which genome is given.
@@ -71,7 +71,22 @@ class BlockTranslator {
 		// coord range on the to side.
 		let s2 = Math.ceil(blk[mapper](s));
 		let e2 = Math.floor(blk[mapper](e));
-	        return {
+	        return invert ? {
+		    chr:   blk[fromC],
+		    start: s,
+		    end:   e,
+		    ori:   blk.blockOri,
+		    index: blk[fromI],
+		    // also return the fromGenome coords for this piece of the translation
+		    fChr:   blk[toC],
+		    fStart: Math.min(s2,e2),
+		    fEnd:   Math.max(s2,e2),
+		    fIndex: blk[toI],
+		    // include the block id and full block coords
+		    blockId: blk.blockId,
+		    blockStart: blk[fromS],
+		    blockEnd: blk[fromE]
+		    } : {
 		    chr:   blk[toC],
 		    start: Math.min(s2,e2),
 		    end:   Math.max(s2,e2),
@@ -106,9 +121,11 @@ class BlockTranslator {
 	let fromC = from+"Chr";
 	let fromS = from+"Start";
 	let fromE = from+"End";
+	let fromI = from+"Index";
 	let toC = to+"Chr";
 	let toS = to+"Start";
 	let toE = to+"End";
+	let toI = to+"Index";
 	let mapper = from+to+"Map";
 	// 
 	let blks = this.blocks
@@ -119,9 +136,11 @@ class BlockTranslator {
 		    fromChr:   blk[fromC],
 		    fromStart: blk[fromS],
 		    fromEnd:   blk[fromE],
+		    fromIndex: blk[fromI],
 		    toChr:     blk[toC],
 		    toStart:   blk[toS],
 		    toEnd:     blk[toE],
+		    toIndex:   blk[toI]
 		};
 	    })
 	// 

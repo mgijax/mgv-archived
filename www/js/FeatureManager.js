@@ -134,6 +134,7 @@ class FeatureManager {
 	console.log("Requesting:", genome.name, newranges);
 	return d3json(url).then(function(blocks){
 	    blocks.forEach( b => self._registerBlock(genome, b) );
+	    self.app.showStatus(`Loaded: ${genome.name}`);
 	    return true;
 	});
     }
@@ -146,6 +147,11 @@ class FeatureManager {
 	    return { chr: c.name, start: 1, end: c.length };
 	});
 	return this._ensureFeaturesByRange(genome, ranges).then(x=>{ this.loadedGenomes.add(genome); return true;});
+    }
+
+    //----------------------------------------------
+    loadGenomes (genomes) {
+        return Promise.all(genomes.map(g => this._ensureFeaturesByGenome (g))).then(()=>true);
     }
 
     //----------------------------------------------
@@ -162,18 +168,19 @@ class FeatureManager {
     }
 
     //----------------------------------------------
-    getCachedFeaturesByMgiId (mgiid) {
-        return this.canonical2feats[mgiid] || [];
+    // Returns all cached features having the given canonical id.
+    getCachedFeaturesByCanonicalId (cid) {
+        return this.canonical2feats[cid] || [];
     }
 
     //----------------------------------------------
-    // Returns a list of features that match the given label.
-    // First tries matching on feature ID, then on canonical ID, and then on symbol.
+    // Returns a list of features that match the given label, which can be an id, canonical id, or symbol.
+    // If genome is specified, limit results to features from that genome.
     // 
-    getCachedFeaturesByLabel (label) {
+    getCachedFeaturesByLabel (label,genome) {
 	let f = this.id2feat[label]
-	if (f) return [f];
-	return this.canonical2feats[label] || this.symbol2feats[label] || []
+	let feats = f ? [f] : this.canonical2feats[label] || this.symbol2feats[label] || [];
+	return genome ? feats.filter(f=> f.genome === genome) : feats;
     }
 
     //----------------------------------------------

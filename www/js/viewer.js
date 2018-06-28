@@ -44,6 +44,15 @@ function pqstring (qstring) {
     start && (cfg.start = parseInt(start));
     end   && (cfg.end = parseInt(end));
     //
+    let landmark = prms.get("landmark");
+    let flank    = prms.get("flank");
+    let length   = prms.get("length");
+    let delta    = prms.get("delta");
+    landmark && (cfg.landmark = landmark);
+    flank    && (cfg.flank = parseInt(flank));
+    length   && (cfg.length = parseInt(length));
+    delta    && (cfg.delta = parseInt(delta));
+    //
     // ----- drawing mode -------------
     let dmode = prms.get("dmode");
     dmode && (cfg.dmode = dmode);

@@ -37,7 +37,7 @@ class FeatureDetails extends Component {
 	let flist = [f];
 	if (f.mgiid) {
 	    // FIXME: reachover
-	    flist = this.app.featureManager.getCachedFeaturesByMgiId(f.mgiid);
+	    flist = this.app.featureManager.getCachedFeaturesByCanonicalId(f.mgiid);
 	}
 	// Got the list. Now order it the same as the displayed genomes
 	// build index of genome name -> feature in flist

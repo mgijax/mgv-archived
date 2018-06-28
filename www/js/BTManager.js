@@ -79,7 +79,7 @@ class BTManager {
     }
 
     //----------------------------------------------
-    // Returns the synteny blocks that map the current ref genome to the specified comparison genome.
+    // Returns the synteny block translator that maps the current ref genome to the specified comparison genome.
     //
     getBlocks (fromGenome, toGenome) {
         let blkTrans = this.rcBlocks[fromGenome.name][toGenome.name];
@@ -90,13 +90,12 @@ class BTManager {
     // Translates the given coordinate range from the specified fromGenome to the specified toGenome.
     // Returns a list of zero or more coordinate ranges in the toGenome.
     //
-    // FIXME is this code even used? looks out of place. copy/paste error?
-    translate (fromGenome, chr, start, end, toGenome) {
+    translate (fromGenome, chr, start, end, toGenome, inverted) {
 	// get the right block file
 	let blkTrans = this.rcBlocks[fromGenome.name][toGenome.name];
 	if (!blkTrans) throw "Internal error. No block file found in index."
 	// translate!
-	let ranges = blkTrans.translate(fromGenome, chr, start, end);
+	let ranges = blkTrans.translate(fromGenome, chr, start, end, inverted);
 	return ranges;
     }
 } // end class BTManager
