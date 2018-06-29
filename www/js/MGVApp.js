@@ -201,12 +201,12 @@ class MGVApp extends Component {
 	    this.processChromosomes(data);
 
 	    //
-	    this.initialCfg = this.sanitizeCfg(this.initialCfg);
+	    let cfg = this.sanitizeCfg(this.initialCfg);
 	    let self = this;
 
 	    // initialize the ref and comp genome option lists
-	    initOptList("#refGenome",   this.allGenomes, g=>g.name, g=>g.label, false, g => g === this.initialCfg.ref);
-	    initOptList("#compGenomes", this.allGenomes, g=>g.name, g=>g.label, true,  g => this.initialCfg.genomes.indexOf(g) !== -1);
+	    initOptList("#refGenome",   this.allGenomes, g=>g.name, g=>g.label, false, g => g === cfg.ref);
+	    initOptList("#compGenomes", this.allGenomes, g=>g.name, g=>g.label, true,  g => cfg.genomes.indexOf(g) !== -1);
 	    d3.select("#refGenome").on("change", function() {
 		self.setContext({ ref: this.value });
 	    });
