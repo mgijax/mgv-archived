@@ -58,18 +58,18 @@ class MGVApp extends Component {
 	    ;
 	d3.selectAll('.closable')
 	    .append('i')
-	    .attr('class','material-icons button close')
-	    .attr('title','Click to open/close.')
-	    .on('click.default', function () {
-		let p = d3.select(this.parentNode);
-		p.classed('closed', ! p.classed('closed'));
-		d3.select(this).attr('title','Click to ' +  (p.classed('closed') ? 'open' : 'close') + '.')
-		self.setPrefsFromUI();
-	    });
+		.attr('class','material-icons button close')
+		.attr('title','Click to open/close.')
+		.on('click.default', function () {
+		    let p = d3.select(this.parentNode);
+		    p.classed('closed', ! p.classed('closed'));
+		    d3.select(this).attr('title','Click to ' +  (p.classed('closed') ? 'open' : 'close') + '.')
+		    self.setPrefsFromUI();
+		});
 	d3.selectAll('.content-draggable > *')
 	    .append('i')
-	    .attr('title','Drag up/down to reposition.')
-	    .attr('class','material-icons button draghandle');
+		.attr('title','Drag up/down to reposition.')
+		.attr('class','material-icons button draghandle');
 
 	// 
         d3.select('#statusMessage')
@@ -553,11 +553,11 @@ class MGVApp extends Component {
 	
 	// Set cfg.start to be the specified start with fallback to the current start
 	// Clip at chr boundaries
-	cfg.start = clip(typeof(c.start) === "number" ? c.start : this.coords.start, 1, cfg.chr.length);
+	cfg.start = clip(Math.round(typeof(c.start) === "number" ? c.start : this.coords.start), 1, cfg.chr.length);
 
 	// Set cfg.end to be the specified end with fallback to the current end
 	// Clip at chr boundaries
-	cfg.end = clip(typeof(c.end) === "number" ? c.end : this.coords.end, 1, cfg.chr.length);
+	cfg.end = clip(Math.round(typeof(c.end) === "number" ? c.end : this.coords.end), 1, cfg.chr.length);
 
 	// Ensure start <= end
 	if (cfg.start > cfg.end) {
@@ -566,15 +566,15 @@ class MGVApp extends Component {
 
 	// landmark coordinates --------------------------------------------------------
 	cfg.landmark = c.landmark || this.lcoords.landmark;
-	cfg.delta    = 'delta' in c ? c.delta : (this.lcoords.delta || 0);
+	cfg.delta    = Math.round('delta' in c ? c.delta : (this.lcoords.delta || 0));
 	if ('flank' in c){
-	    cfg.flank = c.flank;
+	    cfg.flank = Math.round(c.flank);
 	}
 	else if ('length' in c) {
-	    cfg.length = c.length;
+	    cfg.length = Math.round(c.length);
 	}
 	else {
-	    cfg.length = this.coords.end - this.coords.start + 1;
+	    cfg.length = Math.round(this.coords.end - this.coords.start + 1);
 	}
 
 	// cmode -----------------------------------------------------------------------
@@ -667,7 +667,7 @@ class MGVApp extends Component {
 	    this.zoomView.highlighted = cfg.highlight;
 	    this.zoomView.genomes = this.vGenomes;
 	    this.zoomView.dmode = cfg.dmode;
-	    this.zoomView.update(this.cmode === 'mapped' ? this.coords : this.lcoords);
+	    this.zoomView.update();
 	    //
 	    this.genomeView.redraw();
 	    this.genomeView.setBrushCoords(this.coords);
@@ -723,6 +723,7 @@ class MGVApp extends Component {
     get currentList () {
         return this.currList;
     }
+    //----------------------------------------------
     set currentList (lst) {
     	//
 	let prevList = this.currList;
@@ -737,9 +738,6 @@ class MGVApp extends Component {
 	    else
 	        this.currListCounter = 0;
 	    let currId = lst.ids[this.currListCounter];
-	    // make this list the current selection in the zoom view
-	    //this.zoomView.hiFeats = lst.ids.reduce((a,v) => { a[v]=v; return a; }, {})
-	    //this.zoomView.update();
 	    // show this list as tick marks in the genome view
 	    this.featureManager.getFeaturesById(this.rGenome, lst.ids)
 		.then( feats => {
@@ -786,7 +784,7 @@ class MGVApp extends Component {
 	let width = c.end - c.start + 1;
 	let minD = -(c.start-1);
 	let maxD = chr.length - c.end;
-	let d = Math.max(minD, Math.min(maxD, Math.round(factor * width)));
+	let d = clip(factor * width, minD, maxD);
 	if (this.cmode === 'mapped') {
 	    this.setContext({ chr: c.chr, start: c.start+d, end: c.end+d });
 	}

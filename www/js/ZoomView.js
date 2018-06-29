@@ -107,6 +107,11 @@ class ZoomView extends SVGView {
 	//
 	let fClickHandler = function (f, evt, preserve) {
 	    let id = f.mgiid || f.mgpid;
+	    if (evt.metaKey) {
+		this.hiFeats[id] = id;
+	        this.app.setContext({landmark:f.mgiid, delta:0})
+		return;
+	    }
 	    if (evt.shiftKey) {
 		if (this.hiFeats[id])
 		    delete this.hiFeats[id]
@@ -116,9 +121,6 @@ class ZoomView extends SVGView {
 	    else {
 		if (!preserve) this.hiFeats = {};
 		this.hiFeats[id] = id;
-	    }
-	    if (evt.metaKey) {
-	        this.app.setContext({landmark:f.mgiid, delta:0})
 	    }
 	}.bind(this);
 	//
@@ -377,6 +379,7 @@ class ZoomView extends SVGView {
 	    });
     }
 
+    //----------------------------------------------
     // Returns the current brush coordinates, translated (if needed) to ref genome coordinates.
     bbGetRefCoords () {
       let rg = this.app.rGenome;
@@ -396,10 +399,12 @@ class ZoomView extends SVGView {
       }
       return r;
     }
+    //----------------------------------------------
     // handler for the start of a brush action by the user on a block
     bbStart (blk,bElt) {
       this.brushing = blk;
     }
+    //----------------------------------------------
     // handler for brush motion. Main job is to reflect the brush
     // in parallel across the genomes in the view. The currnt brush extent 
     // is translated (if necessary) to ref genome space. Then those
@@ -434,36 +439,34 @@ class ZoomView extends SVGView {
 	  });
       });
     }
+    //----------------------------------------------
     bbEnd () {
+      let se = d3.event.sourceEvent;
       let xt = this.brushing.brush.extent();
       let r = this.bbGetRefCoords();
       this.brushing = null;
       //
-      let se = d3.event.sourceEvent;
       if (se.ctrlKey || se.altKey || se.metaKey) {
 	  this.clearBrushes();
           return;
       }
       //
+      let cc = this.app.coords; // current coordinates
+      let currWidth = cc.end - cc.start + 1;
+      let mid = (cc.start + cc.end)/2;
+      //
       if (Math.abs(xt[0] - xt[1]) <= 10){
-          // user clicked instead of dragged. Recenter the view instead of zooming.
-	  let cxt = this.app.getContext();
-	  let w = cxt.end - cxt.start + 1;
-	  r.start -= w/2;
-	  r.end += w/2;
-	  this.app.setContext(r);
-      }
-      else if (se.shiftKey) {
-          // zoom out
-	  let currWidth = this.app.coords.end - this.app.coords.start + 1;
-	  let brushWidth = r.end - r.start + 1;
-	  let factor = currWidth / brushWidth;
-	  this.app.zoom(factor);
+          // user clicked instead of dragged. Recenter the view on the clicked point.
+	  let dx  = r.start - mid;
+	  this.app.pan(dx/currWidth);
       }
       else {
-          this.app.setContext(r);
+	  // zoom in (no shift key) or out (shift key)
+	  let brushWidth = r.end - r.start + 1;
+	  let factor = brushWidth / currWidth;
+	  this.app.zoom(se.shiftKey ? 1/factor : factor);
       }
-  }
+    }
 
     //----------------------------------------------
     highlightStrip (g, elt) {
@@ -543,9 +546,11 @@ class ZoomView extends SVGView {
 	let c = coords;
 	let mgv = this.app;
         let self = this;
+	// get the landmark from each genome where it exists.
 	let feats = mgv.featureManager.getCachedFeaturesByLabel(c.landmark);
 	let rf = null;
 	let delta = coords.delta || 0;
+	// compute ranges around landmark in each genome
 	let ranges = feats.map(f => {
 	    let flank = c.length ? (c.length - f.length) / 2 : c.flank;
 	    let range = {
@@ -562,16 +567,19 @@ class ZoomView extends SVGView {
 	    }
 	    return range;
 	});
+	// Make sure the ref genome has the landmark
 	if (!rf) {
 	    alert(`Landmark ${c.landmark} does not exist in genome ${mgv.rGenome.name}.`)
 	    return;
 	}
 	let seenGenomes = new Set();
 	let rCoords;
+	// Get (promises for) the features in each range.
 	let promises = ranges.map(r => {
             let rrs;
 	    seenGenomes.add(r.genome);
 	    if (r.genome === mgv.rGenome){
+		// the ref genome range
 		rCoords = r;
 	        rrs = [{
 		    chr    : r.chr,
@@ -587,21 +595,25 @@ class ZoomView extends SVGView {
 		}];
 	    }
 	    else { 
+		// turn the single range into a range for each overlapping synteny block with the ref genome
 	        rrs = mgv.translator.translate(r.genome, r.chr, r.start, r.end, mgv.rGenome, true);
 	    }
 	    return mgv.featureManager.getFeatures(r.genome, rrs);
 	});
+	// For each genome where the landmark does not exist, compute a mapped range (as in mapped cmode).
 	mgv.cGenomes.forEach(g => {
 	    if (! seenGenomes.has(g)) {
 		let rrs = mgv.translator.translate(mgv.rGenome, rCoords.chr, rCoords.start, rCoords.end, g);
 		promises.push( mgv.featureManager.getFeatures(g, rrs) );
 	    }
 	});
+	// When all the data is ready, draw.
 	Promise.all(promises).then( data => {
 	    self.draw(data);
 	});
     }
-    update (coords) {
+    //
+    update () {
 	if (this.app.cmode === 'mapped')
 	    this.updateViaMappedCoordinates(this.app.coords);
 	else
