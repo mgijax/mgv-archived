@@ -73,8 +73,8 @@ function __main__ (selector) {
     // the browser history.
     function setHash () {
 	let newHash = mgv.getParamString();
-	if ('#'+newHash === window.location.hash) return;
-	// don't want to trigger an infinite loop here!
+	if ('#'+newHash === window.location.hash)
+	    return;
 	// temporarily disable popstate handler
 	let f = window.onpopstate;
 	window.onpopstate = null;
@@ -88,7 +88,7 @@ function __main__ (selector) {
     // location.
     window.onpopstate = function(event) {
 	let cfg = pqstring(document.location.hash.substring(1));
-	mgv.setContext(cfg);
+	mgv.setContext(cfg, true);
     };
     // get initial set of context params 
     let qstring = window.location.hash.substring(1);

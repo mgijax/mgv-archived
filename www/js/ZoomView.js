@@ -547,7 +547,7 @@ class ZoomView extends SVGView {
 	let rf = null;
 	let delta = coords.delta || 0;
 	let ranges = feats.map(f => {
-	    let flank = c.width ? (c.width - f.length) / 2 : c.flank;
+	    let flank = c.length ? (c.length - f.length) / 2 : c.flank;
 	    let range = {
 		genome:	f.genome,
 		chr:	f.chr,
@@ -566,14 +566,36 @@ class ZoomView extends SVGView {
 	    alert(`Landmark ${c.landmark} does not exist in genome ${mgv.rGenome.name}.`)
 	    return;
 	}
+	let seenGenomes = new Set();
+	let rCoords;
 	let promises = ranges.map(r => {
             let rrs;
-	    if (r.genome === mgv.rGenome)
-	        rrs = [r];
+	    seenGenomes.add(r.genome);
+	    if (r.genome === mgv.rGenome){
+		rCoords = r;
+	        rrs = [{
+		    chr    : r.chr,
+		    start  : r.start,
+		    end    : r.end,
+		    index  : 0,
+		    fChr   : r.chr,
+		    fStart : r.start,
+		    fEnd   : r.end,
+		    fIndex  : 0,
+		    ori    : "+",
+		    blockId: mgv.rGenome.name
+		}];
+	    }
 	    else { 
 	        rrs = mgv.translator.translate(r.genome, r.chr, r.start, r.end, mgv.rGenome, true);
 	    }
 	    return mgv.featureManager.getFeatures(r.genome, rrs);
+	});
+	mgv.cGenomes.forEach(g => {
+	    if (! seenGenomes.has(g)) {
+		let rrs = mgv.translator.translate(mgv.rGenome, rCoords.chr, rCoords.start, rCoords.end, g);
+		promises.push( mgv.featureManager.getFeatures(g, rrs) );
+	    }
 	});
 	Promise.all(promises).then( data => {
 	    self.draw(data);

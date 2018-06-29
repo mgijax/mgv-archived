@@ -317,6 +317,12 @@ function removeDups (lst) {
 }
 
 // ---------------------------------------------
+// Clips a value to a range.
+function clip (n, min, max) {
+    return Math.min(max, Math.max(min, n));
+}
+
+// ---------------------------------------------
 // ---------------------------------------------
 export {
     initOptList,
@@ -335,5 +341,6 @@ export {
     moveCaretPosition,
     getCaretPosition,
     coordsAfterTransform,
-    removeDups
+    removeDups,
+    clip
 };
