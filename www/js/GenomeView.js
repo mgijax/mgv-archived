@@ -58,11 +58,11 @@ class GenomeView extends SVGView {
     //----------------------------------------------
     brushend (){
 	if(!this.brushChr) return;
+	let cc = this.app.coords;
 	var xtnt = this.brushChr.brush.extent();
 	if (Math.abs(xtnt[0] - xtnt[1]) <= 10){
 	    // user clicked
-	    let cxt = this.app.getContext()
-	    let w = cxt.end - cxt.start + 1;
+	    let w = cc.end - cc.start + 1;
 	    xtnt[0] -= w/2;
 	    xtnt[1] += w/2;
 	}
