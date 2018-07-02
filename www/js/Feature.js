@@ -16,7 +16,14 @@ class Feature {
         if (this.symbol === ".") this.symbol = null;
     }
     //----------------------------------------------
+    get ID () {
+        return this.mgpid;
+    }
+    get canonical () {
+        return this.mgiid;
+    }
     get id () {
+	// FIXME: remove this method
         return this.mgiid || this.mgpid;
     }
     //----------------------------------------------
