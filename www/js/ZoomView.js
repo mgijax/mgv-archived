@@ -108,8 +108,9 @@ class ZoomView extends SVGView {
 	let fClickHandler = function (f, evt, preserve) {
 	    let id = f.mgiid || f.mgpid;
 	    if (evt.metaKey) {
+		if (!evt.shiftKey && !preserve) this.hiFeats = {};
 		this.hiFeats[id] = id;
-	        this.app.setContext({landmark:f.mgiid, delta:0})
+	        this.app.setContext({landmark:(f.canonical || f.ID), delta:0})
 		return;
 	    }
 	    if (evt.shiftKey) {
@@ -546,9 +547,8 @@ class ZoomView extends SVGView {
 	let c = coords;
 	let mgv = this.app;
         let self = this;
-	// get the landmark from each genome where it exists.
-	let feats = mgv.featureManager.getCachedFeaturesByLabel(c.landmark);
-	let rf = null;
+	let rf = coords.landmarkRefFeat;
+	let feats = coords.landmarkFeats;
 	let delta = coords.delta || 0;
 	// compute ranges around landmark in each genome
 	let ranges = feats.map(f => {
@@ -556,22 +556,16 @@ class ZoomView extends SVGView {
 	    let range = {
 		genome:	f.genome,
 		chr:	f.chr,
-		start:	f.start - flank + delta,
-		end:	f.end + flank + delta
+		start:	Math.round(f.start - flank + delta),
+		end:	Math.round(f.end + flank + delta)
 	    } ;
 	    if (f.genome === mgv.rGenome) {
-	        rf = f;
 		let c = this.app.coords = range;
 		d3.select("#zoomCoords")[0][0].value = formatCoords(c.chr, c.start, c.end);
 		d3.select("#zoomWSize")[0][0].value = Math.round(c.end - c.start + 1)
 	    }
 	    return range;
 	});
-	// Make sure the ref genome has the landmark
-	if (!rf) {
-	    alert(`Landmark ${c.landmark} does not exist in genome ${mgv.rGenome.name}.`)
-	    return;
-	}
 	let seenGenomes = new Set();
 	let rCoords;
 	// Get (promises for) the features in each range.

@@ -417,47 +417,15 @@ class MGVApp extends Component {
     }
 
     //----------------------------------------------
-    // Args:
-    //   g  (string) genome name (eg "mus_caroli") or label (eg "CAROLI/EiJ") 
-    // Returns:
-    //   true iff the ref genome was actually changed
-    setRefGenomeSelection (g) {
-	//
-	if (!g) return false;
-	//
-	let rg = this.nl2genome[g];
-	if (rg && rg !== this.rGenome){
-	    // change the ref genome
-	    this.rGenome = rg;
-	    d3.selectAll("#refGenome option")
-	        .property("selected",  gg => (gg.label === rg.label  || null));
-	    return true;
-	}
-	return false;
+    setRefGenomeSelection () {
+	d3.selectAll("#refGenome option")
+	    .property("selected",  gg => (gg.label === this.rGenome.label  || null));
     }
     //----------------------------------------------
-    // Args:
-    //   glist (list of strings) genome name or labels
-    // Returns:
-    //   true iff comp genomes actually changed
-    setCompGenomesSelection (glist) {
-        //
-        if (!glist) return false;
-	// 
-	let cgs = [];
-	for( let x of glist ) {
-	    let cg = this.nl2genome[x];
-	    cg && cg !== this.rGenome && cgs.indexOf(cg) === -1 && cgs.push(cg);
-	}
-	let cgns = cgs.map( cg => cg.label );
+    setCompGenomesSelection () {
+	let cgns = this.vGenomes.map(g=>g.label);
 	d3.selectAll("#compGenomes option")
 	        .property("selected",  gg => cgns.indexOf(gg.label) >= 0);
-	//
-	// compare contents of cgs with the current cGenomes.
-	if (same(cgs, this.cGenomes)) return false;
-	//
-	this.cGenomes = cgs;
-	return true;
     }
     //----------------------------------------------
     // Sets or returns
@@ -494,6 +462,44 @@ class MGVApp extends Component {
 		dmode: this.zoomView.dmode
 	    }
 	}
+    }
+    //----------------------------------------------
+    // Resolves the specified landmark to a feature and the list of equivalent feaures.
+    // May be given an id, canonical id, or symbol.
+    // Args:
+    //     cfg (obj) Sanitized config object, with a landmark (string) field.
+    // Returns:
+    //     The cfg object, with additional fields:
+    //        landmarkRefFeat: the landmark (Feature obj) in the ref genome
+    //        landmarkFeats: [ equivalent features in each genome (includes rf)]
+    //     Also, changes ref to be the genome of the landmarkRefFeat
+    //     Returns null if landmark not found in any genome.
+    // 
+    resolveLandmark (cfg) {
+	let rf, feats;
+	// Find the landmark feature in the ref genome. 
+	rf = this.featureManager.getCachedFeaturesByLabel(cfg.landmark, cfg.ref)[0];
+	if (rf) {
+	    // landmark exists in ref genome. Get equivalent feat in each genome.
+	    feats = rf.canonical ? this.featureManager.getCachedFeaturesByCanonicalId(rf.canonical) : [rf];
+	}
+	else {
+	    // landmark does not exist in ref genome. Does it exist anywhere?
+	    rf = this.featureManager.getCachedFeaturesByLabel(cfg.landmark)[0];
+	    if (rf) {
+	        // Yes, landmark exists in another genome.
+		// Change ref genome and proceed.
+		cfg.ref = rf.genome;
+		feats = rf.canonical ? this.featureManager.getCachedFeaturesByCanonicalId(rf.canonical) : [rf];
+	    }
+	    else {
+	        // landmark doesn't exist anywhere. 
+		return null;
+	    }
+	}
+	cfg.landmarkRefFeat = rf;
+	cfg.landmarkFeats = feats
+	return cfg;
     }
     //----------------------------------------------
     // Returns a sanitized version of the argument configuration object.
@@ -565,6 +571,8 @@ class MGVApp extends Component {
 	}
 
 	// landmark coordinates --------------------------------------------------------
+	// NOTE that landmark coordinate cannot be fully resolved to absolute coordinate until
+	// *after* genome data have been loaded. See setContext and resolveLandmark methods.
 	cfg.landmark = c.landmark || this.lcoords.landmark;
 	cfg.delta    = Math.round('delta' in c ? c.delta : (this.lcoords.delta || 0));
 	if ('flank' in c){
@@ -636,6 +644,8 @@ class MGVApp extends Component {
     //
     //              Displays the region around the specified landmark in each genome where it exists.
     //
+    //    quietly (boolean) If true, don't update browser history (as when going back)
+    //
     // Returns:
     //    Nothing
     // Side effects:
@@ -647,22 +657,30 @@ class MGVApp extends Component {
 	console.log("Set context (raw):", c);
 	console.log("Set context (sanitized):", cfg);
 	if (!cfg) return;
-	//
-	this.vGenomes = cfg.genomes;
-	this.rGenome  = cfg.ref;
-	this.cGenomes = cfg.genomes.filter(g => g !== cfg.ref);
-	this.setRefGenomeSelection(cfg.ref.name);
-	this.setCompGenomesSelection(cfg.genomes.map(g=>g.name));
-	//
-	this.cmode = cfg.cmode;
-	this.coords   = { chr: cfg.chr.name, start: cfg.start, end: cfg.end };
-	this.lcoords  = { landmark: cfg.landmark, flank: cfg.flank, length: cfg.length, delta: cfg.delta };
 	this.showBusy(true, 'Requesting data...');
-	this.featureManager.loadGenomes(this.vGenomes).then(() => this.translator.ready())
-	.then(() => {
+	let p = this.featureManager.loadGenomes(cfg.genomes).then(() => {
+	    if (cfg.cmode === 'landmark')
+	        this.resolveLandmark(cfg);
 	    //
-	    if (!quietly)
-	        this.contextChanged();
+	    this.vGenomes = cfg.genomes;
+	    this.rGenome  = cfg.ref;
+	    this.cGenomes = cfg.genomes.filter(g => g !== cfg.ref);
+	    this.setRefGenomeSelection(this.rGenome.name);
+	    this.setCompGenomesSelection(this.vGenomes.map(g=>g.name));
+	    //
+	    this.cmode = cfg.cmode;
+	    return this.translator.ready();
+	}).then(() => {
+	    //
+	    this.coords   = { chr: cfg.chr.name, start: cfg.start, end: cfg.end };
+	    this.lcoords  = {
+	        landmark: cfg.landmark, 
+		landmarkRefFeat: cfg.landmarkRefFeat,
+		landmarkFeats: cfg.landmarkFeats,
+		flank: cfg.flank, 
+		length: cfg.length, 
+		delta: cfg.delta 
+	    };
 	    //
 	    this.zoomView.highlighted = cfg.highlight;
 	    this.zoomView.genomes = this.vGenomes;
@@ -671,9 +689,13 @@ class MGVApp extends Component {
 	    //
 	    this.genomeView.redraw();
 	    this.genomeView.setBrushCoords(this.coords);
-
+	    //
+	    if (!quietly)
+	        this.contextChanged();
+	    //
 	    this.showBusy(false);
 	});
+	return p;
     }
  
     //----------------------------------------------
