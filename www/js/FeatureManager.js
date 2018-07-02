@@ -169,6 +169,12 @@ class FeatureManager {
 
     //----------------------------------------------
     // Returns all cached features having the given canonical id.
+    getCachedFeatureById (id) {
+        return this.id2feats[id];
+    }
+
+    //----------------------------------------------
+    // Returns all cached features having the given canonical id.
     getCachedFeaturesByCanonicalId (cid) {
         return this.canonical2feats[cid] || [];
     }
@@ -177,7 +183,7 @@ class FeatureManager {
     // Returns a list of features that match the given label, which can be an id, canonical id, or symbol.
     // If genome is specified, limit results to features from that genome.
     // 
-    getCachedFeaturesByLabel (label,genome) {
+    getCachedFeaturesByLabel (label, genome) {
 	let f = this.id2feat[label]
 	let feats = f ? [f] : this.canonical2feats[label] || this.symbol2feats[label] || [];
 	return genome ? feats.filter(f=> f.genome === genome) : feats;
