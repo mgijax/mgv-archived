@@ -928,7 +928,7 @@ class ZoomView extends SVGView {
     //
     highlight (current, pulseCurrent) {
 	let self = this;
-	// current's feature
+	// current feature
 	let currFeat = current ? (current instanceof Feature ? current : current.__data__) : null;
 	// create local copy of hiFeats, with current feature added
 	let hiFeats = Object.assign({}, this.hiFeats);
@@ -1015,10 +1015,52 @@ class ZoomView extends SVGView {
 	//
 	ffGrps.attr("class",d => "featureMarks " + (d.cls || ""))
 
+	// -------------------------------------
+	// Draw the connector polygons.
+	// Bind second level data (rectangle pairs) to polygons in the group
+	let pgons = ffGrps.selectAll("polygon")
+	    .data(d=>d.rects.filter(r => r[0] && r[1]));
+	pgons.exit().remove();
+	pgons.enter().append("polygon")
+	    .attr("class","fiducial")
+	    ;
+	//
+	pgons.attr("points", r => {
+	    // polygon connects bottom corners of 1st rect to top corners of 2nd rect
+	    let c1 = coordsAfterTransform(r[0]); // transform coords for 1st rect
+	    let c2= coordsAfterTransform(r[1]);  // transform coords for 2nd rect
+	    // four polygon points
+	    let s = `${c1.x},${c1.y+c1.height} ${c2.x},${c2.y} ${c2.x+c2.width},${c2.y} ${c1.x+c1.width},${c1.y+c1.height}`
+	    return s;
+	})
+	// mousing over the fiducial highlights (as if the user had moused over the feature itself)
+	.on("mouseover", (p) => {
+	    if (!d3.event.ctrlKey)
+	        this.highlight(p[0]);
+	})
+	.on("mouseout",  (p) => {
+	    if (!d3.event.ctrlKey)
+	        this.highlight();
+	});
+	// -------------------------------------
 	// Draw feature labels. Each label is drawn once, above the first rectangle in its list.
-	// 
+	// The exception is the current (mouseover) feature, where the label is drawn above that feature.
 	let labels = ffGrps.selectAll('text.featLabel')
-	    .data(d => [{ fid: d.fid, rect: d.rects[0][0], trect: coordsAfterTransform(d.rects[0][0]) }]);
+	    .data(d => {
+		let r = d.rects[0][0];
+		if (currFeat && (d.fid === currFeat.ID || d.fid === currFeat.canonical)){
+		    r = d.rects.map( rr =>
+		       rr[0].__data__ === currFeat ? rr[0] : rr[1]&&rr[1].__data__ === currFeat ? rr[1] : null
+		       ).filter(x=>x)[0];
+		}
+	        return [{
+		    fid: d.fid,
+		    rect: r,
+		    trect: coordsAfterTransform(r)
+		}];
+	    });
+
+	// Draw the text.
 	labels.enter().append('text').attr('class','featLabel');
 	labels.exit().remove();
 	labels
@@ -1030,11 +1072,11 @@ class ZoomView extends SVGView {
 	       return sym;
 	  });
 
-	// Put a rectangle behind each label (as a background)
+	// Put a rectangle behind each label as a background
 	let lblBoxData = labels.map(lbl => lbl[0].getBBox())
 	let lblBoxes = ffGrps.selectAll('rect.featLabelBox')
 	    .data((d,i) => [lblBoxData[i]]);
-	lblBoxes.enter().insert('rect',':first-child').attr('class','featLabelBox');
+	lblBoxes.enter().insert('rect','text').attr('class','featLabelBox');
 	lblBoxes.exit().remove();
 	lblBoxes
 	    .attr("x",      bb => bb.x-2)
@@ -1061,31 +1103,6 @@ class ZoomView extends SVGView {
 	    }
 	}
 	
-	// Bind second level data (rectangle pairs) to polygons in the group
-	let pgons = ffGrps.selectAll("polygon")
-	    .data(d=>d.rects.filter(r => r[0] && r[1]));
-	pgons.exit().remove();
-	pgons.enter().append("polygon")
-	    .attr("class","fiducial")
-	    ;
-	//
-	pgons.attr("points", r => {
-	    // polygon connects bottom corners of 1st rect to top corners of 2nd rect
-	    let c1 = coordsAfterTransform(r[0]); // transform coords for 1st rect
-	    let c2= coordsAfterTransform(r[1]);  // transform coords for 2nd rect
-	    // four polygon points
-	    let s = `${c1.x},${c1.y+c1.height} ${c2.x},${c2.y} ${c2.x+c2.width},${c2.y} ${c1.x+c1.width},${c1.y+c1.height}`
-	    return s;
-	})
-	// mousing over the fiducial highlights (as if the user had moused over the feature itself)
-	.on("mouseover", (p) => {
-	    if (!d3.event.ctrlKey)
-	        this.highlight(p[0]);
-	})
-	.on("mouseout",  (p) => {
-	    if (!d3.event.ctrlKey)
-	        this.highlight();
-	});
     }
     //----------------------------------------------
     hideFiducials () {
