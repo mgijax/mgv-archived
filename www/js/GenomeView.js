@@ -345,11 +345,15 @@ class GenomeView extends SVGView {
 	//
 	let shape = "circle";  // "circle" or "line"
 	//
-	feats.enter()
+	let newfs = feats.enter()
 	    .append(shape)
 	    .attr("class","feature")
-	    .append("title")
-	    .text(f=>f.symbol || f.id);
+	    .on('click', (f) => {
+		let i = f.canonical||f.ID;
+	        this.app.setContext({landmark:i, highlight:[i]});
+	    }) ;
+	newfs.append("title")
+		.text(f=>f.symbol || f.id);
 	if (shape === "line") {
 	    feats.attr("x1", f => xAdj(f) + 5)
 	    feats.attr("y1", f => rg.yscale(f.start))

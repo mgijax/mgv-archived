@@ -554,6 +554,7 @@ label > i.material-icons {
 #genomeView .chromosome [name="ticks"] circle.feature {
     fill: red;
     fill-opacity: 0.3;
+    cursor: pointer;
 }
 #genomeView .sblock {
     fill: #000;

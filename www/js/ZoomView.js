@@ -622,8 +622,8 @@ class ZoomView extends SVGView {
 	sblocks.forEach( strip => strip.sort( cmpFunc ) );
 	// pixels per base
 	let ppb = this.width / (this.app.coords.end - this.app.coords.start + 1);
-	let pstart = []; // offset of start position of next block, by strip index (0===ref)
-	let bstart = []; // block start pos assoc with pstart
+	let pstart = []; // offset (in pixels) of start position of next block, by strip index (0===ref)
+	let bstart = []; // block start pos (in bp) assoc with pstart
 	let cchr = null;
 	let self = this;
 	let dx;
@@ -771,7 +771,9 @@ class ZoomView extends SVGView {
 	    }, b => b.blockId);
 	let newsbs = sblocks.enter()
 	    .append("g")
-	    .attr("class", b => "sBlock " + (b.ori==="+" ? "plus" : b.ori==="-" ? "minus": "confused") + (b.chr !== b.fChr ? " translocation" : ""))
+	    .attr("class", b => "sBlock " + 
+	        (b.ori==="+" ? "plus" : b.ori==="-" ? "minus": "confused") + 
+		(b.chr !== b.fChr ? " translocation" : ""))
 	    .attr("name", b=>b.index)
 	    ;
 	let l0 = newsbs.append("g").attr("name", "layer0");
