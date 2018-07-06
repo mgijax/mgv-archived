@@ -640,15 +640,14 @@ class ZoomView extends SVGView {
 		dx = 0;
 		cchr = b.chr;
 	    }
-	    else if (b.chr === cchr) {
-		// Next block on current chr
-		dx = pstart[j] + ppb * (b.start - bstart[j]);
-	    }
 	    else {
-		// Changed chr
-		pstart[j] = pend + 4;
-		bstart[j] = b.start;
-		dx = pstart[j];
+		dx = b.chr === cchr ? pstart[j] + ppb * (b.start - bstart[j]) : Infinity;
+		if (dx > self.width) {
+		    // Changed chr or jumped a large gap
+		    pstart[j] = pend + 6;
+		    bstart[j] = b.start;
+		    dx = pstart[j];
+		}
 	    }
 	    d3.select(this).attr("transform", `translate(${dx},0)`);
 	    pend = dx + blen;
@@ -725,7 +724,7 @@ class ZoomView extends SVGView {
 	    .attr("name", "genomeLabel")
 	    .text( d => d.genome.label)
 	    .attr("x", 0)
-	    .attr("y", this.blockHeight/2 + 10)
+	    .attr("y", this.blockHeight/2 + 20)
 	    .attr("font-family","sans-serif")
 	    .attr("font-size", 10)
 	    ;
@@ -883,11 +882,11 @@ class ZoomView extends SVGView {
 	}
 	let fx = function(f) {
 	    let b = fBlock(this);
-	    return b.xscale(f.start)
+	    return b.xscale(Math.max(f.start,b.start))
 	};
 	let fw = function (f) {
 	    let b = fBlock(this);
-	    return Math.abs(b.xscale(f.end) - b.xscale(f.start)) + 1;
+	    return Math.abs(b.xscale(Math.min(f.end,b.end)) - b.xscale(Math.max(f.start,b.start))) + 1;
 	};
 	let fy = function (f) {
 	       let b = fBlock(this);
