@@ -780,9 +780,43 @@ class MGVApp extends Component {
     }
 
     //----------------------------------------------
+    panzoom(pfactor, zfactor) {
+	//
+	!pfactor && (pfactor = 0);
+	!zfactor && (zfactor = 1);
+	//
+	let c = this.coords;
+	let width = c.end - c.start + 1;
+	let mid = (c.start + c.end)/2;
+	let chr = this.rGenome.chromosomes.filter(c => c.name === this.coords.chr)[0];
+	let ncxt = {}; // new context
+	let minD = -(c.start-1); // min delta (at current zoom)
+	let maxD = chr.length - c.end; // max delta (at current zoom)
+	let d = clip(pfactor * width, minD, maxD); // delta (at new zoom)
+	let newwidth = zfactor * width;
+	let newstart = mid - newwidth/2 + d;
+	//
+	if (this.cmode === 'mapped') {
+	    ncxt.chr = c.chr;
+	    ncxt.start = newstart;
+	    ncxt.end = newstart + newwidth - 1;
+	}
+	else {
+	    ncxt.length = newwidth;
+	    ncxt.delta = this.lcoords.delta + d ;
+	}
+	this.setContext(ncxt);
+    }
+    zoom (factor) {
+        this.panzoom(null, factor);
+    }
+    pan (factor) {
+        this.panzoom(factor, null);
+    }	
+    //----------------------------------------------
     // Zooms in/out by factor. New zoom width is factor * the current width.
     // Factor > 1 zooms out, 0 < factor < 1 zooms in.
-    zoom (factor) {
+    xzoom (factor) {
 	let len = this.coords.end - this.coords.start + 1;
 	let newlen = Math.round(factor * len);
 	let x = (this.coords.start + this.coords.end)/2;
@@ -800,7 +834,7 @@ class MGVApp extends Component {
     // Negative values pan left. Positive values pan right. (Note that panning moves the "camera". Panning to the
     // right makes the objects in the scene appear to move to the left, and vice versa.)
     //
-    pan (factor) {
+    xpan (factor) {
 	let c = this.coords;
 	let chr = this.rGenome.chromosomes.filter(c => c.name === this.coords.chr)[0];
 	let width = c.end - c.start + 1;

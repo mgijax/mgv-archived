@@ -452,23 +452,46 @@ class ZoomView extends SVGView {
           return;
       }
       //
-      let cc = this.app.coords; // current coordinates
+      let cc        = this.app.coords; // current coordinates
       let currWidth = cc.end - cc.start + 1;
-      let mid = (cc.start + cc.end)/2;
-      //
-      if (Math.abs(xt[0] - xt[1]) <= 10){
-          // user clicked instead of dragged. Recenter the view on the clicked point.
-	  let dx  = r.start - mid;
-	  this.app.pan(dx/currWidth);
-      }
-      else {
-	  // zoom in (no shift key) or out (shift key)
-	  let brushWidth = r.end - r.start + 1;
-	  let factor = brushWidth / currWidth;
-	  this.app.zoom(se.shiftKey ? 1/factor : factor);
-      }
+      let mid       = (cc.start + cc.end)/2;
+      let dx        = (r.start + r.end)/2 - mid;
+      let brushWidth= r.end - r.start + 1;
+      let zfactor   = (Math.abs(xt[0] - xt[1]) <= 10) ? 1 : brushWidth / currWidth;
+      se.shiftKey && (zfactor = 1/zfactor);
+      this.app.panzoom(dx/currWidth, zfactor);
     }
 
+    xbbEnd () {
+      let xt = this.brushing.brush.extent();
+      let r = this.bbGetRefCoords();
+      this.brushing = null;
+      //
+      let se = d3.event.sourceEvent;
+      if (se.ctrlKey || se.altKey || se.metaKey) {
+	  this.clearBrushes();
+	  return;
+      }
+      //
+      if (Math.abs(xt[0] - xt[1]) <= 10){
+	  // user clicked instead of dragged. Recenter the view instead of zooming.
+	  let cxt = this.app.getContext();
+	  let w = cxt.end - cxt.start + 1;
+	  r.start -= w/2;
+	  r.end += w/2;
+      }
+      else if (se.shiftKey) {
+	  // zoom out
+	  let currWidth = this.coords.end - this.coords.start + 1;
+	  let brushWidth = r.end - r.start + 1;
+	  let factor = currWidth / brushWidth;
+	  let newWidth = factor * currWidth;
+	  let ds = ((r.start - this.coords.start + 1)/currWidth) * newWidth;
+	  r.start = this.coords.start - ds;
+	  r.end = r.start + newWidth - 1;
+      }
+      this.app.setContext(r);
+    }
     //----------------------------------------------
     highlightStrip (g, elt) {
 	if (g === this.currentHLG) return;
@@ -549,6 +572,8 @@ class ZoomView extends SVGView {
         let self = this;
 	let rf = coords.landmarkRefFeat;
 	let feats = coords.landmarkFeats;
+	if (this.root.classed('closed'))
+	    feats = feats.filter(f => f.genome === this.app.rGenome);
 	let delta = coords.delta || 0;
 	// compute ranges around landmark in each genome
 	let ranges = feats.map(f => {
@@ -595,12 +620,13 @@ class ZoomView extends SVGView {
 	    return mgv.featureManager.getFeatures(r.genome, rrs);
 	});
 	// For each genome where the landmark does not exist, compute a mapped range (as in mapped cmode).
-	mgv.cGenomes.forEach(g => {
-	    if (! seenGenomes.has(g)) {
-		let rrs = mgv.translator.translate(mgv.rGenome, rCoords.chr, rCoords.start, rCoords.end, g);
-		promises.push( mgv.featureManager.getFeatures(g, rrs) );
-	    }
-	});
+	if (!this.root.classed('closed'))
+	    mgv.cGenomes.forEach(g => {
+		if (! seenGenomes.has(g)) {
+		    let rrs = mgv.translator.translate(mgv.rGenome, rCoords.chr, rCoords.start, rCoords.end, g);
+		    promises.push( mgv.featureManager.getFeatures(g, rrs) );
+		}
+	    });
 	// When all the data is ready, draw.
 	Promise.all(promises).then( data => {
 	    self.draw(data);
@@ -684,10 +710,11 @@ class ZoomView extends SVGView {
 
 	// Draw the title on the zoomview position controls
 	d3.select("#zoomView .zoomCoords label")
-	    .text(data[0].genome.label + " coords");
+	    .text(this.app.rGenome.label + " coords");
 	
 	// the reference genome block (always just 1 of these).
-	let rBlock = data[0].blocks[0];
+	let rData = data.filter(dd => dd.genome === this.app.rGenome)[0];
+	let rBlock = rData.blocks[0];
 
 	// x-scale and x-axis based on the ref genome data.
 	this.xscale = d3.scale.linear()
