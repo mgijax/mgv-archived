@@ -479,26 +479,21 @@ class MGVApp extends Component {
 	let rf, feats;
 	// Find the landmark feature in the ref genome. 
 	rf = this.featureManager.getCachedFeaturesByLabel(cfg.landmark, cfg.ref)[0];
-	if (rf) {
-	    // landmark exists in ref genome. Get equivalent feat in each genome.
-	    feats = rf.canonical ? this.featureManager.getCachedFeaturesByCanonicalId(rf.canonical) : [rf];
-	}
-	else {
-	    // landmark does not exist in ref genome. Does it exist anywhere?
-	    rf = this.featureManager.getCachedFeaturesByLabel(cfg.landmark)[0];
+	if (!rf) {
+	    // Landmark does not exist in ref genome. Does it exist in any specified genome?
+	    rf = this.featureManager.getCachedFeaturesByLabel(cfg.landmark).filter(f => cfg.genomes.indexOf(f.genome) >= 0)[0];
 	    if (rf) {
-	        // Yes, landmark exists in another genome.
-		// Change ref genome and proceed.
-		cfg.ref = rf.genome;
-		feats = rf.canonical ? this.featureManager.getCachedFeaturesByCanonicalId(rf.canonical) : [rf];
+	        cfg.ref = rf.genome;
 	    }
 	    else {
-	        // landmark doesn't exist anywhere. 
+	        // Landmark cannot be resolved.
 		return null;
 	    }
 	}
+	// landmark exists in ref genome. Get equivalent feat in each genome.
+	feats = rf.canonical ? this.featureManager.getCachedFeaturesByCanonicalId(rf.canonical) : [rf];
 	cfg.landmarkRefFeat = rf;
-	cfg.landmarkFeats = feats.filter(f => this.app.vGenomes.indexOf(f.genome) >= 0);
+	cfg.landmarkFeats = feats.filter(f => cfg.genomes.indexOf(f.genome) >= 0);
 	return cfg;
     }
     //----------------------------------------------
@@ -659,6 +654,14 @@ class MGVApp extends Component {
 	if (!cfg) return;
 	this.showBusy(true, 'Requesting data...');
 	let p = this.featureManager.loadGenomes(cfg.genomes).then(() => {
+	    if (cfg.cmode === 'landmark') {
+	        cfg = this.resolveLandmark(cfg);
+		if (!cfg) {
+		    alert("Landmark does not exist in current reference genome. Please change the reference genome and try again.");
+		    this.showBusy(false);
+		    return;
+		}
+	    }
 	    this.vGenomes = cfg.genomes;
 	    this.rGenome  = cfg.ref;
 	    this.cGenomes = cfg.genomes.filter(g => g !== cfg.ref);
@@ -670,9 +673,7 @@ class MGVApp extends Component {
 	    return this.translator.ready();
 	}).then(() => {
 	    //
-	    if (cfg.cmode === 'landmark')
-	        this.resolveLandmark(cfg);
-	    //
+	    if (!cfg) return;
 	    this.coords   = { chr: cfg.chr.name, start: cfg.start, end: cfg.end };
 	    this.lcoords  = {
 	        landmark: cfg.landmark, 
