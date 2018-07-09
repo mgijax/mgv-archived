@@ -315,8 +315,13 @@ class GenomeView extends SVGView {
     }
 
     // ---------------------------------------------
-    drawTicks (features) {
-	this.currTicks = features;
+    drawTicks (ids) {
+	this.currTicks = ids || [];
+	this.app.featureManager.getFeaturesById(this.app.rGenome, this.currTicks)
+	    .then( feats => { this._drawTicks(feats); });
+    }
+    // ---------------------------------------------
+    _drawTicks (features) {
 	let rg = this.app.rGenome; // ref genome
 	// feature tick marks
 	if (!features || features.length === 0) {

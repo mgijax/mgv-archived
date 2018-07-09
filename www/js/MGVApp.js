@@ -674,7 +674,11 @@ class MGVApp extends Component {
 	}).then(() => {
 	    //
 	    if (!cfg) return;
-	    this.coords   = { chr: cfg.chr.name, start: cfg.start, end: cfg.end };
+	    this.coords   = {
+	        chr: cfg.chr.name,
+		start: cfg.start,
+		end: cfg.end
+	    };
 	    this.lcoords  = {
 	        landmark: cfg.landmark, 
 		landmarkRefFeat: cfg.landmarkRefFeat,
@@ -711,6 +715,7 @@ class MGVApp extends Component {
 		coords = {
 		    ref: f.genome.name,
 		    landmark: str,
+		    delta: 0,
 		    highlight: f.id
 		}
 	    }
@@ -763,12 +768,9 @@ class MGVApp extends Component {
 	        this.currListCounter = 0;
 	    let currId = lst.ids[this.currListCounter];
 	    // show this list as tick marks in the genome view
-	    this.featureManager.getFeaturesById(this.rGenome, lst.ids)
-		.then( feats => {
-		    this.genomeView.drawTicks(feats);
-		    this.genomeView.drawTitle();
-		    this.setCoordinates(currId);
-		});
+	    this.genomeView.drawTicks(lst.ids);
+	    this.genomeView.drawTitle();
+	    this.setCoordinates(currId);
 	}
 	else {
 	    this.currListCounter = 0;

@@ -461,37 +461,6 @@ class ZoomView extends SVGView {
       se.shiftKey && (zfactor = 1/zfactor);
       this.app.panzoom(dx/currWidth, zfactor);
     }
-
-    xbbEnd () {
-      let xt = this.brushing.brush.extent();
-      let r = this.bbGetRefCoords();
-      this.brushing = null;
-      //
-      let se = d3.event.sourceEvent;
-      if (se.ctrlKey || se.altKey || se.metaKey) {
-	  this.clearBrushes();
-	  return;
-      }
-      //
-      if (Math.abs(xt[0] - xt[1]) <= 10){
-	  // user clicked instead of dragged. Recenter the view instead of zooming.
-	  let cxt = this.app.getContext();
-	  let w = cxt.end - cxt.start + 1;
-	  r.start -= w/2;
-	  r.end += w/2;
-      }
-      else if (se.shiftKey) {
-	  // zoom out
-	  let currWidth = this.coords.end - this.coords.start + 1;
-	  let brushWidth = r.end - r.start + 1;
-	  let factor = currWidth / brushWidth;
-	  let newWidth = factor * currWidth;
-	  let ds = ((r.start - this.coords.start + 1)/currWidth) * newWidth;
-	  r.start = this.coords.start - ds;
-	  r.end = r.start + newWidth - 1;
-      }
-      this.app.setContext(r);
-    }
     //----------------------------------------------
     highlightStrip (g, elt) {
 	if (g === this.currentHLG) return;
@@ -704,7 +673,7 @@ class ZoomView extends SVGView {
 	let closed = this.root.classed("closed");
 
 	// reset the svg size based on number of strips
-	let totalHeight = (this.stripHeight+this.stripGap) * data.length + 12;
+	let totalHeight = (this.stripHeight+this.stripGap) * data.length + 20;
 	this.svg
 	    .attr("height", totalHeight);
 
