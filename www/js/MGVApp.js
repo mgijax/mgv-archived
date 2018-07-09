@@ -498,7 +498,7 @@ class MGVApp extends Component {
 	    }
 	}
 	cfg.landmarkRefFeat = rf;
-	cfg.landmarkFeats = feats
+	cfg.landmarkFeats = feats.filter(f => this.app.vGenomes.indexOf(f.genome) >= 0);
 	return cfg;
     }
     //----------------------------------------------
@@ -659,9 +659,6 @@ class MGVApp extends Component {
 	if (!cfg) return;
 	this.showBusy(true, 'Requesting data...');
 	let p = this.featureManager.loadGenomes(cfg.genomes).then(() => {
-	    if (cfg.cmode === 'landmark')
-	        this.resolveLandmark(cfg);
-	    //
 	    this.vGenomes = cfg.genomes;
 	    this.rGenome  = cfg.ref;
 	    this.cGenomes = cfg.genomes.filter(g => g !== cfg.ref);
@@ -669,8 +666,12 @@ class MGVApp extends Component {
 	    this.setCompGenomesSelection(this.vGenomes.map(g=>g.name));
 	    //
 	    this.cmode = cfg.cmode;
+	    //
 	    return this.translator.ready();
 	}).then(() => {
+	    //
+	    if (cfg.cmode === 'landmark')
+	        this.resolveLandmark(cfg);
 	    //
 	    this.coords   = { chr: cfg.chr.name, start: cfg.start, end: cfg.end };
 	    this.lcoords  = {
