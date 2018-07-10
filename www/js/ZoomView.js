@@ -123,6 +123,8 @@ class ZoomView extends SVGView {
 		if (!preserve) this.hiFeats = {};
 		this.hiFeats[id] = id;
 	    }
+	    // FIXME: reachover
+	    this.app.featureDetails.update(f);
 	}.bind(this);
 	//
 	let fMouseOverHandler = function(f) {
@@ -983,8 +985,6 @@ class ZoomView extends SVGView {
 	}
 	this.drawFiducials(data, currFeat);
 
-	// FIXME: reachover
-	this.app.featureDetails.update(currFeat);
     }
 
     //----------------------------------------------

@@ -1,7 +1,7 @@
 // ---------------------------------------------
 class Component {
     // app - the owning app object
-    // elt may be a string (selector), a DOM node, or a d3 selection of 1 node.
+    // elt - container. may be a string (selector), a DOM node, or a d3 selection of 1 node.
     constructor (app, elt) {
 	this.app = app
 	if (typeof(elt) === "string")
