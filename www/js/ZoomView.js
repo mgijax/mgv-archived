@@ -136,12 +136,11 @@ class ZoomView extends SVGView {
 		    if (this.timeout) window.clearTimeout(this.timeout);
 		    this.timeout = window.setTimeout(function(){ this.app.contextChanged(); }.bind(this), 1000);
 		}
-		else if (!d3.event.ctrlKey) 
+		else 
 		    this.highlight(f);
 	}.bind(this);
 	//
 	let fMouseOutHandler = function(f) {
-	    if (!d3.event.ctrlKey)
 		this.highlight(); 
 	}.bind(this);
 
@@ -1032,12 +1031,10 @@ class ZoomView extends SVGView {
 	})
 	// mousing over the fiducial highlights (as if the user had moused over the feature itself)
 	.on("mouseover", (p) => {
-	    if (!d3.event.ctrlKey)
-	        this.highlight(p[0]);
+	    this.highlight(p[0]);
 	})
 	.on("mouseout",  (p) => {
-	    if (!d3.event.ctrlKey)
-	        this.highlight();
+	    this.highlight();
 	});
 	// -------------------------------------
 	// Draw feature labels. Each label is drawn once, above the first rectangle in its list.

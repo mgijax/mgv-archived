@@ -47,34 +47,8 @@ class MGVApp extends Component {
 	this.coords = { chr: '1', start: 1000000, end: 10000000 };  // mapped
 	this.lcoords = { landmark: 'Pax6', flank: 500000, delta:0 };// landmark
 
-	//
-	// TODO: refactor pagebox, draggable, and friends into a framework module,
-	// 
-	this.pbDragger = this.getContentDragger();
-	d3.selectAll('.pagebox')
-	    .call(this.pbDragger)
-	    .append('i')
-	    .attr('class','material-icons busy rotating')
-	    ;
-	d3.selectAll('.closable')
-	    .append('i')
-		.attr('class','material-icons button close')
-		.attr('title','Click to open/close.')
-		.on('click.default', function () {
-		    let p = d3.select(this.parentNode);
-		    p.classed('closed', ! p.classed('closed'));
-		    d3.select(this).attr('title','Click to ' +  (p.classed('closed') ? 'open' : 'close') + '.')
-		    self.setPrefsFromUI();
-		});
-	d3.selectAll('.content-draggable > *')
-	    .append('i')
-		.attr('title','Drag up/down to reposition.')
-		.attr('class','material-icons button draghandle');
+	this.initDom();
 
-	// 
-        d3.select('#statusMessage')
-	    .on('click', () => { this.showStatus(false); });
-	
 	//
 	//
 	this.genomeView = new GenomeView(this, '#genomeView', 800, 250);
@@ -83,6 +57,7 @@ class MGVApp extends Component {
         //
 	this.featureDetails = new FeatureDetails(this, '#featureDetails');
 
+	// Categorical color scale for feature types
 	this.cscale = d3.scale.category10().domain([
 	    'protein_coding_gene',
 	    'pseudogene',
@@ -125,18 +100,6 @@ class MGVApp extends Component {
 	this.queryManager = new QueryManager(this, "#findGenesBox", searchTypes);
 	//
 	this.userPrefsManager = new UserPrefsManager();
-	//
-	// Button: Gear icon to show/hide left column
-	d3.select("#header > .gear.button")
-	    .on("click", () => {
-	        let lc = this.root.select('[name="leftcolumn"]');
-		lc.classed("closed", () => ! lc.classed("closed"));
-		window.setTimeout(()=>{
-		    this.resize()
-		    this.setContext({});
-		    this.setPrefsFromUI();
-		}, 250);
-	    });
 	
 	//
 	// -------------------------------------------------------------------
@@ -176,7 +139,7 @@ class MGVApp extends Component {
 
 	// Things are all wired up. Now let's get some data.
 	// Start with the file of all the genomes.
-	d3tsv("./data/genomeList.tsv").then(function(data){
+	d3tsv("./data/genomeList.tsv").then(data => {
 	    // create Genome objects from the raw data.
 	    this.allGenomes   = data.map(g => new Genome(g));
 	    this.allGenomes.sort( (a,b) => {
@@ -191,43 +154,107 @@ class MGVApp extends Component {
 	    this.label2genome = this.allGenomes
 	        .reduce((acc,g) => { this.nl2genome[g.label] = acc[g.label] = g; return acc; }, {});
 
-	    // Preload all the chromosome files for all the genomes
+	    // Now preload all the chromosome files for all the genomes
 	    let cdps = this.allGenomes.map(g => d3tsv(`./data/genomedata/${g.name}-chromosomes.tsv`));
 	    return Promise.all(cdps);
-	}.bind(this))
-	.then(function (data) {
+	})
+	.then( data => {
 
 	    //
 	    this.processChromosomes(data);
-
-	    //
-	    let cfg = this.sanitizeCfg(this.initialCfg);
-	    let self = this;
-
-	    // initialize the ref and comp genome option lists
-	    initOptList("#refGenome",   this.allGenomes, g=>g.name, g=>g.label, false, g => g === cfg.ref);
-	    initOptList("#compGenomes", this.allGenomes, g=>g.name, g=>g.label, true,  g => cfg.genomes.indexOf(g) !== -1);
-	    d3.select("#refGenome").on("change", function() {
-		self.setContext({ ref: this.value });
-	    });
-	    d3.select("#compGenomes").on("change", function() {
-		let selectedNames = [];
-		for(let x of this.selectedOptions){
-		    selectedNames.push(x.value);
-		}
-		// want to preserve current genome order as much as possible 
-		let gNames = self.vGenomes.map(g=>g.name)
-		    .filter(n => {
-		        return selectedNames.indexOf(n) >= 0 || n === self.rGenome.name;
-		    });
-		gNames = gNames.concat(selectedNames.filter(n => gNames.indexOf(n) === -1));
-		self.setContext({ genomes: gNames });
-	    });
+            this.initDomPart2();
 	    //
 	    // FINALLY! We are ready to draw the initial scene.
 	    this.setContext(this.initialCfg);
 
-	}.bind(this));
+	});
+    }
+    //----------------------------------------------
+    // 
+    initDom () {
+	self = this;
+	//
+	// TODO: refactor pagebox, draggable, and friends into a framework module,
+	// 
+	this.pbDragger = this.getContentDragger();
+	d3.selectAll('.pagebox')
+	    .call(this.pbDragger)
+	    .append('i')
+	    .attr('class','material-icons busy rotating')
+	    ;
+	d3.selectAll('.closable')
+	    .append('i')
+		.attr('class','material-icons button close')
+		.attr('title','Click to open/close.')
+		.on('click.default', function () {
+		    let p = d3.select(this.parentNode);
+		    p.classed('closed', ! p.classed('closed'));
+		    d3.select(this).attr('title','Click to ' +  (p.classed('closed') ? 'open' : 'close') + '.')
+		    self.setPrefsFromUI();
+		});
+	d3.selectAll('.content-draggable > *')
+	    .append('i')
+		.attr('title','Drag up/down to reposition.')
+		.attr('class','material-icons button draghandle');
+
+	// 
+        d3.select('#statusMessage')
+	    .on('click', () => { this.showStatus(false); });
+	
+	//
+	// Button: Gear icon to show/hide left column
+	d3.select("#header > .gear.button")
+	    .on("click", () => {
+	        let lc = this.root.select('[name="leftcolumn"]');
+		lc.classed("closed", () => ! lc.classed("closed"));
+		window.setTimeout(()=>{
+		    this.resize()
+		    this.setContext({});
+		    this.setPrefsFromUI();
+		}, 250);
+	    });
+    }
+    //----------------------------------------------
+    // Dom initializtion that must wait until after genome meta data is loaded.
+    initDomPart2 () {
+	//
+	let cfg = this.sanitizeCfg(this.initialCfg);
+	let self = this;
+
+	// initialize the ref and comp genome option lists
+	initOptList("#refGenome",   this.allGenomes, g=>g.name, g=>g.label, false, g => g === cfg.ref);
+	initOptList("#compGenomes", this.allGenomes, g=>g.name, g=>g.label, true,  g => cfg.genomes.indexOf(g) !== -1);
+	d3.select("#refGenome").on("change", function() {
+	    self.setContext({ ref: this.value });
+	});
+	d3.select("#compGenomes").on("change", function() {
+	    let selectedNames = [];
+	    for(let x of this.selectedOptions){
+		selectedNames.push(x.value);
+	    }
+	    // want to preserve current genome order as much as possible 
+	    let gNames = self.vGenomes.map(g=>g.name)
+		.filter(n => {
+		    return selectedNames.indexOf(n) >= 0 || n === self.rGenome.name;
+		});
+	    gNames = gNames.concat(selectedNames.filter(n => gNames.indexOf(n) === -1));
+	    self.setContext({ genomes: gNames });
+	});
+	d3tsv("./data/genomeSets.tsv").then(sets => {
+	    // Create selection buttons.
+	    sets.forEach( s => s.genomes = s.genomes.split(",") );
+	    let cgb = d3.select('#compGenomesBox').selectAll('button').data(sets);
+	    cgb.enter().append('button')
+		.text(d=>d.name)
+		.attr('title', d=>d.description)
+		.on('click', d => {
+		    self.setContext(d);
+		})
+		;
+	}).catch(()=>{
+	    console.log("No genomeSets file found.");
+	}); // OK if no genomeSets file
+
     }
     //----------------------------------------------
     processChromosomes (data) {
@@ -254,10 +281,6 @@ class MGVApp extends Component {
 	    g.chromosomes = chrs;
 	});
     }
-    //----------------------------------------------
-    initDom () {
-    }
-
     //----------------------------------------------
     getContentDragger () {
       let self = this;

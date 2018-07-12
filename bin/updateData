@@ -26,6 +26,12 @@ do :
     count=$(expr $count + 1)
 done
 
+# copy the genomeSets file to the dataDir. This defines named sets of genomes
+# and will have cooresponding buttons in the browser for easy selection.
+cp "${BDIR}/genomeSets.tsv" "${DIR}/data/genomeSets.tsv"
+
+exit
+
 # generate MGI secondary-to-primary ID mapping file
 secondaryIdFile="${DDIR}/mgiSecondaryIds.tsv"
 python "${BDIR}/getMgiSecondaryIds.py" > "${secondaryIdFile}"
