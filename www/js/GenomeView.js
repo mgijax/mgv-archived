@@ -212,8 +212,8 @@ class GenomeView extends SVGView {
 	chrs.select('[name="brush"]')
 	    .each(function(d){d3.select(this).call(d.brush);})
 	    .selectAll('rect')
-	     .attr('width',10)
-	     .attr('x', -5)
+	     .attr('width',16)
+	     .attr('x', -8)
 	    ;
 
 	chrs.exit().remove();
