@@ -47,14 +47,14 @@ class FeatureDetails extends Component {
 	//
 	let colHeaders = [
 	    // columns headers and their % widths
+	    ["MGI id"     ,10],
+	    ["MGI symbol" ,10],
 	    ["Genome"     ,9],
 	    ["MGP id"     ,17],
 	    ["Type"       ,10.5],
 	    ["BioType"    ,18.5],
-	    ["Coords"     ,18],
-	    ["Length"     ,7],
-	    ["MGI id"     ,10],
-	    ["MGI symbol" ,10]
+	    ["Coordinates",18],
+	    ["Length"     ,7]
 	];
 	// In the closed state, only show the header and the row for the passed feature
 	if (this.root.classed('closed'))
@@ -76,7 +76,7 @@ class FeatureDetails extends Component {
 	    if (i === 0) {
 		return f;
 	    }
-	    let cellData = [ genomeOrder[i-1].label, ".", ".", ".", ".", ".", ".", "." ];
+	    let cellData = [ ".", ".", genomeOrder[i-1].label, ".", ".", ".", ".", "." ];
 	    // f is null if it doesn't exist for genome i 
 	    if (f) {
 		let link = "";
@@ -86,14 +86,14 @@ class FeatureDetails extends Component {
 		    link = `<a target="_blank" href="${url}">${mgiid}</a>`;
 		}
 		cellData = [
+		    link || mgiid,
+		    f.symbol,
 		    f.genome.label,
 		    f.mgpid,
 		    f.type,
 		    f.biotype,
 		    `${f.chr}:${f.start}..${f.end} (${f.strand})`,
-		    `${f.end - f.start + 1} bp`,
-		    link || mgiid,
-		    f.symbol
+		    `${f.end - f.start + 1} bp`
 		];
 	    }
 	    return cellData;
