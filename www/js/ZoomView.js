@@ -1,6 +1,6 @@
 import { SVGView } from './SVGView';
 import { Feature } from './Feature';
-import { parseCoords, formatCoords, coordsAfterTransform, removeDups } from './utils';
+import { clip, parseCoords, formatCoords, coordsAfterTransform, removeDups } from './utils';
 
 // ---------------------------------------------
 class ZoomView extends SVGView {
@@ -136,8 +136,11 @@ class ZoomView extends SVGView {
 		    if (this.timeout) window.clearTimeout(this.timeout);
 		    this.timeout = window.setTimeout(function(){ this.app.contextChanged(); }.bind(this), 1000);
 		}
-		else 
+		else {
 		    this.highlight(f);
+		    if (d3.event.ctrlKey)
+		        this.app.featureDetails.update(f);
+		}
 	}.bind(this);
 	//
 	let fMouseOutHandler = function(f) {
@@ -548,11 +551,15 @@ class ZoomView extends SVGView {
 	// compute ranges around landmark in each genome
 	let ranges = feats.map(f => {
 	    let flank = c.length ? (c.length - f.length) / 2 : c.flank;
+	    let clength = f.genome.getChromosome(f.chr).length;
+	    let w     = c.length ? c.length : (f.length + 2*flank);
+	    let start = clip(Math.round(delta + f.start - flank), 1, clength);
+	    let end   = clip(Math.round(start + w), start, clength)
 	    let range = {
 		genome:	f.genome,
 		chr:	f.chr,
-		start:	Math.round(f.start - flank + delta),
-		end:	Math.round(f.end + flank + delta)
+		start:	start,
+		end:	end
 	    } ;
 	    if (f.genome === mgv.rGenome) {
 		let c = this.app.coords = range;

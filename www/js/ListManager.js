@@ -232,6 +232,7 @@ class ListManager extends Component {
 	    .attr("name", lst=>lst.name)
 	    .on("click", function (lst) {
 		if (d3.event.altKey) {
+		    // alt-click copies the list's name into the formula editor
 		    let le = self.app.listEditor; // FIXME reachover
 		    let s = lst.name;
 		    let re = /[ =()+*-]/;
