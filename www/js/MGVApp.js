@@ -784,7 +784,7 @@ class MGVApp extends Component {
 	let lists = d3.select('#mylists').selectAll('.listInfo');
 	lists.classed("current", d => d === lst);
 	//
-	if (lst) {
+	if (lst && lst.ids.length > 0) {
 	    if (lst === prevList)
 	        this.currListCounter = (this.currListCounter + 1) % this.currList.ids.length;
 	    else
