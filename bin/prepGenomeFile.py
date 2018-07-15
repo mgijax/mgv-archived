@@ -7,9 +7,6 @@
 # The feature output is a TSV file with these columns:
 #    chromosome, start, end, strand, contig, lane, type, biotype, id, mgiid, symbol
 #
-# ID, chromosome, start, end, strand.
-# Basic information for each feature.
-#
 # Associations to canonical genes.
 # For MGP files (strain genomes other than B6), top level features may have an MGI id embedded in a description 
 # attribute in col 9. This ID is taken as the asserted association to an MGI canonical gene. 
@@ -67,6 +64,9 @@ class Prep:
 	#
         self.initArgParser()
 
+    def log(self, msg):
+        sys.stderr.write(msg + '\n')
+
     def initArgParser (self):
         """
         Sets up the parser for the command line args.
@@ -95,7 +95,7 @@ class Prep:
             '-m',
             dest="mappingfile",
             metavar='FILE', 
-            help='File of MGI primary and secondary ids. 2 columns, tab delimited. Columns=primaryId, secondaryId')
+            help='File of ENSEMBL to MGI id mappings.')
 
         self.parser.add_argument(
             '-o',
@@ -127,11 +127,10 @@ class Prep:
 	#
 	if self.args.mappingfile:
 	    # read the mapping file, build a dict
+	    # each line = ensid mgiid symbol
 	    self.mapping = {}
 	    for line in open( self.args.mappingfile, "r"):
 	        toks = line[:-1].split("\t")
-		if len(toks) != 3: continue
-		if not toks[0].startswith("MGI:") or not toks[1].startswith("MGI:"): continue
 		self.mapping[toks[0]] = (toks[1],toks[2])
 	#
         self.tsvOut = sys.stdout
@@ -217,21 +216,19 @@ class Prep:
 	    ]
 	    self.chrOut.write('\t'.join(r) + '\n')
 	    return None
-	# regular old feature. get the MGI id, if any
-	match = self.mgi_re.search(f.attributes.get('description',''))
-	if match:
-	    f.attributes['mgiid'] = match.group(1)
-	    f.attributes['symbol'] = f.attributes.get("Name",".")
-	    # in case they used secondary ids, convert to primary
-	    primary = self.mapping.get(f.attributes['mgiid'], None)
-	    if primary:
-		sys.stderr.write("Secondary %s (%s) converted to primary %s (%s)\n"
-		    % (f.attributes['mgiid'], f.attributes['symbol'], primary[0], primary[1]))
-		f.attributes['mgiid'] = primary[0]
-		f.attributes['symbol'] = primary[1]
-	else:
-	    f.attributes['mgiid'] = "."
-	    f.attributes['symbol'] = "."
+	# regular old feature
+	# if projection_parent_gene attribute (an ENSEMBL id) is present, map it to an MGI id.
+	# if mapping is successful, set the MGI id and symbol.
+	# otherwise, set them both to "."
+	f.attributes['mgiid'] = "."
+	f.attributes['symbol'] = "."
+	ensid = f.attributes.get('projection_parent_gene',None)
+	if ensid:
+	    ensid = ensid.split(".")[0]
+	    mm = self.mapping.get(ensid,None)
+	    if mm:
+		f.attributes['mgiid'] = mm[0]
+		f.attributes['symbol'] = mm[1]
 	return f
 
     #
