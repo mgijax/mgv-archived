@@ -249,6 +249,7 @@ class Block (Region):
 # Specifically:
 # - blocks in a cover do not overlap
 # - every feature is covered by exactly one block
+#
 # A BlockCover in one genome may be joined with a BlockCover in another.
 #
 class BlockCover:
@@ -467,11 +468,13 @@ class BlockCover:
 	self.mergeRanges ( mergeOrders[0] )
 	self.joinedTo.mergeRanges( mergeOrders[1] )
 
+
 # end class BlockCover
 
 #-------------------------------------------------------------------------
-# A SyntenyBloc is a pair of Blocks, one from genome A and one from genome B,
-# deemed to be equivalent.
+# A SyntenyBloc comprises two lists of Blocks, one from genome A and one from genome B,
+# deemed to be equivalent. Hopefully, each list contains exactly 1 Block (ie, the bloc is 1:1),
+# but we must allow for the general case 1:n, n:1, and even n:m.
 #
 class SyntenyBloc:
     COUNT = 0
@@ -516,8 +519,7 @@ class SyntenyBloc:
 
 
     #
-    def getColNames(self):
-	return [
+    COLNAMES = [
 	      "blockId",
 	      "blockCount",
 	      "blockOri",
@@ -601,6 +603,8 @@ def generate(a, b):
 #    aFile (string) Path to file of genome A features
 #    bName (string) Name of genome B, e.g. "AKR/J"
 #    bFile (string) Path to file of genome B features
+# Yields:
+#    stream of SyntenyBlocs
 #    
 def generateFromFiles(aName, aFile, bName, bFile):
     global a
@@ -608,7 +612,8 @@ def generateFromFiles(aName, aFile, bName, bFile):
     a = Genome(aName).readFromFile(aFile)
     b = Genome(bName).readFromFile(bFile)
     for sbloc in generate(a, b):
-        yield sbloc
+        for r in sbloc.getRows():
+	    yield r
 
 #
 def format(lst):
@@ -663,11 +668,20 @@ if __name__ == "__main__":
 	args.bfile = "../data/genomedata/mus_musculus_akrj-features.tsv"
     else:
 	args = getArgs()
-    sbg = generateFromFiles(args.aname, args.afile, args.bname, args.bfile)
-    for i,sb in enumerate(sbg):
-        if i == 0:
-	    sys.stdout.write( format(sb.getColNames()) + NL )
-	for r in sb.getRows():
-	    sys.stdout.write( format(r) + NL )
+    allRows = list(generateFromFiles(args.aname, args.afile, args.bname, args.bfile))
+    def _(ci):
+	allRows.sort(lambda x,y: x[ci]-y[ci])
+	i = -1
+	prev = None
+	for r in allRows:
+	    if r[ci] != prev:
+	        i += 1
+	    prev = r[ci]
+	    r[ci] = i
+    _(9) # sort on col 9 and renumber
+    _(4) # sort on col 4 and renumber
+    sys.stdout.write( format(SyntenyBloc.COLNAMES) + NL )
+    for r in allRows:
+	sys.stdout.write( format(r) + NL )
 
 
