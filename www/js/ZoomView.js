@@ -456,14 +456,25 @@ class ZoomView extends SVGView {
           return;
       }
       //
-      let cc        = this.app.coords; // current coordinates
-      let currWidth = cc.end - cc.start + 1;
-      let mid       = (cc.start + cc.end)/2;
+      if (Math.abs(xt[0] - xt[1]) <= 10) {
+	  // User clicked. Recenter view.
+	  let cc        = this.app.coords; 
+	  let currWidth = cc.end - cc.start + 1;
+	  let mid       = (cc.start + cc.end)/2;
+          let d = (xt[0] + xt[1])/2 - mid;
+	  this.app.setContext({ start: cc.start+d, end: cc.end+d });
+      }
+      else {
+	  // User dragged. Zoom in or out.
+	  this.app.setContext({ start:xt[0], end:xt[1] });
+      }
+      /*
       let dx        = (r.start + r.end)/2 - mid;
       let brushWidth= r.end - r.start + 1;
       let zfactor   = (Math.abs(xt[0] - xt[1]) <= 10) ? 1 : brushWidth / currWidth;
       se.shiftKey && (zfactor = 1/zfactor);
       this.app.panzoom(dx/currWidth, zfactor);
+      */
     }
     //----------------------------------------------
     highlightStrip (g, elt) {
@@ -663,7 +674,7 @@ class ZoomView extends SVGView {
     // Data is structured as follows:
     //     data = [ zoomStrip_data ]
     //     zoomStrip_data = { genome [ zoomBlock_data ] }
-    //     zoomBlock_data = { xscale, chr, start, end, fChr, fStart, fEnd, ori, [ feature_data ] }
+    //     zoomBlock_data = { xscale, chr, start, end, index, fChr, fStart, fEnd, fIndex, ori, [ feature_data ] }
     //     feature_data = { mgpid, mgiid, symbol, chr, start, end, strand, type, biotype }
     //
     // Again, in English:
@@ -699,12 +710,12 @@ class ZoomView extends SVGView {
 	    .range([0,this.width]);
 
         // -----------------------------------------------------
-	// draw the axis
+	// draw the coordinate axis
         // -----------------------------------------------------
 	this.axisFunc = d3.svg.axis()
 	    .scale(this.xscale)
 	    .orient("top")
-	    .outerTickSize(0)
+	    .outerTickSize(2)
 	    .ticks(5)
 	    ;
 	this.axis.call(this.axisFunc);
@@ -732,6 +743,15 @@ class ZoomView extends SVGView {
 	    .attr("font-family","sans-serif")
 	    .attr("font-size", 10)
 	    ;
+	// Strip axes.
+	newzs.append("line")
+	    .attr("class", "axis")
+	    .attr("x1", 0)
+	    .attr("y1", 0)
+	    .attr("x2", this.width)
+	    .attr("y2", 0)
+	    ;
+
 	newzs.append("g")
 	    .attr("name", "sBlocks");
 	newzs.append("rect")
@@ -746,7 +766,8 @@ class ZoomView extends SVGView {
 	    .classed("reference", d => d.genome === this.app.rGenome)
 	    .attr("transform", g => `translate(0,${closed ? this.topOffset : g.genome.zoomY})`)
 	    ;
-
+        zstrips.select("line.axis")
+	    .attr("x2", this.width);
         zstrips.exit()
 	    .on(".drag", null)
 	    .remove();
@@ -809,14 +830,6 @@ class ZoomView extends SVGView {
 	  .attr("y",     b => -this.blockHeight / 2)
 	  .attr("width", b => Math.abs(b.xscale(b.end)-b.xscale(b.start)))
 	  .attr("height",this.blockHeight);
-
-	// synteny block axis lines
-	sblocks.select("line.axis")
-	    .attr("x1", b => b.xscale.range()[0])
-	    .attr("y1", 0)
-	    .attr("x2", b => b.xscale.range()[1])
-	    .attr("y2", 0)
-	    ;
 
 	// brush
 	sblocks.select("g.brush")
@@ -1031,11 +1044,13 @@ class ZoomView extends SVGView {
 	pgons.attr("points", r => {
 	    // polygon connects bottom corners of 1st rect to top corners of 2nd rect
 	    let c1 = coordsAfterTransform(r[0]); // transform coords for 1st rect
-	    let c2= coordsAfterTransform(r[1]);  // transform coords for 2nd rect
+	    let c2 = coordsAfterTransform(r[1]);  // transform coords for 2nd rect
+	    r.tcoords = [c1,c2];
 	    // four polygon points
 	    let s = `${c1.x},${c1.y+c1.height} ${c2.x},${c2.y} ${c2.x+c2.width},${c2.y} ${c1.x+c1.width},${c1.y+c1.height}`
 	    return s;
 	})
+	//
 	// mousing over the fiducial highlights (as if the user had moused over the feature itself)
 	.on("mouseover", (p) => {
 	    this.highlight(p[0]);
@@ -1050,9 +1065,10 @@ class ZoomView extends SVGView {
 	    .data(d => {
 		let r = d.rects[0][0];
 		if (currFeat && (d.fid === currFeat.ID || d.fid === currFeat.canonical)){
-		    r = d.rects.map( rr =>
+		    let r2 = r = d.rects.map( rr =>
 		       rr[0].__data__ === currFeat ? rr[0] : rr[1]&&rr[1].__data__ === currFeat ? rr[1] : null
 		       ).filter(x=>x)[0];
+		    r = r2 ? r2 : r;
 		}
 	        return [{
 		    fid: d.fid,
