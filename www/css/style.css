@@ -700,12 +700,14 @@ label > i.material-icons {
 }
 
 #zoomView .fiducials .fiducial {
-   stroke : none;
+   stroke : blue;
    fill: blue;
    fill-opacity: 0.3;
+   stroke-opacity: 0.3;
 }
 
 #zoomView .fiducials .current .fiducial {
+   stroke : red;
    fill: red;
 }
 
