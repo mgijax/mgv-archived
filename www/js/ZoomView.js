@@ -18,6 +18,7 @@ class ZoomView extends SVGView {
       this.laneHeight = this.featHeight + this.laneGap;
       this.stripHeight = 70;    // height per genome in the zoom view
       this.stripGap = 20;	// space between strips
+      this.maxSBgap = 20;	// max gap allowed between blocks.
       this.dmode = 'comparison';// drawing mode. 'comparison' or 'reference'
 
       //
@@ -410,41 +411,6 @@ class ZoomView extends SVGView {
       this.brushing = blk;
     }
     //----------------------------------------------
-    // handler for brush motion. Main job is to reflect the brush
-    // in parallel across the genomes in the view. The currnt brush extent 
-    // is translated (if necessary) to ref genome space. Then those
-    // coordinates are translated to each comparison genome space, and the appropriate
-    // brush(es) updated.
-    //
-    bbBrush () {
-      let rg = this.app.rGenome; // the reference genome
-      let gs = [rg].concat(this.app.cGenomes); // all the genomes in the view
-      let tr = this.app.translator; // for translating coords between genomes
-      let blk = this.brushing; // the block currenly being brushed
-      let r = this.bbGetRefCoords(); // current brush extent, in ref genome space
-      gs.forEach( g => {
-	  // if g is the refGenome, no need to translate. Otherwise, translate from 
-	  // ref genome to comparison genome g.
-          let rs;
-	  if (g === rg) {
-	      r.blockId = rg.name;
-	      rs = [r];
-	  }
-	  else {
-	      rs = tr.translate(rg, r.chr, r.start, r.end, g);
-	  }
-	  // note that translated results include block identifiers, which tell
-	  // us the block (and hence, brushes) in the display to target.
-	  rs.forEach( rr => {
-	      let bb = this.svgMain.select(`.zoomStrip[name="${g.name}"] .sBlock[name="${rr.blockId}"] .brush`)
-	      bb.each( function(b) {
-	          b.brush.extent([rr.start, rr.end]);
-		  d3.select(this).call(b.brush);
-	      });
-	  });
-      });
-    }
-    //----------------------------------------------
     bbEnd () {
       let se = d3.event.sourceEvent;
       let xt = this.brushing.brush.extent();
@@ -468,13 +434,6 @@ class ZoomView extends SVGView {
 	  // User dragged. Zoom in or out.
 	  this.app.setContext({ start:xt[0], end:xt[1] });
       }
-      /*
-      let dx        = (r.start + r.end)/2 - mid;
-      let brushWidth= r.end - r.start + 1;
-      let zfactor   = (Math.abs(xt[0] - xt[1]) <= 10) ? 1 : brushWidth / currWidth;
-      se.shiftKey && (zfactor = 1/zfactor);
-      this.app.panzoom(dx/currWidth, zfactor);
-      */
     }
     //----------------------------------------------
     highlightStrip (g, elt) {
@@ -501,7 +460,7 @@ class ZoomView extends SVGView {
         let mgv = this.app;
 	// when the translator is ready, we can translate the ref coords to each genome and
 	// issue requests to load the features in those regions.
-	mgv.translator.ready().then(function(){
+	return mgv.translator.ready().then(function(){
 	    // Now issue requests for features. One request per genome, each request specifies one or more
 	    // coordinate ranges.
 	    // Wait for all the data to become available, then draw.
@@ -531,10 +490,7 @@ class ZoomView extends SVGView {
 		    promises.push(p);
 		});
 	    }
-	    // when everything is ready, call the draw function
-	    Promise.all(promises).then( data => {
-	        self.draw(data);
-            });
+	    return Promise.all(promises)
 	});
     }
     // Updates the ZoomView to show the region around a landmark in each genome.
@@ -616,16 +572,18 @@ class ZoomView extends SVGView {
 		}
 	    });
 	// When all the data is ready, draw.
-	Promise.all(promises).then( data => {
-	    self.draw(data);
-	});
+	return Promise.all(promises);
     }
     //
     update () {
+	let p;
 	if (this.app.cmode === 'mapped')
-	    this.updateViaMappedCoordinates(this.app.coords);
+	    p = this.updateViaMappedCoordinates(this.app.coords);
 	else
-	    this.updateViaLandmarkCoordinates(this.app.lcoords);
+	    p = this.updateViaLandmarkCoordinates(this.app.lcoords);
+	p.then( data => {
+	    this.draw(data);
+	});
     }
 
     //----------------------------------------------
@@ -656,9 +614,9 @@ class ZoomView extends SVGView {
 	    }
 	    else {
 		dx = b.chr === cchr ? pstart[j] + ppb * (b.start - bstart[j]) : Infinity;
-		if (dx > self.width) {
+		if (dx > self.maxSBgap) {
 		    // Changed chr or jumped a large gap
-		    pstart[j] = pend + 6;
+		    pstart[j] = pend + 16;
 		    bstart[j] = b.start;
 		    dx = pstart[j];
 		}
@@ -668,10 +626,70 @@ class ZoomView extends SVGView {
 	});
     }
 
+    // ------------------------------------
+    mergeSblockRuns (data) {
+	// -----
+	// Reducer function. Will be called with these args:
+	//   nblcks (list) New blocks. (current accumulator value)
+	//   	A list of lists of synteny blocks.
+	//   blk (synteny block) the current synteny block
+	//   i (int) The iteration count.
+	// Returns:
+	//   list of lists of blocks
+	let merger = function(nblks, b, i) {
+	    let initBlk = function (bb) {
+		let nb = Object.assign({}, bb);
+		nb.features = bb.features.concat();
+		nb.sblocks = [bb];
+		nb.ori = '+';
+	        return nb;
+	    };
+	    if (i === 0){
+		nblks.push(initBlk(b));
+		return nblks;
+	    }
+	    let lastBlk = nblks[nblks.length - 1];
+	    if (b.chr !== lastBlk.chr || b.index - lastBlk.index > 2) {
+	        nblks.push(initBlk(b));
+		return nblks;
+	    }
+	    // merge
+	    lastBlk.index = b.index;
+	    lastBlk.end = b.end;
+	    lastBlk.blockEnd = b.blockEnd;
+	    lastBlk.features = lastBlk.features.concat(b.features);
+	    //b.features = null;
+	    lastBlk.sblocks.push(b);
+	    return nblks;
+	};
+	// -----
+        data.forEach((gdata,i) => {
+	    gdata.blocks.sort( (a,b) => a.index - b.index );
+	    gdata.blocks = gdata.blocks.reduce(merger,[]);
+	});
+	return data;
+    }
+
+    // -----------------------------------------------------
+    // synteny blocks. Each zoom strip has a list of 1 or more sblocks.
+    // The reference genome always has just 1. The comp genomes many have
+    // 1 or more (and in rare cases, 0).
+    // -----------------------------------------------------
+    uniqifyBlocks (blocks) {
+	// helper function. When sblock relationship between genomes is confused, requesting one
+	// region in genome A can end up requesting the same region in genome B multiple times.
+	// This function avoids drawing the same sblock twice. (NB: Really not sure where this 
+	// check is best done. Could push it farther upstream.)
+	let seen = new Set();
+	return blocks.filter( b => { 
+	    if (seen.has(b.index)) return false;
+	    seen.add(b.index);
+	    return true;
+	});
+    };
     //----------------------------------------------
-    // Draws the zoom view panel with the given data.
-    //
-    // Data is structured as follows:
+    // Applies several transformation steps on the data as returned by the server to prepare for drawing.
+    // Input data is structured as follows:
     //     data = [ zoomStrip_data ]
     //     zoomStrip_data = { genome [ zoomBlock_data ] }
     //     zoomBlock_data = { xscale, chr, start, end, index, fChr, fStart, fEnd, fIndex, ori, [ feature_data ] }
@@ -685,7 +703,26 @@ class ZoomView extends SVGView {
     //  - each block is an object containing a chromosome, start, end, orientation, etc, and a list of features.
     //  - each feature has chr,start,end,strand,type,biotype,mgpid
     //
+    // Because SBlocks can be very fragmented, one contiguous region in the ref genome can turn into 
+    // a bazillion tiny blocks in the comparison. The resulting rendering is jarring and unusable.
+    // The drawing routine modifies the data by merging runs of consecutive blocks in each comp genome.
+    // The data change is to insert a grouping layer on top of the sblocks, specifically, 
+    //     zoomStrip_data = { genome [ zoomBlock_data ] }
+    // becomes
+    //     zoomStrip_data = { genome [ zoomSuperBlock_data ] }
+    //     zoomSuperBlock_data = { chr start end blocks [ zoomBlock_data ] }
+    //
+    mungeData (data) {
+        data.forEach(gData => gData.blocks = this.uniqifyBlocks(gData.blocks));
+	data = this.mergeSblockRuns(data);
+	return data;
+    }
+
+    //----------------------------------------------
+    // Draws the zoom view panel with the given data.
+    //
     draw (data) {
+        data = this.mungeData(data);
 	// 
 	let self = this;
 
@@ -717,6 +754,7 @@ class ZoomView extends SVGView {
 	    .orient("top")
 	    .outerTickSize(2)
 	    .ticks(5)
+	    .tickSize(5)
 	    ;
 	this.axis.call(this.axisFunc);
 
@@ -726,6 +764,7 @@ class ZoomView extends SVGView {
         let zstrips = this.stripsGrp
 	        .selectAll("g.zoomStrip")
 		.data(data, d => d.genome.name);
+	// Create the group
 	let newzs = zstrips.enter()
 	        .append("g")
 		.attr("class","zoomStrip")
@@ -735,6 +774,7 @@ class ZoomView extends SVGView {
 		})
 		.call(this.dragger)
 		;
+	// Strip label
 	newzs.append("text")
 	    .attr("name", "genomeLabel")
 	    .text( d => d.genome.label)
@@ -742,14 +782,6 @@ class ZoomView extends SVGView {
 	    .attr("y", this.blockHeight/2 + 20)
 	    .attr("font-family","sans-serif")
 	    .attr("font-size", 10)
-	    ;
-	// Strip axes.
-	newzs.append("line")
-	    .attr("class", "axis")
-	    .attr("x1", 0)
-	    .attr("y1", 0)
-	    .attr("x2", this.width)
-	    .attr("y2", 0)
 	    ;
 
 	newzs.append("g")
@@ -766,33 +798,13 @@ class ZoomView extends SVGView {
 	    .classed("reference", d => d.genome === this.app.rGenome)
 	    .attr("transform", g => `translate(0,${closed ? this.topOffset : g.genome.zoomY})`)
 	    ;
-        zstrips.select("line.axis")
-	    .attr("x2", this.width);
         zstrips.exit()
 	    .on(".drag", null)
 	    .remove();
 
-        // -----------------------------------------------------
-	// synteny blocks. Each zoom strip has a list of 1 or more sblocks.
-	// The reference genome always has just 1. The comp genomes many have
-	// 1 or more (and in rare cases, 0).
-        // -----------------------------------------------------
-	let uniqify = blocks => {
-	    // helper function. When sblock relationship between genomes is confused, requesting one
-	    // region in genome A can end up requesting the same region in genome B twice. This function
-	    // avoids drawing the same sblock twice. (NB: Really not sure where this check is best done.
-	    // Could push it farther upstream.)
-	    let seen = new Set();
-	    return blocks.filter( b => { 
-	        if (seen.has(b.index)) return false;
-		seen.add(b.index);
-		return true;
-	    });
-	};
+	// ---- Synteny blocks ----
         let sblocks = zstrips.select('[name="sBlocks"]').selectAll('g.sBlock')
-	    .data(d => {
-	        return uniqify(d.blocks);
-	    }, b => b.blockId);
+	    .data(d=>d.blocks, b => b.blockId);
 	let newsbs = sblocks.enter()
 	    .append("g")
 	    .attr("class", b => "sBlock " + 
@@ -803,19 +815,40 @@ class ZoomView extends SVGView {
 	let l0 = newsbs.append("g").attr("name", "layer0");
 	let l1 = newsbs.append("g").attr("name", "layer1");
 
-	// rectangle for the whole block
-	l0.append("rect").attr("class", "block");
+	this.orderSBlocks(sblocks);
+	// rectangle for each synteny block
+	let sbrects = l0.selectAll("rect").data(d=> {
+	    d.sblocks.forEach(b=>b.xscale = d.xscale);
+	    return d.sblocks
+	    }, sb=>sb.index);
+        sbrects.enter().append('rect')
+	    .attr("class", b => "block " + 
+	        (b.ori==="+" ? "plus" : b.ori==="-" ? "minus": "confused") + 
+		(b.chr !== b.fChr ? " translocation" : ""))
+	    ;
+	sbrects
+	  .attr("x",     b => b.xscale(b.flip ? b.end : b.start))
+	  .attr("y",     b => -this.blockHeight / 2)
+	  .attr("width", b => Math.abs(b.xscale(b.end)-b.xscale(b.start)))
+	  .attr("height",this.blockHeight);
+	  ;
+	sbrects.exit().remove();
+
 	// the axis line
-	l0.append("line").attr("class","axis") ;
+	l0.append("line").attr("class","axis")
+	    .attr("x1", b => b.xscale(b.start))
+	    .attr("y1", 0)
+	    .attr("x2", b => b.xscale(b.end))
+	    .attr("y2", 0)
+	    ;
 	// label
 	l0.append("text")
 	    .attr("class","blockLabel") ;
 	// brush
 	l0.append("g").attr("class","brush");
 
+	//
 	sblocks.exit().remove();
-
-	this.orderSBlocks(sblocks);
 
 	// synteny block labels
 	sblocks.select("text.blockLabel")
@@ -824,13 +857,6 @@ class ZoomView extends SVGView {
 	    .attr("y", this.blockHeight / 2 + 10)
 	    ;
 
-	// synteny block rects
-	sblocks.select("rect.block")
-	  .attr("x",     b => b.xscale(b.flip ? b.end : b.start))
-	  .attr("y",     b => -this.blockHeight / 2)
-	  .attr("width", b => Math.abs(b.xscale(b.end)-b.xscale(b.start)))
-	  .attr("height",this.blockHeight);
-
 	// brush
 	sblocks.select("g.brush")
 	    .attr("transform", b => `translate(0,${this.blockHeight / 2})`)
@@ -838,7 +864,6 @@ class ZoomView extends SVGView {
 		if (!b.brush) {
 		    b.brush = d3.svg.brush()
 			.on("brushstart", function(){ self.bbStart( b, this ); })
-			.on("brush",      function(){ self.bbBrush( b, this ); })
 			.on("brushend",   function(){ self.bbEnd( b, this ); })
 		}
 		b.brush.x(b.xscale).clear();

@@ -610,22 +610,19 @@ label > i.material-icons {
     fill: #fff;
     fill-opacity: 0.3;
 }
-#zoomView svg .sBlock.confused [name="layer0"] rect.block {
+#zoomView svg .sBlock [name="layer0"] rect.block.confused {
     fill: green;
 }
-#zoomView svg .sBlock.minus [name="layer0"] rect.block {
+#zoomView svg .sBlock [name="layer0"] rect.block.minus {
     fill: red;
 }
-#zoomView svg .sBlock.translocation [name="layer0"] rect.block {
+#zoomView svg .sBlock [name="layer0"] rect.block.translocation {
     fill: orange;
 }
-#zoomView svg .sBlock.translocation [name="layer0"] text.blockLabel {
-    font-style: italic;
-}
-#zoomView svg .sBlock.minus.translocation [name="layer0"] rect.block {
+#zoomView svg .sBlock [name="layer0"] rect.block.minus.translocation {
     fill: yellow;
 }
-#zoomView svg .sBlock.minus.translocation [name="layer0"] text.blockLabel {
+#zoomView svg .sBlock [name="layer0"] text.blockLabel.minus.translocation {
     font-style: italic;
 }
 #zoomView svg .sBlock text {
