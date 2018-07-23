@@ -815,9 +815,11 @@ class ZoomView extends SVGView {
 	let l0 = newsbs.append("g").attr("name", "layer0");
 	let l1 = newsbs.append("g").attr("name", "layer1");
 
+	//
 	this.orderSBlocks(sblocks);
+
 	// rectangle for each synteny block
-	let sbrects = l0.selectAll("rect").data(d=> {
+	let sbrects = sblocks.select('g[name="layer0"]').selectAll('rect.block').data(d=> {
 	    d.sblocks.forEach(b=>b.xscale = d.xscale);
 	    return d.sblocks
 	    }, sb=>sb.index);
