@@ -363,7 +363,7 @@ class ZoomView extends SVGView {
 	      let my = d3.mouse(self.svgMain[0][0])[1];
 	      self.dragging.attr("transform", `translate(${mx}, ${my})`);
 	      self.setGenomeYOrder(self.getGenomeYOrder());
-	      self.highlight();
+	      self.drawFiducials();
 	  })
 	  .on("dragend.z", function (g) {
 	      if (!self.dragging) return;
@@ -372,7 +372,7 @@ class ZoomView extends SVGView {
 	      self.dragging = null;
 	      self.setGenomeYOrder(self.getGenomeYOrder());
 	      self.app.setContext({ genomes: self.getGenomeYOrder() });
-	      window.setTimeout( self.highlight.bind(self), 250 );
+	      window.setTimeout( self.drawFiducials.bind(self), 50 );
 	  })
 	  ;
     }
@@ -990,7 +990,7 @@ class ZoomView extends SVGView {
 	// Also, make each highlighted feature taller (so it stands above its neighbors)
 	// and give it the ".highlight" class.
 	//
-	let stacks = {}; // fid -> [ rects ] 
+	this.stacks = {}; // fid -> [ rects ] 
 	let dh = this.blockHeight/2 - this.featHeight;
         let feats = this.svgMain.selectAll(".feature")
 	  // filter rect.features for those in the highlight list
@@ -1003,8 +1003,8 @@ class ZoomView extends SVGView {
 	      if (hl) {
 		  // for each highlighted feature, add its rectangle to the list
 		  let k = ff.id;
-		  if (!stacks[k]) stacks[k] = []
-		  stacks[k].push(this)
+		  if (!self.stacks[k]) self.stacks[k] = []
+		  self.stacks[k].push(this)
 	      }
 	      // 
 	      d3.select(this)
@@ -1015,24 +1015,7 @@ class ZoomView extends SVGView {
 	  })
 	  ;
 
-	// build data array for drawing fiducials between equivalent features
-	let data = [];
-	for (let k in stacks) {
-	    // for each highlighted feature, sort the rectangles in its list by Y-coordinate
-	    let rects = stacks[k];
-	    rects.sort( (a,b) => parseFloat(a.getAttribute("y")) - parseFloat(b.getAttribute("y")) );
-	    rects.sort( (a,b) => {
-		return a.__data__.genome.zoomY - b.__data__.genome.zoomY;
-	    });
-	    // Want a polygon between each successive pair of items. The following creates a list of
-	    // n pairs, where rect[i] is paired with rect[i+1]. The last pair consists of the last
-	    // rectangle paired with undefined. (We want this.)
-	    let pairs = rects.map((r, i) => [r,rects[i+1]]);
-	    // Add a class ("current") for the polygons associated with the mouseover feature so they
-	    // can be distinguished from others.
-	    data.push({ fid: k, rects: pairs, cls: (currFeat && currFeat.id === k ? 'current' : '') });
-	}
-	this.drawFiducials(data, currFeat);
+	this.drawFiducials(currFeat);
 
     }
 
@@ -1046,7 +1029,25 @@ class ZoomView extends SVGView {
     //       }
     //   currFeat : current (mouseover) feature (if any)
     //
-    drawFiducials (data, currFeat) {
+    drawFiducials (currFeat) {
+	// build data array for drawing fiducials between equivalent features
+	let data = [];
+	for (let k in this.stacks) {
+	    // for each highlighted feature, sort the rectangles in its list by Y-coordinate
+	    let rects = this.stacks[k];
+	    rects.sort( (a,b) => parseFloat(a.getAttribute("y")) - parseFloat(b.getAttribute("y")) );
+	    rects.sort( (a,b) => {
+		return a.__data__.genome.zoomY - b.__data__.genome.zoomY;
+	    });
+	    // Want a polygon between each successive pair of items. The following creates a list of
+	    // n pairs, where rect[i] is paired with rect[i+1]. The last pair consists of the last
+	    // rectangle paired with undefined. (We want this.)
+	    let pairs = rects.map((r, i) => [r,rects[i+1]]);
+	    // Add a class ("current") for the polygons associated with the mouseover feature so they
+	    // can be distinguished from others.
+	    data.push({ fid: k, rects: pairs, cls: (currFeat && currFeat.id === k ? 'current' : '') });
+	}
+
 	let self = this;
 	//
 	// put fiducial marks in their own group 
