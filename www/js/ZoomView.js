@@ -359,8 +359,9 @@ class ZoomView extends SVGView {
 	  })
 	  .on("drag.z", function (g) {
 	      if (!self.dragging) return;
+	      let mx = d3.mouse(self.svgMain[0][0])[0];
 	      let my = d3.mouse(self.svgMain[0][0])[1];
-	      self.dragging.attr("transform", `translate(0, ${my})`);
+	      self.dragging.attr("transform", `translate(${mx}, ${my})`);
 	      self.setGenomeYOrder(self.getGenomeYOrder());
 	      self.highlight();
 	  })
@@ -831,13 +832,15 @@ class ZoomView extends SVGView {
 	sbrects
 	  .attr("x",     b => b.xscale(b.flip ? b.end : b.start))
 	  .attr("y",     b => -this.blockHeight / 2)
-	  .attr("width", b => Math.abs(b.xscale(b.end)-b.xscale(b.start)))
+	  .attr("width", b => Math.max(4, Math.abs(b.xscale(b.end)-b.xscale(b.start))))
 	  .attr("height",this.blockHeight);
 	  ;
 	sbrects.exit().remove();
 
 	// the axis line
-	l0.append("line").attr("class","axis")
+	l0.append("line").attr("class","axis");
+	
+	sblocks.select("line.axis")
 	    .attr("x1", b => b.xscale(b.start))
 	    .attr("y1", 0)
 	    .attr("x2", b => b.xscale(b.end))
