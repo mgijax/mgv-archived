@@ -15,6 +15,7 @@ class FeatureManager {
         this.id2feat = {};		// index from  feature ID to feature
 	this.canonical2feats = {};	// index from canonical ID -> [ features tagged with that id ]
 	this.symbol2feats = {}		// index from symbol -> [ features having that symbol ]
+					// want case insensitive searches, so keys are lower cased
 	this.cache = {};		// {genome.name -> {chr.name -> list of blocks}}
 	this.mineFeatureCache = {};	// auxiliary info pulled from MouseMine 
 	this.loadedGenomes = new Set(); // the set of Genomes that have been fully loaded
@@ -42,7 +43,8 @@ class FeatureManager {
 		lst.push(f);
 	    }
 	    if (f.symbol && f.symbol !== '.') {
-		let lst = this.symbol2feats[f.symbol] = (this.symbol2feats[f.symbol] || []);
+		let s = f.symbol.toLowerCase();
+		let lst = this.symbol2feats[s] = (this.symbol2feats[s] || []);
 		lst.push(f);
 	    }
 	    // here y'go.
@@ -185,7 +187,7 @@ class FeatureManager {
     // 
     getCachedFeaturesByLabel (label, genome) {
 	let f = this.id2feat[label]
-	let feats = f ? [f] : this.canonical2feats[label] || this.symbol2feats[label] || [];
+	let feats = f ? [f] : this.canonical2feats[label] || this.symbol2feats[label.toLowerCase()] || [];
 	return genome ? feats.filter(f=> f.genome === genome) : feats;
     }
 
