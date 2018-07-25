@@ -8,12 +8,12 @@ let searchTypes = [{
     method: "featuresByPhenotype",
     label: "...by phenotype or disease",
     template: "",
-    placeholder: "Phenotypes, disease names, or IDs"
+    placeholder: "Pheno/disease (MP/DO) term or IDs"
 },{
     method: "featuresByFunction",
     label: "...by cellular function",
     template: "",
-    placeholder: "Gene Ontology (GO) terms/IDs"
+    placeholder: "Gene Ontology (GO) terms or IDs"
 },{
     method: "featuresByPathway",
     label: "...by pathway",
