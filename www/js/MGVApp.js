@@ -571,7 +571,7 @@ class MGVApp extends Component {
 	// *after* genome data have been loaded. See setContext and resolveLandmark methods.
 	cfg.landmark = c.landmark || this.lcoords.landmark;
 	cfg.delta    = Math.round('delta' in c ? c.delta : (this.lcoords.delta || 0));
-	if ('flank' in c){
+	if (typeof(c.flank) === 'number'){
 	    cfg.flank = Math.round(c.flank);
 	}
 	else if ('length' in c) {

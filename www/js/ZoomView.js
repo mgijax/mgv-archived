@@ -20,6 +20,7 @@ class ZoomView extends SVGView {
       this.stripGap = 20;	// space between strips
       this.maxSBgap = 20;	// max gap allowed between blocks.
       this.dmode = 'comparison';// drawing mode. 'comparison' or 'reference'
+      this.deltaX = 0;
 
       //
       // IDs of Features we're highlighting. May be mgpid  or mgiId
@@ -182,7 +183,36 @@ class ZoomView extends SVGView {
 	      if (f instanceof Feature) {
 		  fMouseOutHandler(f);
 	      }
-	  });
+	  })
+	  .on('wheel', function(d) {
+	    let e = d3.event;
+	    // only interested in horizontal motion events
+	    if (Math.abs(e.deltaX) < Math.abs(e.deltaY)) 
+	        return;
+	    self.deltaX += e.deltaX;
+	    d3.select(this).selectAll('g.zoomStrip > g[name="sBlocks"]')
+		.attr('transform',`translate(${-self.deltaX},0)`);
+	    self.drawFiducials();
+	    e.stopPropagation();
+	    e.preventDefault();
+	    if (self.timeout)
+	        window.clearTimeout(self.timeout);
+	    self.timeout = window.setTimeout(() => {
+		self.timeout = null;
+		let ccxt = self.app.getContext();
+		let deltaB = self.deltaX / self.ppb;
+		if (ccxt.landmark) {
+		    ccxt.delta += deltaB;
+		    self.app.setContext(ccxt);
+		}
+		else {
+		    ccxt.start += deltaB;
+		    ccxt.end += deltaB;
+		    self.app.setContext(ccxt);
+		}
+	    }, 50);
+	});
+
 
 	// Button: Drop down menu in zoom view
 	this.root.select(".menu > .button")
@@ -361,7 +391,7 @@ class ZoomView extends SVGView {
 	      if (!self.dragging) return;
 	      let mx = d3.mouse(self.svgMain[0][0])[0];
 	      let my = d3.mouse(self.svgMain[0][0])[1];
-	      self.dragging.attr("transform", `translate(${mx}, ${my})`);
+	      self.dragging.attr("transform", `translate(0, ${my})`);
 	      self.setGenomeYOrder(self.getGenomeYOrder());
 	      self.drawFiducials();
 	  })
@@ -415,7 +445,7 @@ class ZoomView extends SVGView {
     bbEnd () {
       let se = d3.event.sourceEvent;
       let xt = this.brushing.brush.extent();
-      let r = this.bbGetRefCoords();
+      let g = this.brushing.genome.label;
       this.brushing = null;
       //
       if (se.ctrlKey || se.altKey || se.metaKey) {
@@ -433,7 +463,7 @@ class ZoomView extends SVGView {
       }
       else {
 	  // User dragged. Zoom in or out.
-	  this.app.setContext({ start:xt[0], end:xt[1] });
+	  this.app.setContext({ ref:g, start:xt[0], end:xt[1] });
       }
     }
     //----------------------------------------------
@@ -594,7 +624,7 @@ class ZoomView extends SVGView {
 	let cmpFunc = (a,b) => a.__data__[cmpField]-b.__data__[cmpField];
 	sblocks.forEach( strip => strip.sort( cmpFunc ) );
 	// pixels per base
-	let ppb = this.width / (this.app.coords.end - this.app.coords.start + 1);
+	this.ppb = this.width / (this.app.coords.end - this.app.coords.start + 1);
 	let pstart = []; // offset (in pixels) of start position of next block, by strip index (0===ref)
 	let bstart = []; // block start pos (in bp) assoc with pstart
 	let cchr = null;
@@ -602,7 +632,7 @@ class ZoomView extends SVGView {
 	let dx;
 	let pend;
 	sblocks.each( function (b,i,j) { // b=block, i=index within strip, j=strip index
-	    let blen = ppb * (b.end - b.start + 1); // total screen width of this sblock
+	    let blen = self.ppb * (b.end - b.start + 1); // total screen width of this sblock
 	    b.flip = b.ori === '-' && self.dmode === 'reference';
 	    b.xscale = d3.scale.linear().domain([b.start, b.end]).range( b.flip ? [blen, 0] : [0, blen] );
 	    //
@@ -614,7 +644,7 @@ class ZoomView extends SVGView {
 		cchr = b.chr;
 	    }
 	    else {
-		dx = b.chr === cchr ? pstart[j] + ppb * (b.start - bstart[j]) : Infinity;
+		dx = b.chr === cchr ? pstart[j] + self.ppb * (b.start - bstart[j]) : Infinity;
 		if (dx > self.maxSBgap) {
 		    // Changed chr or jumped a large gap
 		    pstart[j] = pend + 16;
@@ -775,6 +805,7 @@ class ZoomView extends SVGView {
 		})
 		.call(this.dragger)
 		;
+	//
 	// Strip label
 	newzs.append("text")
 	    .attr("name", "genomeLabel")
@@ -794,7 +825,6 @@ class ZoomView extends SVGView {
 	    .attr("width", 15)
 	    .attr("height", this.blockHeight)
 	    ;
-
 	zstrips
 	    .classed("reference", d => d.genome === this.app.rGenome)
 	    .attr("transform", g => `translate(0,${closed ? this.topOffset : g.genome.zoomY})`)
@@ -802,7 +832,10 @@ class ZoomView extends SVGView {
         zstrips.exit()
 	    .on(".drag", null)
 	    .remove();
-
+	//
+	this.deltaX = 0;
+        zstrips.select('g[name="sBlocks"]')
+	    .attr('transform',`translate(0,0)`);
 	// ---- Synteny super blocks ----
         let sblocks = zstrips.select('[name="sBlocks"]').selectAll('g.sBlock')
 	    .data(d=>d.blocks, b => b.blockId);
@@ -882,8 +915,6 @@ class ZoomView extends SVGView {
 	// We need to let the view render before doing the highlighting, since it depends on
 	// the positions of rectangles in the scene.
 	window.setTimeout(() => {
-	    //this.setGenomeYOrder( this.genomes.map(g => g.name) );
-	    //window.setTimeout(() => this.highlight(), 50);
 	    this.highlight();
 	}, 50);
     };
