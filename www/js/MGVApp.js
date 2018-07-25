@@ -75,29 +75,7 @@ class MGVApp extends Component {
 	//
 	this.translator     = new BTManager(this);
 	this.featureManager = new FeatureManager(this);
-	//
-	let searchTypes = [{
-	    method: "featuresByFunction",
-	    label: "...by cellular function",
-	    template: "",
-	    placeholder: "Gene Ontology (GO) terms/IDs"
-	},{
-	    method: "featuresByPhenotype",
-	    label: "...by mutant phenotype",
-	    template: "",
-	    placeholder: "Mammalian Phenotype (MP) terms/IDs"
-	},{
-	    method: "featuresByDisease",
-	    label: "...by disease implication",
-	    template: "",
-	    placeholder: "Disease Ontology (DO) terms/IDs"
-	},{
-	    method: "featuresById",
-	    label: "...by nomenclature",
-	    template: "",
-	    placeholder: "MGI names, synonyms, etc."
-	}];
-	this.queryManager = new QueryManager(this, "#findGenesBox", searchTypes);
+	this.queryManager = new QueryManager(this, "#findGenesBox");
 	//
 	this.userPrefsManager = new UserPrefsManager();
 	

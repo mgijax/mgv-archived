@@ -3,10 +3,33 @@ import { Component } from './Component';
 import { AuxDataManager } from './AuxDataManager';
 
 // ---------------------------------------------
+// Not sure where this should go
+let searchTypes = [{
+    method: "featuresByPhenotype",
+    label: "...by phenotype or disease",
+    template: "",
+    placeholder: "Phenotypes, disease names, or IDs"
+},{
+    method: "featuresByFunction",
+    label: "...by cellular function",
+    template: "",
+    placeholder: "Gene Ontology (GO) terms/IDs"
+},{
+    method: "featuresByPathway",
+    label: "...by pathway",
+    template: "",
+    placeholder: "Reactome pathways names, IDs"
+},{
+    method: "featuresById",
+    label: "...by nomenclature",
+    template: "",
+    placeholder: "MGI names, synonyms, etc."
+}];
+// ---------------------------------------------
 class QueryManager extends Component {
-    constructor (app, elt, cfg) {
+    constructor (app, elt) {
         super(app, elt);
-	this.cfg = cfg;
+	this.cfg = searchTypes;
 	this.auxDataManager = new AuxDataManager();
 	this.select = null;	// my <select> element
 	this.term = null;	// my <input> element
