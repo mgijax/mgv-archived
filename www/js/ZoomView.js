@@ -803,14 +803,12 @@ class ZoomView extends SVGView {
 	    .on(".drag", null)
 	    .remove();
 
-	// ---- Synteny blocks ----
+	// ---- Synteny super blocks ----
         let sblocks = zstrips.select('[name="sBlocks"]').selectAll('g.sBlock')
 	    .data(d=>d.blocks, b => b.blockId);
 	let newsbs = sblocks.enter()
 	    .append("g")
-	    .attr("class", b => "sBlock " + 
-	        (b.ori==="+" ? "plus" : b.ori==="-" ? "minus": "confused") + 
-		(b.chr !== b.fChr ? " translocation" : ""))
+	    .attr("class", "sBlock")
 	    .attr("name", b=>b.index)
 	    ;
 	let l0 = newsbs.append("g").attr("name", "layer0");
@@ -819,23 +817,22 @@ class ZoomView extends SVGView {
 	//
 	this.orderSBlocks(sblocks);
 
-	// rectangle for each synteny block
+	// rectangle for each individual synteny block
 	let sbrects = sblocks.select('g[name="layer0"]').selectAll('rect.block').data(d=> {
 	    d.sblocks.forEach(b=>b.xscale = d.xscale);
 	    return d.sblocks
 	    }, sb=>sb.index);
-        sbrects.enter().append('rect')
-	    .attr("class", b => "block " + 
-	        (b.ori==="+" ? "plus" : b.ori==="-" ? "minus": "confused") + 
-		(b.chr !== b.fChr ? " translocation" : ""))
-	    ;
-	sbrects
-	  .attr("x",     b => b.xscale(b.flip ? b.end : b.start))
-	  .attr("y",     b => -this.blockHeight / 2)
-	  .attr("width", b => Math.max(4, Math.abs(b.xscale(b.end)-b.xscale(b.start))))
-	  .attr("height",this.blockHeight);
-	  ;
+        sbrects.enter().append('rect') ;
 	sbrects.exit().remove();
+	sbrects
+	   .attr("class", b => "block " + 
+	       (b.ori==="+" ? "plus" : b.ori==="-" ? "minus": "confused") + 
+	       (b.chr !== b.fChr ? " translocation" : ""))
+	   .attr("x",     b => b.xscale(b.flip ? b.end : b.start))
+	   .attr("y",     b => -this.blockHeight / 2)
+	   .attr("width", b => Math.max(4, Math.abs(b.xscale(b.end)-b.xscale(b.start))))
+	   .attr("height",this.blockHeight);
+	   ;
 
 	// the axis line
 	l0.append("line").attr("class","axis");
@@ -1096,7 +1093,7 @@ class ZoomView extends SVGView {
 	    .data(d => {
 		let r = d.rects[0][0];
 		if (currFeat && (d.fid === currFeat.ID || d.fid === currFeat.canonical)){
-		    let r2 = r = d.rects.map( rr =>
+		    let r2 = d.rects.map( rr =>
 		       rr[0].__data__ === currFeat ? rr[0] : rr[1]&&rr[1].__data__ === currFeat ? rr[1] : null
 		       ).filter(x=>x)[0];
 		    r = r2 ? r2 : r;
