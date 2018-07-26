@@ -645,11 +645,12 @@ class ZoomView extends SVGView {
 	    }
 	    else {
 		dx = b.chr === cchr ? pstart[j] + self.ppb * (b.start - bstart[j]) : Infinity;
-		if (dx > self.maxSBgap) {
+		if (dx < 0 || dx > self.maxSBgap) {
 		    // Changed chr or jumped a large gap
 		    pstart[j] = pend + 16;
 		    bstart[j] = b.start;
 		    dx = pstart[j];
+		    cchr = b.chr;
 		}
 	    }
 	    d3.select(this).attr("transform", `translate(${dx},0)`);
@@ -658,6 +659,7 @@ class ZoomView extends SVGView {
     }
 
     // ------------------------------------
+    //
     mergeSblockRuns (data) {
 	// -----
 	// Reducer function. Will be called with these args:
@@ -673,14 +675,14 @@ class ZoomView extends SVGView {
 		nb.features = bb.features.concat();
 		nb.sblocks = [bb];
 		nb.ori = '+';
-	        return nb;
+		return nb;
 	    };
 	    if (i === 0){
 		nblks.push(initBlk(b));
 		return nblks;
 	    }
 	    let lastBlk = nblks[nblks.length - 1];
-	    if (b.chr !== lastBlk.chr || b.index - lastBlk.index > 2) {
+	    if (b.chr !== lastBlk.chr || b.index - lastBlk.index !== 1) {
 	        nblks.push(initBlk(b));
 		return nblks;
 	    }
@@ -689,23 +691,33 @@ class ZoomView extends SVGView {
 	    lastBlk.end = b.end;
 	    lastBlk.blockEnd = b.blockEnd;
 	    lastBlk.features = lastBlk.features.concat(b.features);
-	    //b.features = null;
 	    lastBlk.sblocks.push(b);
 	    return nblks;
 	};
 	// -----
         data.forEach((gdata,i) => {
-	    gdata.blocks.sort( (a,b) => a.index - b.index );
-	    gdata.blocks = gdata.blocks.reduce(merger,[]);
+	    // first sort by ref genome order
+	    gdata.blocks.sort( (a,b) => a.fIndex - b.fIndex );
+	    // Sub-group into runs of same comp genome chromosome.
+            let tmp = gdata.blocks.reduce((nbs, b, i) => {
+	        if (i === 0 || nbs[nbs.length - 1][0].chr !== b.chr)
+		    nbs.push([b]);
+		else
+		    nbs[nbs.length - 1].push(b);
+		return nbs;
+	    }, []);
+	    // Sort each subgroup into comparison genome order
+	    tmp.forEach( subgrp => subgrp.sort((a,b) => a.index - b.index) );
+	    // Flatten the list
+	    tmp = tmp.reduce((lst, curr) => lst.concat(curr), []);
+            // Now create the supergroups.
+	    gdata.blocks = tmp.reduce(merger,[]);
 	});
 	return data;
     }
 
-    // -----------------------------------------------------
-    // synteny blocks. Each zoom strip has a list of 1 or more sblocks.
-    // The reference genome always has just 1. The comp genomes many have
-    // 1 or more (and in rare cases, 0).
-    // -----------------------------------------------------
+    // ---------------------------------------------------
+    //
     uniqifyBlocks (blocks) {
 	// helper function. When sblock relationship between genomes is confused, requesting one
 	// region in genome A can end up requesting the same region in genome B multiple times.

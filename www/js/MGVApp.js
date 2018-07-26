@@ -650,8 +650,8 @@ class MGVApp extends Component {
     //
     setContext (c, quietly) {
         let cfg = this.sanitizeCfg(c);
-	console.log("Set context (raw):", c);
-	console.log("Set context (sanitized):", cfg);
+	//console.log("Set context (raw):", c);
+	//console.log("Set context (sanitized):", cfg);
 	if (!cfg) return;
 	this.showBusy(true, 'Requesting data...');
 	let p = this.featureManager.loadGenomes(cfg.genomes).then(() => {

@@ -8,7 +8,7 @@ class BlockTranslator {
 	this.aGenome = aGenome;
 	this.bGenome = bGenome;
 	this.blocks = blocks.map(b => this.processBlock(b))
-	this.currentSort = "a"; // either 'a' or 'b'
+	this.currSort = "a"; // either 'a' or 'b'
     }
     processBlock (blk) { 
         blk.aIndex = parseInt(blk.aIndex);
@@ -86,7 +86,7 @@ class BlockTranslator {
 		    blockId: blk.blockId,
 		    blockStart: blk[fromS],
 		    blockEnd: blk[fromE]
-		    } : {
+		} : {
 		    chr:   blk[toC],
 		    start: Math.min(s2,e2),
 		    end:   Math.max(s2,e2),
@@ -102,8 +102,35 @@ class BlockTranslator {
 		    blockStart: blk[toS],
 		    blockEnd: blk[toE]
 		};
-	    })
-	// 
+	    });
+	// Look for 1-block gaps and fill them in. 
+	blks.sort((a,b) => a.index - b.index);
+	let nbs = [];
+	blks.forEach( (b, i) => {
+	    if (i === 0) return;
+	    if (blks[i].index - blks[i - 1].index === 2) {
+		let blk = this.blocks.filter( b => b[toI] === blks[i].index - 1 )[0];
+		nbs.push({
+		    chr:   blk[toC],
+		    start: blk[toS],
+		    end:   blk[toE],
+		    ori:   blk.blockOri,
+		    index: blk[toI],
+		    // also return the fromGenome coords for this piece of the translation
+		    fChr:   blk[fromC],
+		    fStart: blk[fromS],
+		    fEnd:   blk[fromE],
+		    fIndex: blk[fromI],
+		    // include the block id and full block coords
+		    blockId: blk.blockId,
+		    blockStart: blk[toS],
+		    blockEnd: blk[toE]
+		});
+		console.log("Found 1-block gap. Added:", nbs[nbs.length - 1]);
+	    }
+	});
+	blks = blks.concat(nbs);
+	blks.sort((a,b) => a.fIndex - b.fIndex);
 	return blks;
     }
     // Given a genome (either the a or b genome)
