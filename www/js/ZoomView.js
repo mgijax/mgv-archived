@@ -694,8 +694,8 @@ class ZoomView extends SVGView {
 	    lastBlk.features = lastBlk.features.concat(b.features);
 	    let lastSb = lastBlk.sblocks[lastBlk.sblocks.length - 1];
 	    let d = b.start - lastSb.end;
-	    //lastSb.end += d/2;
-	    //b.start -= d/2;
+	    lastSb.end += d/2;
+	    b.start -= d/2;
 	    lastBlk.sblocks.push(b);
 	    return nblks;
 	};
