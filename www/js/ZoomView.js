@@ -21,6 +21,7 @@ class ZoomView extends SVGView {
       this.maxSBgap = 20;	// max gap allowed between blocks.
       this.dmode = 'comparison';// drawing mode. 'comparison' or 'reference'
       this.deltaX = 0;
+      this.deltaB = 0;
 
       //
       // IDs of Features we're highlighting. May be mgpid  or mgiId
@@ -189,7 +190,10 @@ class ZoomView extends SVGView {
 	    // only interested in horizontal motion events
 	    if (Math.abs(e.deltaX) < Math.abs(e.deltaY)) 
 	        return;
-	    self.deltaX += e.deltaX;
+	    let db = e.deltaX / self.ppb; // delta in bases on for this event
+	    let c  = self.app.coords;
+	    self.deltaB = clip(self.deltaB + db, -c.start, c.chromosome.length - c.end)
+	    self.deltaX = self.deltaB * self.ppb;
 	    d3.select(this).selectAll('g.zoomStrip > g[name="sBlocks"]')
 		.attr('transform',`translate(${-self.deltaX},0)`);
 	    self.drawFiducials();
@@ -200,16 +204,15 @@ class ZoomView extends SVGView {
 	    self.timeout = window.setTimeout(() => {
 		self.timeout = null;
 		let ccxt = self.app.getContext();
-		let deltaB = self.deltaX / self.ppb;
 		if (ccxt.landmark) {
-		    ccxt.delta += deltaB;
-		    self.app.setContext(ccxt);
+		    ccxt.delta += self.deltaB;
 		}
 		else {
-		    ccxt.start += deltaB;
-		    ccxt.end += deltaB;
-		    self.app.setContext(ccxt);
+		    ccxt.start += self.deltaB;
+		    ccxt.end += self.deltaB;
 		}
+		self.deltaB = self.deltaX = 0;
+		self.app.setContext(ccxt);
 	    }, 50);
 	});
 
