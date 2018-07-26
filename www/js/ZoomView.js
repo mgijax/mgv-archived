@@ -669,9 +669,10 @@ class ZoomView extends SVGView {
 	//   i (int) The iteration count.
 	// Returns:
 	//   list of lists of blocks
-	let merger = function(nblks, b, i) {
+	let merger = (nblks, b, i) => {
 	    let initBlk = function (bb) {
 		let nb = Object.assign({}, bb);
+		nb.superBlock = true;
 		nb.features = bb.features.concat();
 		nb.sblocks = [bb];
 		nb.ori = '+';
@@ -691,11 +692,18 @@ class ZoomView extends SVGView {
 	    lastBlk.end = b.end;
 	    lastBlk.blockEnd = b.blockEnd;
 	    lastBlk.features = lastBlk.features.concat(b.features);
+	    let lastSb = lastBlk.sblocks[lastBlk.sblocks.length - 1];
+	    let d = b.start - lastSb.end;
+	    //lastSb.end += d/2;
+	    //b.start -= d/2;
 	    lastBlk.sblocks.push(b);
 	    return nblks;
 	};
 	// -----
         data.forEach((gdata,i) => {
+	    gdata.blocks.sort( (a,b) => a.index - b.index );
+	    gdata.blocks = gdata.blocks.reduce(merger,[]);
+	    /*
 	    // first sort by ref genome order
 	    gdata.blocks.sort( (a,b) => a.fIndex - b.fIndex );
 	    // Sub-group into runs of same comp genome chromosome.
@@ -712,6 +720,7 @@ class ZoomView extends SVGView {
 	    tmp = tmp.reduce((lst, curr) => lst.concat(curr), []);
             // Now create the supergroups.
 	    gdata.blocks = tmp.reduce(merger,[]);
+	    */
 	});
 	return data;
     }
