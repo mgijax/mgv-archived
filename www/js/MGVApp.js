@@ -676,7 +676,7 @@ class MGVApp extends Component {
 	    //
 	    if (!cfg) return;
 	    this.coords   = {
-	        chr: cfg.chr.name,
+		chr: cfg.chr.name,
 		chromosome: cfg.chr,
 		start: cfg.start,
 		end: cfg.end

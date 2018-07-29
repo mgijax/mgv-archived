@@ -642,8 +642,6 @@ class ZoomView extends SVGView {
 	let cmpField = this.dmode === 'comparison' ? 'index' : 'fIndex';
 	let cmpFunc = (a,b) => a.__data__[cmpField]-b.__data__[cmpField];
 	sblocks.forEach( strip => strip.sort( cmpFunc ) );
-	// pixels per base
-	this.ppb = this.width / (this.app.coords.end - this.app.coords.start + 1);
 	let pstart = []; // offset (in pixels) of start position of next block, by strip index (0===ref)
 	let bstart = []; // block start pos (in bp) assoc with pstart
 	let cchr = null;
@@ -832,6 +830,9 @@ class ZoomView extends SVGView {
 	this.xscale = d3.scale.linear()
 	    .domain([rBlock.start,rBlock.end])
 	    .range([0,this.width]);
+
+	// pixels per base
+	this.ppb = this.width / (this.app.coords.end - this.app.coords.start + 1);
 
         // -----------------------------------------------------
 	// draw the coordinate axis
