@@ -631,6 +631,9 @@ label > i.material-icons {
 #zoomView svg .zoomStrip rect[name="zoomStripHandle"] {
   fill: #ccc;
 }
+#zoomView svg .zoomStrip.reference g.sBlock g[name="layer0"] rect.block {
+  fill: none;
+}
 #zoomView svg .zoomStrip.reference rect[name="zoomStripHandle"] {
     fill: blue;
 }

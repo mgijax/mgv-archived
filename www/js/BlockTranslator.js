@@ -127,7 +127,6 @@ class BlockTranslator {
 			blockStart: blk[toS],
 			blockEnd: blk[toE]
 		    });
-		    console.log("Found 1-block gap. Added:", nbs[nbs.length - 1]);
 		}
 	    });
 	    blks = blks.concat(nbs);

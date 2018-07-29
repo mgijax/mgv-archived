@@ -20,8 +20,6 @@ class ZoomView extends SVGView {
       this.stripGap = 20;	// space between strips
       this.maxSBgap = 20;	// max gap allowed between blocks.
       this.dmode = 'comparison';// drawing mode. 'comparison' or 'reference'
-      this.deltaX = 0;
-      this.deltaB = 0;
 
       //
       // IDs of Features we're highlighting. May be mgpid  or mgiId
@@ -186,32 +184,49 @@ class ZoomView extends SVGView {
 	      }
 	  })
 	  .on('wheel', function(d) {
-	    let e = d3.event;
 	    // only interested in horizontal motion events
-	    if (Math.abs(e.deltaX) < Math.abs(e.deltaY)) 
+	    // occurring in a zoom strip.
+	    let e = d3.event;
+	    let z = e.target.closest('g.zoomStrip');
+	    if (!z || Math.abs(e.deltaX) < Math.abs(e.deltaY)) 
 	        return;
-	    let db = e.deltaX / self.ppb; // delta in bases on for this event
-	    let c  = self.app.coords;
-	    self.deltaB = clip(self.deltaB + db, -c.start, c.chromosome.length - c.end)
-	    self.deltaX = self.deltaB * self.ppb;
-	    d3.select(this).selectAll('g.zoomStrip > g[name="sBlocks"]')
-		.attr('transform',`translate(${-self.deltaX},0)`);
-	    self.drawFiducials();
 	    e.stopPropagation();
 	    e.preventDefault();
+	    // For comparison genomes, just translate the blocks by the wheel amount, so the user can 
+	    // see everything.
+	    let db = e.deltaX / self.ppb; // delta in bases for this event
+	    let zd = z.__data__;
+	    if (zd.genome !== self.app.rGenome) {
+		zd.deltaB -= db;
+	        d3.select(z).select('g[name="sBlocks"]').attr('transform',`translate(${zd.deltaB * self.ppb},0)`);
+		self.drawFiducials();
+		return;
+	    }
+	    // For the reference genome, translate the blocks and then actually scroll the view.
+	    // Also, limit the block translations by chromosome ends.
+	    //
+	    let c  = self.app.coords;
+	    // Limit delta by chr ends
+	    // Delta in bases:
+	    zd.deltaB = clip(zd.deltaB + db, -c.start, c.chromosome.length - c.end)
+	    // translate
+	    d3.select(this).selectAll('g.zoomStrip > g[name="sBlocks"]')
+		.attr('transform',`translate(${-zd.deltaB * self.ppb},0)`);
+	    self.drawFiducials();
+	    // Wait until wheel events have stopped for a while, then scroll the view.
 	    if (self.timeout)
 	        window.clearTimeout(self.timeout);
 	    self.timeout = window.setTimeout(() => {
 		self.timeout = null;
 		let ccxt = self.app.getContext();
 		if (ccxt.landmark) {
-		    ccxt.delta += self.deltaB;
+		    ccxt.delta += zd.deltaB;
 		}
 		else {
-		    ccxt.start += self.deltaB;
-		    ccxt.end += self.deltaB;
+		    ccxt.start += zd.deltaB;
+		    ccxt.end += zd.deltaB;
 		}
-		self.deltaB = self.deltaX = 0;
+		zd.deltaB = 0;
 		self.app.setContext(ccxt);
 	    }, 50);
 	});
@@ -449,25 +464,25 @@ class ZoomView extends SVGView {
       let se = d3.event.sourceEvent;
       let xt = this.brushing.brush.extent();
       let g = this.brushing.genome.label;
-      this.brushing = null;
       //
       if (se.ctrlKey || se.altKey || se.metaKey) {
 	  this.clearBrushes();
+	  this.brushing = null;
           return;
       }
       //
       if (Math.abs(xt[0] - xt[1]) <= 10) {
 	  // User clicked. Recenter view.
-	  let cc        = this.app.coords; 
-	  let currWidth = cc.end - cc.start + 1;
-	  let mid       = (cc.start + cc.end)/2;
-          let d = (xt[0] + xt[1])/2 - mid;
-	  this.app.setContext({ start: cc.start+d, end: cc.end+d });
+	  let xmid = (xt[0] + xt[1])/2;
+	  let w = this.app.coords.end - this.app.coords.start + 1;
+	  let s = Math.round(xmid - w/2);
+	  this.app.setContext({ ref:g, chr: this.brushing.chr, start: s, end: s + w - 1 });
       }
       else {
 	  // User dragged. Zoom in or out.
-	  this.app.setContext({ ref:g, start:xt[0], end:xt[1] });
+	  this.app.setContext({ ref:g, chr: this.brushing.chr, start:xt[0], end:xt[1] });
       }
+      this.brushing = null;
     }
     //----------------------------------------------
     highlightStrip (g, elt) {
@@ -559,6 +574,7 @@ class ZoomView extends SVGView {
 	    let range = {
 		genome:	f.genome,
 		chr:	f.chr,
+		chromosome: f.genome.getChromosome(f.chr),
 		start:	start,
 		end:	end
 	    } ;
@@ -616,7 +632,7 @@ class ZoomView extends SVGView {
 	else
 	    p = this.updateViaLandmarkCoordinates(this.app.lcoords);
 	p.then( data => {
-	    this.draw(data);
+	    this.draw(this.mungeData(data));
 	});
     }
 
@@ -704,26 +720,28 @@ class ZoomView extends SVGView {
 	};
 	// -----
         data.forEach((gdata,i) => {
-	    gdata.blocks.sort( (a,b) => a.index - b.index );
-	    gdata.blocks = gdata.blocks.reduce(merger,[]);
-	    /*
-	    // first sort by ref genome order
-	    gdata.blocks.sort( (a,b) => a.fIndex - b.fIndex );
-	    // Sub-group into runs of same comp genome chromosome.
-            let tmp = gdata.blocks.reduce((nbs, b, i) => {
-	        if (i === 0 || nbs[nbs.length - 1][0].chr !== b.chr)
-		    nbs.push([b]);
-		else
-		    nbs[nbs.length - 1].push(b);
-		return nbs;
-	    }, []);
-	    // Sort each subgroup into comparison genome order
-	    tmp.forEach( subgrp => subgrp.sort((a,b) => a.index - b.index) );
-	    // Flatten the list
-	    tmp = tmp.reduce((lst, curr) => lst.concat(curr), []);
-            // Now create the supergroups.
-	    gdata.blocks = tmp.reduce(merger,[]);
-	    */
+	    if (this.dmode === 'comparison') {
+		gdata.blocks.sort( (a,b) => a.index - b.index );
+		gdata.blocks = gdata.blocks.reduce(merger,[]);
+	    }
+	    else {
+		// first sort by ref genome order
+		gdata.blocks.sort( (a,b) => a.fIndex - b.fIndex );
+		// Sub-group into runs of same comp genome chromosome.
+		let tmp = gdata.blocks.reduce((nbs, b, i) => {
+		    if (i === 0 || nbs[nbs.length - 1][0].chr !== b.chr)
+			nbs.push([b]);
+		    else
+			nbs[nbs.length - 1].push(b);
+		    return nbs;
+		}, []);
+		// Sort each subgroup into comparison genome order
+		tmp.forEach( subgrp => subgrp.sort((a,b) => a.index - b.index) );
+		// Flatten the list
+		tmp = tmp.reduce((lst, curr) => lst.concat(curr), []);
+		// Now create the supergroups.
+		gdata.blocks = tmp.reduce(merger,[]);
+	    }
 	});
 	return data;
     }
@@ -768,8 +786,24 @@ class ZoomView extends SVGView {
     //     zoomSuperBlock_data = { chr start end blocks [ zoomBlock_data ] }
     //
     mungeData (data) {
-        data.forEach(gData => gData.blocks = this.uniqifyBlocks(gData.blocks));
+        data.forEach(gData => {
+	    gData.blocks = this.uniqifyBlocks(gData.blocks)
+	    // Each strip is independently scrollable. Init its offset (in bytes).
+	    gData.deltaB = 0;
+	});
 	data = this.mergeSblockRuns(data);
+	data.forEach( gData => {
+	  gData.blocks.forEach( sb=> {
+	    sb.maxLanesP = 0;
+	    sb.maxLanesN = 0;
+	    sb.features.forEach(f => {
+		if (f.lane > 0)
+		    sb.maxLanesP = Math.max(sb.maxLanesP, f.lane)
+		else
+		    sb.maxLanesN = Math.max(sb.maxLanesN, -f.lane)
+	    });
+	  })
+	});
 	return data;
     }
 
@@ -777,18 +811,16 @@ class ZoomView extends SVGView {
     // Draws the zoom view panel with the given data.
     //
     draw (data) {
-        data = this.mungeData(data);
 	// 
 	let self = this;
-
+        // Is ZoomView currently closed?
 	let closed = this.root.classed("closed");
-
 	// reset the svg size based on number of strips
 	let totalHeight = (this.stripHeight+this.stripGap) * data.length + 20;
 	this.svg
 	    .attr("height", totalHeight);
 
-	// Draw the title on the zoomview position controls
+	// Show ref genome name
 	d3.select("#zoomView .zoomCoords label")
 	    .text(this.app.rGenome.label + " coords");
 	
@@ -796,7 +828,7 @@ class ZoomView extends SVGView {
 	let rData = data.filter(dd => dd.genome === this.app.rGenome)[0];
 	let rBlock = rData.blocks[0];
 
-	// x-scale and x-axis based on the ref genome data.
+	// x-scale and x-axis based on the ref genome.
 	this.xscale = d3.scale.linear()
 	    .domain([rBlock.start,rBlock.end])
 	    .range([0,this.width]);
@@ -839,7 +871,13 @@ class ZoomView extends SVGView {
 	    .attr("font-family","sans-serif")
 	    .attr("font-size", 10)
 	    ;
-
+	newzs.append('rect')
+	    .attr('class','underlay')
+	    .attr('y', -this.blockHeight/2)
+	    .attr('height', this.blockHeight)
+	    .style('width','100%')
+	    .style('opacity',0)
+	    ;
 	newzs.append("g")
 	    .attr("name", "sBlocks");
 	newzs.append("rect")
@@ -857,9 +895,9 @@ class ZoomView extends SVGView {
 	    .on(".drag", null)
 	    .remove();
 	//
-	this.deltaX = 0;
         zstrips.select('g[name="sBlocks"]')
-	    .attr('transform',`translate(0,0)`);
+	    .attr('transform', g => `translate(${g.deltaB * this.ppb},0)`)
+	    ;
 	// ---- Synteny super blocks ----
         let sblocks = zstrips.select('[name="sBlocks"]').selectAll('g.sBlock')
 	    .data(d=>d.blocks, b => b.blockId);
@@ -1119,7 +1157,6 @@ class ZoomView extends SVGView {
 	// Bind second level data (rectangle pairs) to polygons in the group
 	let pgons = ffGrps.selectAll("polygon")
 	    .data(d=>d.rects.filter(r => r[0] && r[1]));
-	pgons.exit().remove();
 	pgons.enter().append("polygon")
 	    .attr("class","fiducial")
 	    ;
@@ -1141,6 +1178,8 @@ class ZoomView extends SVGView {
 	.on("mouseout",  (p) => {
 	    this.highlight();
 	});
+	//
+	pgons.exit().remove();
 	// -------------------------------------
 	// Draw feature labels. Each label is drawn once, above the first rectangle in its list.
 	// The exception is the current (mouseover) feature, where the label is drawn above that feature.
