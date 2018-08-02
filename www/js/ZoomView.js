@@ -187,11 +187,14 @@ class ZoomView extends SVGView {
 	    // only interested in horizontal motion events
 	    // occurring in a zoom strip.
 	    let e = d3.event;
-	    let z = e.target.closest('g.zoomStrip');
-	    if (!z || Math.abs(e.deltaX) < Math.abs(e.deltaY)) 
+	    if (Math.abs(e.deltaX) < Math.abs(e.deltaY)) 
 	        return;
 	    e.stopPropagation();
 	    e.preventDefault();
+	    //
+	    let z = e.target.closest('g.zoomStrip') || d3.select('g.zoomStrip.reference')[0][0];
+	    if (!z) return;
+
 	    let db = e.deltaX / self.ppb; // delta in bases for this event
 	    let zd = z.__data__;
 	    // For comparison genomes, just translate the blocks by the wheel amount, so the user can 
