@@ -4,8 +4,8 @@ import { AuxDataManager } from './AuxDataManager';
 
 // ---------------------------------------------
 
-// This belongs in a config. but for now.
-let MouseMine = 'test'; // one of: public, test, dev
+// This belongs in a config but for now...
+let MouseMine = 'public'; // one of: public, test, dev
 
 // ---------------------------------------------
 // Not sure where this should go
