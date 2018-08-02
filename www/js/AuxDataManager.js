@@ -1,14 +1,25 @@
 import { d3json } from './utils';
 
+let MINES = {
+    'dev' : 'http://bhmgimm-dev:8080/mousemine',
+    'test': 'http://bhmgimm-test.jax.org:8080/mousemine',
+    'public' : 'http://www.mousemine.org/mousemine',
+};
+
 // ---------------------------------------------
 // AuxDataManager - knows how to query an external source (i.e., MouseMine) for genes
 // annotated to different ontologies. 
 class AuxDataManager {
+    constructor (minename) {
+	if (!MINES[minename]) 
+	    throw "Unknown mine name: " + minename;
+        this.url = MINES[minename] + '/service/query/results?';
+    }
     //----------------------------------------------
-    getAuxData (q) {
-	let format = 'jsonobjects';
+    getAuxData (q, format) {
+	format = format || 'jsonobjects';
 	let query = encodeURIComponent(q);
-	let url = `http://www.mousemine.org/mousemine/service/query/results?format=${format}&query=${query}`;
+	let url = this.url + `format=${format}&query=${query}`;
 	return d3json(url).then(data => data.results||[]);
     }
 
@@ -38,7 +49,6 @@ class AuxDataManager {
 	return this.getAuxData(q);
     }
     //----------------------------------------------
-    // (not currently in use...)
     featuresByPathwayTerm (qryString) {
         let q = `<query name="" model="genomic" 
 	  view="Gene.primaryIdentifier Gene.symbol" constraintLogic="A and B">
@@ -53,6 +63,22 @@ class AuxDataManager {
     featuresByPhenotype (qryString) { return this.featuresByOntologyTerm(qryString, ["Mammalian Phenotype","Disease Ontology"]); }
     featuresByPathway   (qryString) { return this.featuresByPathwayTerm(qryString); }
     //----------------------------------------------
+    exonsByRange	(genome, chr, start, end) {
+	let view = [
+	'Exon.gene.primaryIdentifier',
+	'Exon.primaryIdentifier',
+	'Exon.chromosome.primaryIdentifier',
+	'Exon.chromosomeLocation.start',
+	'Exon.chromosomeLocation.end'
+	].join(' ');
+        let q = `<query model="genomic" view="${view}" constraintLogic="A and B">
+	    <constraint code="A" path="Exon.chromosomeLocation" op="OVERLAPS">
+		<value>${chr}:${start}..${end}</value>
+	    </constraint>
+	    <constraint code="B" path="Exon.strain.name" op="=" value="${genome}"/>
+	    </query>`
+	return this.getAuxData(q,'json');
+    }
 }
 
 export { AuxDataManager };

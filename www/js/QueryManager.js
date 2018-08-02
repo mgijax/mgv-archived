@@ -3,6 +3,11 @@ import { Component } from './Component';
 import { AuxDataManager } from './AuxDataManager';
 
 // ---------------------------------------------
+
+// This belongs in a config. but for now.
+let MouseMine = 'test'; // one of: public, test, dev
+
+// ---------------------------------------------
 // Not sure where this should go
 let searchTypes = [{
     method: "featuresByPhenotype",
@@ -30,7 +35,7 @@ class QueryManager extends Component {
     constructor (app, elt) {
         super(app, elt);
 	this.cfg = searchTypes;
-	this.auxDataManager = new AuxDataManager();
+	this.auxDataManager = new AuxDataManager(MouseMine);
 	this.select = null;	// my <select> element
 	this.term = null;	// my <input> element
 	this.initDom();
