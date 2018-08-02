@@ -192,13 +192,13 @@ class ZoomView extends SVGView {
 	        return;
 	    e.stopPropagation();
 	    e.preventDefault();
-	    // For comparison genomes, just translate the blocks by the wheel amount, so the user can 
-	    // see everything.
 	    let db = e.deltaX / self.ppb; // delta in bases for this event
 	    let zd = z.__data__;
-	    if (zd.genome !== self.app.rGenome) {
-		zd.deltaB -= db;
-	        d3.select(z).select('g[name="sBlocks"]').attr('transform',`translate(${zd.deltaB * self.ppb},0)`);
+	    // For comparison genomes, just translate the blocks by the wheel amount, so the user can 
+	    // see everything.
+	    if (e.ctrlKey) {
+		zd.deltaB += db;
+	        d3.select(z).select('g[name="sBlocks"]').attr('transform',`translate(${-zd.deltaB * self.ppb},0)`);
 		self.drawFiducials();
 		return;
 	    }
@@ -636,45 +636,6 @@ class ZoomView extends SVGView {
 	});
     }
 
-    //----------------------------------------------
-    orderSBlocks (sblocks) {
-	// Sort the sblocks in each strip according to the current drawing mode.
-	let cmpField = this.dmode === 'comparison' ? 'index' : 'fIndex';
-	let cmpFunc = (a,b) => a.__data__[cmpField]-b.__data__[cmpField];
-	sblocks.forEach( strip => strip.sort( cmpFunc ) );
-	let pstart = []; // offset (in pixels) of start position of next block, by strip index (0===ref)
-	let bstart = []; // block start pos (in bp) assoc with pstart
-	let cchr = null;
-	let self = this;
-	let dx;
-	let pend;
-	sblocks.each( function (b,i,j) { // b=block, i=index within strip, j=strip index
-	    let blen = self.ppb * (b.end - b.start + 1); // total screen width of this sblock
-	    b.flip = b.ori === '-' && self.dmode === 'reference';
-	    b.xscale = d3.scale.linear().domain([b.start, b.end]).range( b.flip ? [blen, 0] : [0, blen] );
-	    //
-	    if (i===0) {
-		// first block in each strip inits
-		pstart[j] = 0;
-		bstart[j] = b.start;
-		dx = 0;
-		cchr = b.chr;
-	    }
-	    else {
-		dx = b.chr === cchr ? pstart[j] + self.ppb * (b.start - bstart[j]) : Infinity;
-		if (dx < 0 || dx > self.maxSBgap) {
-		    // Changed chr or jumped a large gap
-		    pstart[j] = pend + 16;
-		    bstart[j] = b.start;
-		    dx = pstart[j];
-		    cchr = b.chr;
-		}
-	    }
-	    d3.select(this).attr("transform", `translate(${dx},0)`);
-	    pend = dx + blen;
-	});
-    }
-
     // ------------------------------------
     //
     mergeSblockRuns (data) {
@@ -806,6 +767,45 @@ class ZoomView extends SVGView {
     }
 
     //----------------------------------------------
+    layoutSBlocks (sblocks) {
+	// Sort the sblocks in each strip according to the current drawing mode.
+	let cmpField = this.dmode === 'comparison' ? 'index' : 'fIndex';
+	let cmpFunc = (a,b) => a.__data__[cmpField]-b.__data__[cmpField];
+	sblocks.forEach( strip => strip.sort( cmpFunc ) );
+	let pstart = []; // offset (in pixels) of start position of next block, by strip index (0===ref)
+	let bstart = []; // block start pos (in bp) assoc with pstart
+	let cchr = null;
+	let self = this;
+	let dx;
+	let pend;
+	sblocks.each( function (b,i,j) { // b=block, i=index within strip, j=strip index
+	    let blen = self.ppb * (b.end - b.start + 1); // total screen width of this sblock
+	    b.flip = b.ori === '-' && self.dmode === 'reference';
+	    b.xscale = d3.scale.linear().domain([b.start, b.end]).range( b.flip ? [blen, 0] : [0, blen] );
+	    //
+	    if (i===0) {
+		// first block in each strip inits
+		pstart[j] = 0;
+		bstart[j] = b.start;
+		dx = 0;
+		cchr = b.chr;
+	    }
+	    else {
+		dx = b.chr === cchr ? pstart[j] + self.ppb * (b.start - bstart[j]) : Infinity;
+		if (dx < 0 || dx > self.maxSBgap) {
+		    // Changed chr or jumped a large gap
+		    pstart[j] = pend + 16;
+		    bstart[j] = b.start;
+		    dx = pstart[j];
+		    cchr = b.chr;
+		}
+	    }
+	    d3.select(this).attr("transform", `translate(${dx},0)`);
+	    pend = dx + blen;
+	});
+    }
+
+    //----------------------------------------------
     // Draws the zoom view panel with the given data.
     //
     draw (data) {
@@ -911,7 +911,7 @@ class ZoomView extends SVGView {
 	let l1 = newsbs.append("g").attr("name", "layer1");
 
 	//
-	this.orderSBlocks(sblocks);
+	this.layoutSBlocks(sblocks);
 
 	// rectangle for each individual synteny block
 	let sbrects = sblocks.select('g[name="layer0"]').selectAll('rect.block').data(d=> {
