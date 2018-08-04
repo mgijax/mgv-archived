@@ -326,9 +326,14 @@ class ZoomView extends SVGView {
     //----------------------------------------------
     showFloatingText (text, x, y) {
 	let sr = this.svg.node().getBoundingClientRect();
+	x = x-sr.x-12;
+	y = y-sr.y;
+	let anchor = x < 60 ? 'start' : this.width-x < 60 ? 'end' : 'middle';
 	this.floatingText
 	    .text(text)
-	    .attr('transform', `translate(${x-sr.x},${y-sr.y})`);
+	    .style('text-anchor',anchor)
+	    .attr('x', x)
+	    .attr('y', y)
     }
     hideFloatingText () {
 	this.floatingText.text('');
@@ -482,7 +487,7 @@ class ZoomView extends SVGView {
 	let xt = this.brushing.brush.extent();
 	let s = Math.round(xt[0]);
 	let e = Math.round(xt[1]);
-	this.showFloatingText(`${this.brushing.chr}:${s}..${e}`, ev.clientX-50, ev.clientY);
+	this.showFloatingText(`${this.brushing.chr}:${s}..${e}`, ev.clientX, ev.clientY);
     }
     //----------------------------------------------
     bbEnd () {
@@ -988,7 +993,7 @@ class ZoomView extends SVGView {
 	        let cr = this.getBoundingClientRect();
 		let x = d3.event.clientX - cr.x;
 		let c = Math.round(b.xscale.invert(x));
-		self.showFloatingText(`${b.chr}:${c}`, d3.event.clientX-50, d3.event.clientY);
+		self.showFloatingText(`${b.chr}:${c}`, d3.event.clientX, d3.event.clientY);
 	    })
 	    .on('mouseout', b => this.hideFloatingText())
 	    .each(function(b) {
