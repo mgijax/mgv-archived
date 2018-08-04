@@ -32,6 +32,8 @@ class ZoomView extends SVGView {
         .attr("class","strips");
       this.axis = this.svgMain.append("g")
         .attr("class","axis");
+      this.floatingText = this.svgMain.append("text")
+        .attr("class","floatingText");
       this.cxtMenu = this.root.select('[name="cxtMenu"]');
       //
       this.dragging = null;
@@ -223,14 +225,16 @@ class ZoomView extends SVGView {
 		self.timeout = null;
 		let ccxt = self.app.getContext();
 		if (ccxt.landmark) {
-		    ccxt.delta += zd.deltaB;
+		    self.app.setContext({ delta: ccxt.delta + zd.deltaB });
+		    zd.deltaB = 0;
 		}
 		else {
-		    ccxt.start += zd.deltaB;
-		    ccxt.end += zd.deltaB;
+		    self.app.setContext({ 
+		        start: ccxt.start + zd.deltaB,
+		        end: ccxt.end + zd.deltaB
+			});
+		    zd.deltaB = 0;
 		}
-		zd.deltaB = 0;
-		self.app.setContext(ccxt);
 	    }, 50);
 	});
 
@@ -319,6 +323,16 @@ class ZoomView extends SVGView {
         return this.hiFeats ? Object.keys(this.hiFeats) : [];
     }
 
+    //----------------------------------------------
+    showFloatingText (text, x, y) {
+	let sr = this.svg.node().getBoundingClientRect();
+	this.floatingText
+	    .text(text)
+	    .attr('transform', `translate(${x-sr.x},${y-sr.y})`);
+    }
+    hideFloatingText () {
+	this.floatingText.text('');
+    }
     //----------------------------------------------
     showContextMenu (x,y) {
         this.cxtMenu
@@ -463,10 +477,20 @@ class ZoomView extends SVGView {
       this.brushing = blk;
     }
     //----------------------------------------------
+    bbBrush () {
+        let ev = d3.event.sourceEvent;
+	let xt = this.brushing.brush.extent();
+	let s = Math.round(xt[0]);
+	let e = Math.round(xt[1]);
+	this.showFloatingText(`${this.brushing.chr}:${s}..${e}`, ev.clientX-50, ev.clientY);
+    }
+    //----------------------------------------------
     bbEnd () {
       let se = d3.event.sourceEvent;
       let xt = this.brushing.brush.extent();
       let g = this.brushing.genome.label;
+      //
+      this.hideFloatingText();
       //
       if (se.ctrlKey || se.altKey || se.metaKey) {
 	  this.clearBrushes();
@@ -947,7 +971,6 @@ class ZoomView extends SVGView {
 	    .attr("class","blockLabel") ;
 	// brush
 	l0.append("g").attr("class","brush");
-
 	//
 	sblocks.exit().remove();
 
@@ -961,10 +984,18 @@ class ZoomView extends SVGView {
 	// brush
 	sblocks.select("g.brush")
 	    .attr("transform", b => `translate(0,${this.blockHeight / 2})`)
+	    .on('mousemove', function(b) {
+	        let cr = this.getBoundingClientRect();
+		let x = d3.event.clientX - cr.x;
+		let c = Math.round(b.xscale.invert(x));
+		self.showFloatingText(`${b.chr}:${c}`, d3.event.clientX-50, d3.event.clientY);
+	    })
+	    .on('mouseout', b => this.hideFloatingText())
 	    .each(function(b) {
 		if (!b.brush) {
 		    b.brush = d3.svg.brush()
 			.on("brushstart", function(){ self.bbStart( b, this ); })
+			.on("brush",      function(){ self.bbBrush( b, this ); })
 			.on("brushend",   function(){ self.bbEnd( b, this ); })
 		}
 		b.brush.x(b.xscale).clear();

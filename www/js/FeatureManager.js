@@ -1,5 +1,9 @@
-import {d3json, overlaps, subtract} from './utils';
+import {d3json, d3tsv, overlaps, subtract} from './utils';
 import {Feature} from './Feature';
+import {IDBKeyStore} from './IDBKeyStore';
+
+const IDB_NAME = "mgv-genome-cache"
+const IDB_VERSION = 1
 
 //----------------------------------------------
 // How the app loads feature data. Provides two calls:
@@ -19,8 +23,39 @@ class FeatureManager {
 	this.cache = {};		// {genome.name -> {chr.name -> list of blocks}}
 	this.mineFeatureCache = {};	// auxiliary info pulled from MouseMine 
 	this.loadedGenomes = new Set(); // the set of Genomes that have been fully loaded
+	this.idbm = new IDBKeyStore(IDB_NAME, IDB_VERSION);
+	console.log("IDBM: ", this.idbm);
     }
  
+    //----------------------------------------------
+    processFeature (genome, d) {
+	// If we've already got this one in the cache, return it.
+	let f = this.id2feat[d.mgpid];
+	if (f) return f;
+	// Create a new Feature
+	f = new Feature(d);
+	f.genome = genome
+	// Register it.
+	this.id2feat[f.mgpid] = f;
+	// genome cache
+	let gc = this.cache[genome.name] = (this.cache[genome.name] || {});
+	// chromosome cache (w/in genome)
+	let cc = gc[f.chr] = (gc[f.chr] || []);
+	cc.push(f);
+	//
+	if (f.mgiid && f.mgiid !== '.') {
+	    let lst = this.canonical2feats[f.mgiid] = (this.canonical2feats[f.mgiid] || []);
+	    lst.push(f);
+	}
+	if (f.symbol && f.symbol !== '.') {
+	    let s = f.symbol.toLowerCase();
+	    let lst = this.symbol2feats[s] = (this.symbol2feats[s] || []);
+	    lst.push(f);
+	}
+	// here y'go.
+	return f;
+    }
+
     //----------------------------------------------
     // Processes the "raw" features returned by the server.
     // Turns them into Feature objects and registers them.
@@ -28,144 +63,55 @@ class FeatureManager {
     // the Feature object created the first time is returned.
     // (I.e., registering the same feature multiple times is ok)
     //
-    processFeatures (feats, genome) {
-	return feats.map(d => {
-	    // If we've already got this one in the cache, return it.
-	    let f = this.id2feat[d.mgpid];
-	    if (f) return f;
-	    // Create a new Feature
-	    d.genome = genome
-	    f = new Feature(d);
-	    // Register it.
-	    this.id2feat[f.mgpid] = f;
-	    if (f.mgiid && f.mgiid !== '.') {
-		let lst = this.canonical2feats[f.mgiid] = (this.canonical2feats[f.mgiid] || []);
-		lst.push(f);
-	    }
-	    if (f.symbol && f.symbol !== '.') {
-		let s = f.symbol.toLowerCase();
-		let lst = this.symbol2feats[s] = (this.symbol2feats[s] || []);
-		lst.push(f);
-	    }
-	    // here y'go.
-	    return f;
+    processFeatures (genome, feats) {
+	feats.sort( (a,b) => {
+	    if (a.chr < b.chr)
+		return -1;
+	    else if (a.chr > b.chr)
+		return 1;
+	    else
+		return a.start - b.start;
 	});
+	this.idbm.put(genome.name, feats);
+	return feats.map(d => this.processFeature(genome, d));
     }
 
     //----------------------------------------------
-    // Registers an index block for the given genome. An index block
-    // is a contiguous chunk of featues from the GFF file for that genome.
-    // Registering the same block multiple times is ok - successive times
-    // have no effect.
-    // Side effects:
-    //   Adds the block to the cache
-    //   Replaces each raw feature in the block with a Feature object.
-    //   Registers new Features in a lookup.
-    // Args:
-    //   genome (object) The genome the block is for,
-    //   blk (object) An index block, which has a chr, start, end,
-    //   	and a list of "raw" feature objects.
-    // Returns:
-    //   nothing
-    //
-    _registerBlock (genome, blk) {
-	// genome cache
-        let gc = this.cache[genome.name] = (this.cache[genome.name] || {});
-	// chromosome cache (w/in genome)
-	let cc = gc[blk.chr] = (gc[blk.chr] || []);
-	if (cc.filter(b => b.id === blk.id).length === 0) {
-	    blk.features = this.processFeatures( blk.features, genome );
-	    blk.genome = genome;
-	    cc.push(blk);
-	    cc.sort( (a,b) => a.start - b.start );
-	}
-	//else
-	    //console.log("Skipped block. Already seen.", genome.name, blk.id);
-    }
-
-    //----------------------------------------------
-    // Returns the remainder of the given range after
-    // subtracting the already-ensured ranges.
-    // 
-    _subtractRange(genome, range){
-	let gc = this.cache[genome.name];
-	if (!gc) throw "No such genome: " + genome.name;
-	let gBlks = gc[range.chr] || [];
-	let ans = [];
-	let rng = range;
-	gBlks.forEach( b => {
-	    let sub = rng ? subtract( rng, b ) : [];
-	    if (sub.length === 0)
-	        rng = null;
-	    if (sub.length === 1)
-	        rng = sub[0];
-	    else if (sub.length === 2){
-	        ans.push(sub[0]);
-		rng = sub[1];
-	    }
-	})
-	rng && ans.push(rng);
-	ans.sort( (a,b) => a.start - b.start );
-	return ans;
-    }
-    //----------------------------------------------
-    // Calls subtractRange for each range in the list and returns
-    // the accumulated results.
-    //
-    _subtractRanges(genome, ranges) {
-	let gc = this.cache[genome.name];
-	if (!gc) return ranges;
-	let newranges = [];
-	ranges.forEach(r => {
-	    newranges = newranges.concat(this._subtractRange(genome, r));
-	}, this)
-	return newranges;
-    }
-
-    //----------------------------------------------
-    // Ensures that all features in the specified range(s) in the specified genome
-    // are in the cache. Returns a promise that resolves to true when the condition is met.
-    _ensureFeaturesByRange (genome, ranges) {
-	let newranges = this._subtractRanges(genome, ranges);
-	if (newranges.length === 0) 
-	    return Promise.resolve();
-	let coordsArg = newranges.map(r => `${r.chr}:${r.start}..${r.end}`).join(',');
-	let dataString = `genome=${genome.name}&coords=${coordsArg}`;
-	let url = "./bin/getFeatures.cgi?" + dataString;
-	let self = this;
-	console.log("Requesting:", genome.name, newranges);
-	return d3json(url).then(function(blocks){
-	    blocks.forEach( b => self._registerBlock(genome, b) );
-	    self.app.showStatus(`Loaded: ${genome.name}`);
-	    return true;
-	});
-    }
- 
-    //----------------------------------------------
-    _ensureFeaturesByGenome (genome) {
-	if( this.loadedGenomes.has(genome) )
+    ensureFeaturesByGenome (genome) {
+	if (this.loadedGenomes.has(genome))
 	    return Promise.resolve(true);
-        let ranges = genome.chromosomes.map(c => { 
-	    return { chr: c.name, start: 1, end: c.length };
+	return this.idbm.get(genome.name).then(data => {
+	    if (data === undefined) {
+		console.log("Requesting:", genome.name, );
+		let url = `./data/genomedata/${genome.name}-features.tsv`;
+		return d3tsv(url).then( feats => {
+		    feats = this.processFeatures(genome, feats);
+		});
+	    }
+	    else {
+		console.log("Found in cache:", genome.name, );
+		let feats = this.processFeatures(genome, data);
+		return true;
+	    }
+	}).then( ()=> {
+	    this.loadedGenomes.add(genome);  
+	    this.app.showStatus(`Loaded: ${genome.name}`);
+	    return true; 
 	});
-	return this._ensureFeaturesByRange(genome, ranges).then(x=>{ this.loadedGenomes.add(genome); return true;});
     }
 
     //----------------------------------------------
     loadGenomes (genomes) {
-        return Promise.all(genomes.map(g => this._ensureFeaturesByGenome (g))).then(()=>true);
+        return Promise.all(genomes.map(g => this.ensureFeaturesByGenome (g))).then(()=>true);
     }
 
     //----------------------------------------------
-    _getCachedFeatures (genome, range) {
+    getCachedFeatures (genome, range) {
         let gc = this.cache[genome.name] ;
 	if (!gc) return [];
-	let cBlocks = gc[range.chr];
-	if (!cBlocks) return [];
-	let feats = cBlocks
-	    .filter(cb => overlaps(cb, range))
-	    .map( cb => cb.features.filter( f => overlaps( f, range) ) )
-	    .reduce( (acc, val) => acc.concat(val), []);
+	let cFeats = gc[range.chr];
+	if (!cFeats) return [];
+	let feats = cFeats.filter(cf => overlaps(cf, range));
         return feats;	
     }
 
@@ -195,9 +141,9 @@ class FeatureManager {
     // Returns a promise for the features in 
     // the specified ranges of the specified genome.
     getFeatures (genome, ranges) {
-	return this._ensureFeaturesByGenome(genome).then(function() {
+	return this.ensureFeaturesByGenome(genome).then(function() {
             ranges.forEach( r => {
-	        r.features = this._getCachedFeatures(genome, r) 
+	        r.features = this.getCachedFeatures(genome, r) 
 		r.genome = genome;
 	    });
 	    return { genome, blocks:ranges };
@@ -206,7 +152,7 @@ class FeatureManager {
     //----------------------------------------------
     // Returns a promise for the features having the specified ids from the specified genome.
     getFeaturesById (genome, ids) {
-        return this._ensureFeaturesByGenome(genome).then( () => {
+        return this.ensureFeaturesByGenome(genome).then( () => {
 	    let feats = [];
 	    let seen = new Set();
 	    let addf = (f) => {

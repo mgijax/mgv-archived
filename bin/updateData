@@ -59,7 +59,6 @@ function download {
        | grep -v biological_region \
        | sort -k 1,1 -k 4,4n \
        | python "${BDIR}/prepGenomeFile.py" "$ismgi" -m "${ensemblMappingFile}" -o "${featFile}" -c "${chrFile}" 
-   python "${BDIR}/indexFeatures.py" -f "${featFile}" -x "${ixFile}" -a create
 }
 
 #FIXME: move!

@@ -1,8 +1,8 @@
 class Feature {
     constructor (cfg) {
         this.chr     = cfg.chr || cfg.chromosome;
-        this.start   = cfg.start;
-        this.end     = cfg.end;
+        this.start   = parseInt(cfg.start);
+        this.end     = parseInt(cfg.end);
         this.strand  = cfg.strand;
         this.type    = cfg.type;
         this.biotype = cfg.biotype;
