@@ -5,12 +5,12 @@ import { FeatureManager }  from './FeatureManager';
 import { QueryManager }    from './QueryManager';
 import { ListManager }     from './ListManager';
 import { ListEditor }      from './ListEditor';
-import { UserPrefsManager } from './UserPrefsManager';
 import { FacetManager }    from './FacetManager';
 import { BTManager }       from './BTManager';
 import { GenomeView }      from './GenomeView';
 import { FeatureDetails }  from './FeatureDetails';
 import { ZoomView }        from './ZoomView';
+import { KeyStore }        from './KeyStore';
 
 // ---------------------------------------------
 class MGVApp extends Component {
@@ -69,7 +69,7 @@ class MGVApp extends Component {
 	//
 	//
 	this.listManager    = new ListManager(this, "#mylists");
-	this.listManager.update();
+	this.listManager.ready.then( () => this.listManager.update() );
 	//
 	this.listEditor = new ListEditor(this, '#listeditor');
 	//
@@ -77,7 +77,7 @@ class MGVApp extends Component {
 	this.featureManager = new FeatureManager(this);
 	this.queryManager = new QueryManager(this, "#findGenesBox");
 	//
-	this.userPrefsManager = new UserPrefsManager();
+	this.userPrefsStore = new KeyStore("user-preferences");
 	
 	//
 	// -------------------------------------------------------------------
@@ -343,28 +343,30 @@ class MGVApp extends Component {
     }
     //----------------------------------------------
     setUIFromPrefs () {
-        let prefs = this.userPrefsManager.getAll();
-	console.log("Got prefs from storage", prefs);
+	this.userPrefsStore.get("prefs").then( prefs => {
+	    prefs = prefs || {};
+	    console.log("Got prefs from storage", prefs);
 
-	// set open/closed states
-	(prefs.closables || []).forEach( c => {
-	    let id = c[0];
-	    let state = c[1];
-	    d3.select('#'+id).classed('closed', state === "closed" || null);
-	});
-
-	// set draggables' order
-	(prefs.draggables || []).forEach( d => {
-	    let ctrId = d[0];
-	    let contentIds = d[1];
-	    let ctr = d3.select('#'+ctrId);
-	    let contents = ctr.selectAll('#'+ctrId+' > *');
-	    contents[0].sort( (a,b) => {
-	        let ai = contentIds.indexOf(a.getAttribute('id'));
-	        let bi = contentIds.indexOf(b.getAttribute('id'));
-		return ai - bi;
+	    // set open/closed states
+	    (prefs.closables || []).forEach( c => {
+		let id = c[0];
+		let state = c[1];
+		d3.select('#'+id).classed('closed', state === "closed" || null);
 	    });
-	    contents.order();
+
+	    // set draggables' order
+	    (prefs.draggables || []).forEach( d => {
+		let ctrId = d[0];
+		let contentIds = d[1];
+		let ctr = d3.select('#'+ctrId);
+		let contents = ctr.selectAll('#'+ctrId+' > *');
+		contents[0].sort( (a,b) => {
+		    let ai = contentIds.indexOf(a.getAttribute('id'));
+		    let bi = contentIds.indexOf(b.getAttribute('id'));
+		    return ai - bi;
+		});
+		contents.order();
+	    });
 	});
     }
     setPrefsFromUI () {
@@ -386,7 +388,7 @@ class MGVApp extends Component {
 	    draggables: ddData
 	}
 	console.log("Saving prefs to storage", prefs);
-	this.userPrefsManager.setAll(prefs);
+	this.userPrefsStore.set("prefs", prefs);
     }
     //----------------------------------------------
     showBlocks (comp) {

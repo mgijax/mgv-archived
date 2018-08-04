@@ -1,6 +1,6 @@
 import { Component } from './Component';
-import { LocalStorageManager } from './StorageManager';
 import { ListFormulaEvaluator } from './ListFormulaEvaluator';
+import { KeyStore } from './KeyStore';
 
 // ---------------------------------------------
 // Maintains named lists of IDs. Lists may be temporary, lasting only for the session, or permanent,
@@ -13,10 +13,9 @@ class ListManager extends Component {
     constructor (app, elt) {
         super(app, elt);
 	this.name2list = null;
-	this._lists = new LocalStorageManager  ("listManager.lists")
+	this.listStore = new KeyStore('user-lists');
 	this.formulaEval = new ListFormulaEvaluator(this);
-	this._load();
-	this.initDom();
+	this.ready = this._load().then( ()=>this.initDom() );
     }
     initDom () {
 	// Button: show/hide warning message
@@ -62,14 +61,12 @@ class ListManager extends Component {
 	    });
     }
     _load () {
-	this.name2list = this._lists.get("all");
-	if (!this.name2list){
-	    this.name2list = {};
-	    this._save();
-	}
+	return this.listStore.get("all").then(all => {
+	    this.name2list = all || {};
+	});
     }
     _save () {
-        this._lists.put("all", this.name2list);
+	return this.listStore.set("all", this.name2list)
     }
     //
     // returns the names of all the lists, sorted

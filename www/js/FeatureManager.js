@@ -1,9 +1,6 @@
 import {d3json, d3tsv, overlaps, subtract} from './utils';
 import {Feature} from './Feature';
-import {IDBKeyStore} from './IDBKeyStore';
-
-const IDB_NAME = "mgv-genome-cache"
-const IDB_VERSION = 1
+import {KeyStore} from './KeyStore';
 
 //----------------------------------------------
 // How the app loads feature data. Provides two calls:
@@ -23,7 +20,7 @@ class FeatureManager {
 	this.cache = {};		// {genome.name -> {chr.name -> list of blocks}}
 	this.mineFeatureCache = {};	// auxiliary info pulled from MouseMine 
 	this.loadedGenomes = new Set(); // the set of Genomes that have been fully loaded
-	this.idbm = new IDBKeyStore(IDB_NAME, IDB_VERSION);
+	this.idbm = new KeyStore('features');
 	console.log("IDBM: ", this.idbm);
     }
  
@@ -72,7 +69,7 @@ class FeatureManager {
 	    else
 		return a.start - b.start;
 	});
-	this.idbm.put(genome.name, feats);
+	this.idbm.set(genome.name, feats);
 	return feats.map(d => this.processFeature(genome, d));
     }
 
