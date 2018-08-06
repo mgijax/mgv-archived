@@ -20,8 +20,7 @@ class FeatureManager {
 	this.cache = {};		// {genome.name -> {chr.name -> list of blocks}}
 	this.mineFeatureCache = {};	// auxiliary info pulled from MouseMine 
 	this.loadedGenomes = new Set(); // the set of Genomes that have been fully loaded
-	this.idbm = new KeyStore('features');
-	console.log("IDBM: ", this.idbm);
+	this.fStore = new KeyStore('features');
     }
  
     //----------------------------------------------
@@ -69,7 +68,7 @@ class FeatureManager {
 	    else
 		return a.start - b.start;
 	});
-	this.idbm.set(genome.name, feats);
+	this.fStore.set(genome.name, feats);
 	return feats.map(d => this.processFeature(genome, d));
     }
 
@@ -77,7 +76,7 @@ class FeatureManager {
     ensureFeaturesByGenome (genome) {
 	if (this.loadedGenomes.has(genome))
 	    return Promise.resolve(true);
-	return this.idbm.get(genome.name).then(data => {
+	return this.fStore.get(genome.name).then(data => {
 	    if (data === undefined) {
 		console.log("Requesting:", genome.name, );
 		let url = `./data/genomedata/${genome.name}-features.tsv`;
