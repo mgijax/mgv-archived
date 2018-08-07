@@ -20,7 +20,8 @@ class FeatureManager {
 	this.cache = {};		// {genome.name -> {chr.name -> list of blocks}}
 	this.mineFeatureCache = {};	// auxiliary info pulled from MouseMine 
 	this.loadedGenomes = new Set(); // the set of Genomes that have been fully loaded
-	this.fStore = new KeyStore('features');
+	//
+	this.fStore = new KeyStore('features'); // client side disk cache
     }
  
     //----------------------------------------------
@@ -169,6 +170,11 @@ class FeatureManager {
 	    }
 	    return feats;
 	});
+    }
+    //----------------------------------------------
+    clearCachedData () {
+	console.log("FeatureManager: Cache cleared.")
+        return this.fStore.clear();
     }
 
 } // end class Feature Manager

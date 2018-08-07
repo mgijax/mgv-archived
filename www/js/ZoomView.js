@@ -72,20 +72,29 @@ class ZoomView extends SVGView {
 
 	// Create context menu. 
 	this.initContextMenu([{
+	    name: "linkToSnps",
             label: "MGI SNPs", 
 	    icon: "open_in_new",
 	    tooltip: "View SNPs at MGI for the current strains in the current region. (Some strains not available.)",
 	    handler: ()=> this.app.linkToMgiSnpReport()
 	},{
+	    name: "linkToQtl",
             label: "MGI QTLs", 
 	    icon:  "open_in_new",
 	    tooltip: "View QTL at MGI that overlap the current region.",
 	    handler: ()=> this.app.linkToMgiQTLs()
 	},{
+	    name: "linkToJbrowse",
             label: "MGI JBrowse", 
 	    icon: "open_in_new",
 	    tooltip: "Open MGI JBrowse (C57BL/6J GRCm38) with the current coordinate range.",
 	    handler: ()=> this.app.linkToMgiJBrowse()
+	},{
+	    name: "clearCache",
+            label: "Clear cache", 
+	    icon: "delete_sweep",
+	    tooltip: "Delete cached features. Data will be reloaded from the server on next use.",
+	    handler: ()=> this.app.clearCachedData()
 	}]);
 	this.root
 	  .on("click", () => {
@@ -298,6 +307,7 @@ class ZoomView extends SVGView {
 	let news = mitems.enter()
 	  .append("div")
 	  .attr("class", "menuItem flexrow")
+	  .attr("name", d => d.name || null )
 	  .attr("title", d => d.tooltip || null );
 	news.append("label")
 	  .text(d => d.label)

@@ -918,6 +918,12 @@ class MGVApp extends Component {
 	let linkUrl = `${urlBase}?${ [dataArg,locArg,tracksArg,highlightArg].join('&') }`;
 	window.open(linkUrl, "_blank");
     }
+    //----------------------------------------------
+    clearCachedData () {
+	if (window,confirm('Delete all cached data. Are you sure?')) {
+	    this.featureManager.clearCachedData();
+	}
+    }
 } // end class MGVApp
 
 export { MGVApp };
