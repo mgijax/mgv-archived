@@ -168,7 +168,7 @@ class ListManager extends Component {
 	delete this.name2list[name];
 	this._save();
 	// FIXME: use events!!
-	if (lst === this.app.currentList) this.app.currentList = null;
+	if (lst === this.app.getCurrentList()) this.app.setCurrentList(null);
 	if (lst === this.app.listEditor.list) this.app.listEditor.list = null;
 	return lst;
     }
@@ -177,7 +177,7 @@ class ListManager extends Component {
         this.name2list = {}
 	this._save();
 	//
-	this.app.currentList = null;
+	this.app.setCurrentList(null);
 	this.app.listEditor.list = null; // FIXME - reachacross
     }
     // Returns true iff expr is valid, which means it is both syntactically correct 
@@ -242,9 +242,22 @@ class ListManager extends Component {
 		    //
 		    le.addToListExpr(s+' ');
 		}
-		// otherwise, set this as the current list
-		else 
-		    self.app.currentList = lst; // FIXME reachover
+		else if (d3.event.shiftKey) {
+		    // shift-click goes to next list element if it's the same list,
+		    // or else sets the list and goes to the first element.
+		    if (self.app.getCurrentList() !== lst)
+			self.app.setCurrentList(lst, true);
+		    else
+			self.app.goToNextListElement(lst);
+		}
+		else {
+		    // plain click sets the set if it's a different list,
+		    // or else unsets the list.
+		    if (self.app.getCurrentList() !== lst)
+		        self.app.setCurrentList(lst);
+		    else
+		        self.app.setCurrentList(null);
+		}
 	    });
 	items.select('.button[name="edit"]')
 	    // edit: click 

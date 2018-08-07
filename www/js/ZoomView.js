@@ -1109,7 +1109,7 @@ class ZoomView extends SVGView {
 	// current feature
 	let currFeat = current ? (current instanceof Feature ? current : current.__data__) : null;
 	// create local copy of hiFeats, with current feature added
-	let hiFeats = Object.assign({}, this.hiFeats);
+	let hiFeats = Object.assign({}, this.hiFeats, this.app.currListIndex ||{});
 	if (currFeat) {
 	    hiFeats[currFeat.id] = currFeat.id;
 	}

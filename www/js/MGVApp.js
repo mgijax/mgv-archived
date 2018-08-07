@@ -753,40 +753,35 @@ class MGVApp extends Component {
     }
 
     //----------------------------------------------
-    get currentList () {
+    getCurrentList () {
         return this.currList;
     }
     //----------------------------------------------
-    set currentList (lst) {
+    setCurrentList (lst, goToFirst) {
     	//
 	let prevList = this.currList;
 	this.currList = lst;
+	if (lst !== prevList) {
+	    this.currListIndex = lst ? lst.ids.reduce( (x,i) => { x[i]=i; return x; }, {}) : {};
+	    this.currListCounter = 0;
+	}
 	//
 	let lists = d3.select('#mylists').selectAll('.listInfo');
 	lists.classed("current", d => d === lst);
 	//
-	if (lst && lst.ids.length > 0) {
-	    if (lst === prevList)
-	        this.currListCounter = (this.currListCounter + 1) % this.currList.ids.length;
-	    else
-	        this.currListCounter = 0;
-	    let currId = lst.ids[this.currListCounter];
-	    // show this list as tick marks in the genome view
-	    this.genomeView.drawTicks(lst.ids);
-	    this.genomeView.drawTitle();
-	    this.setCoordinates(currId);
-	}
-	else {
-	    this.currListCounter = 0;
-	    //
-	    this.zoomView.hiFeats = {};
-	    this.zoomView.update();
-	    //
-	    this.genomeView.drawTicks([]);
-	    this.genomeView.drawTitle();
-	}
+	// show this list as tick marks in the genome view
+	this.genomeView.drawTicks(lst ? lst.ids : []);
+	this.genomeView.drawTitle();
+	//
+	if (goToFirst) this.goToNextListElement();
     }
-
+    //----------------------------------------------
+    goToNextListElement () {
+	if (!this.currList || this.currList.ids.length === 0) return;
+	let currId = this.currList.ids[this.currListCounter];
+        this.currListCounter = (this.currListCounter + 1) % this.currList.ids.length;
+	this.setCoordinates(currId);
+    }
     //----------------------------------------------
     panzoom(pfactor, zfactor) {
 	//

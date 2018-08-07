@@ -69,7 +69,7 @@ class QueryManager extends Component {
 		  feats.forEach(f => this.app.zoomView.hiFeats[f.mgiid] = f.mgiid);
 		  this.app.zoomView.highlight();
 		  //
-		  this.app.currentList = lst;
+		  this.app.setCurrentList(lst,true);
 		  //
 		  d3.select("#mylists").classed("busy",false);
 	      });
