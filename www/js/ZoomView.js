@@ -115,14 +115,13 @@ class ZoomView extends SVGView {
 	      d3.event.stopPropagation();
 	  });
 
-	//
+	// Feature mouse event handlers.
 	//
 	let fClickHandler = function (f, evt, preserve) {
 	    let id = f.mgiid || f.mgpid;
 	    if (evt.metaKey) {
-		if (!evt.shiftKey && !preserve) this.hiFeats = {};
 		this.hiFeats[id] = id;
-	        this.app.setContext({landmark:(f.canonical || f.ID), delta:0})
+	        this.app.setContext({landmark:(f.canonical || f.ID), delta:0}, true);
 		return;
 	    }
 	    if (evt.shiftKey) {
@@ -1040,7 +1039,7 @@ class ZoomView extends SVGView {
     drawFeatures (sblocks) {
         let self = this;
 	//
-	// never draw the same feature twice
+	// never draw the same feature twice in one rendering pass
 	let drawn = new Set();	// set of mgpids of drawn features
 	let filterDrawn = function (f) {
 	    // returns true if we've not seen this one before.
@@ -1059,6 +1058,7 @@ class ZoomView extends SVGView {
 	    .attr("name", f => f.mgpid)
 	    .style("fill", f => self.app.cscale(f.getMungedType()))
 	    ;
+	// NB: if you are looking for click handlers, they are at 
 
 	// draw the rectangles
 
@@ -1127,8 +1127,6 @@ class ZoomView extends SVGView {
 	// Filter all features (rectangles) in the scene for those being highlighted.
 	// Along the way, build index mapping feature id to its "stack" of equivalent features,
 	// i.e. a list of its genologs sorted by y coordinate.
-	// Also, make each highlighted feature taller (so it stands above its neighbors)
-	// and give it the ".highlight" class.
 	//
 	this.stacks = {}; // fid -> [ rects ] 
 	let dh = this.blockHeight/2 - this.featHeight;
@@ -1161,13 +1159,6 @@ class ZoomView extends SVGView {
 
     //----------------------------------------------
     // Draws polygons that connect highlighted features in the view
-    // Args:
-    //   data : list of {
-    //       fid: feature-id, 
-    //       cls: extra class for .featureMark group,
-    //       rects: list of [rect1,rect2] pairs, 
-    //       }
-    //   currFeat : current (mouseover) feature (if any)
     //
     drawFiducials (currFeat) {
 	// build data array for drawing fiducials between equivalent features
