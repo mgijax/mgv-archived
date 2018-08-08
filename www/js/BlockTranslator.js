@@ -3,8 +3,7 @@
 //
 //
 class BlockTranslator {
-    constructor(url, aGenome, bGenome, blocks){
-        this.url = url;
+    constructor(aGenome, bGenome, blocks){
 	this.aGenome = aGenome;
 	this.bGenome = bGenome;
 	this.blocks = blocks.map(b => this.processBlock(b))

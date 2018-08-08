@@ -31,6 +31,9 @@ class KeyStore {
 	    return this.nullP;
         return set(key, value, this.store);
     }
+    put (key, value) {
+        return this.set(key, value);
+    }
     keys () {
 	if (this.disabled) 
 	    return this.nullP;
