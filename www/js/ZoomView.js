@@ -11,12 +11,12 @@ class ZoomView extends SVGView {
       let self = this;
       //
       this.minSvgHeight = 250;
-      this.blockHeight = 40;
+      this.blockHeight = 60;
       this.topOffset = 45;
-      this.featHeight = 6;	// height of a rectangle representing a feature
+      this.featHeight = 8;	// height of a rectangle representing a feature
       this.laneGap = 2;	        // space between swim lanes
       this.laneHeight = this.featHeight + this.laneGap;
-      this.stripHeight = 70;    // height per genome in the zoom view
+      this.stripHeight = 75;    // height per genome in the zoom view
       this.stripGap = 20;	// space between strips
       this.maxSBgap = 20;	// max gap allowed between blocks.
       this.dmode = 'comparison';// drawing mode. 'comparison' or 'reference'
@@ -1245,7 +1245,7 @@ class ZoomView extends SVGView {
 	labels.exit().remove();
 	labels
 	  .attr("x", d => d.trect.x + d.trect.width/2 )
-	  .attr("y", d => d.rect.__data__.genome.zoomY - 3)
+	  .attr("y", d => d.rect.__data__.genome.zoomY - 12)
 	  .text(d => {
 	       let f = d.rect.__data__;
 	       let sym = f.symbol || f.mgpid;
