@@ -478,9 +478,11 @@ class BlockCover:
 #
 class SyntenyBloc:
     COUNT = 0
-    def __init__(self, cc):
+    def __init__(self, cc, aGenome, bGenome):
 	self.id = SyntenyBloc.COUNT
 	SyntenyBloc.COUNT += 1
+	self.aGenome = aGenome
+	self.bGenome = bGenome
         self.a = [ Block(x) for x in cc[0] ]
 	self.b = [ Block(x) for x in cc[1] ]
 	self.edges = cc[2]
@@ -516,10 +518,10 @@ class SyntenyBloc:
         self.b[0].merge(cc[1][0], update=True)
 	# should be no need to update edges since there's still only 1
 	self.count += 1
-
-
     #
     COLNAMES = [
+	      "aGenome",
+	      "bGenome",
 	      "blockId",
 	      "blockCount",
 	      "blockOri",
@@ -542,6 +544,8 @@ class SyntenyBloc:
 	    aa = self.a[e[0]]
 	    bb = self.b[e[1]]
             r = [
+		self.aGenome.name,
+		self.bGenome.name,
 		"%s_%d" % (self.id, i),
 		self.count,
 		self.ori,
@@ -593,7 +597,7 @@ def generate(a, b):
 	        csb.extend(cc)
 	    else:
 	        if csb: yield csb
-		csb = SyntenyBloc(cc)
+		csb = SyntenyBloc(cc, a, b)
 	if csb:
 	    yield csb
 
@@ -654,6 +658,13 @@ def getArgs ():
 	metavar='NAME', 
 	help='Name of genome B.')
 
+    parser.add_argument(
+	'--noheader',
+	dest="noHeader",
+	default=False,
+	action='store_true',
+	help='Suppress column label line (1st line). Default=false (ie, output the labels).')
+
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -678,9 +689,10 @@ if __name__ == "__main__":
 	        i += 1
 	    prev = r[ci]
 	    r[ci] = i
-    _(9) # sort on col 9 and renumber
-    _(4) # sort on col 4 and renumber
-    sys.stdout.write( format(SyntenyBloc.COLNAMES) + NL )
+    _(11) # sort on col bIndex and renumber
+    _(6)  # sort on col aIndex and renumber
+    if not args.noHeader:
+	sys.stdout.write( format(SyntenyBloc.COLNAMES) + NL )
     for r in allRows:
 	sys.stdout.write( format(r) + NL )
 
