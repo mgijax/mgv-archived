@@ -156,9 +156,8 @@ class MGVApp extends Component {
 	// 
 	this.pbDragger = this.getContentDragger();
 	d3.selectAll('.pagebox')
-	    .call(this.pbDragger)
 	    .append('i')
-	    .attr('class','material-icons busy rotating')
+		.attr('class','material-icons busy rotating')
 	    ;
 	d3.selectAll('.closable')
 	    .append('i')
@@ -173,7 +172,20 @@ class MGVApp extends Component {
 	d3.selectAll('.content-draggable > *')
 	    .append('i')
 		.attr('title','Drag up/down to reposition.')
-		.attr('class','material-icons button draghandle');
+		.attr('class','material-icons button draghandle')
+		.on('mouseenter', function(){
+		    // Attach the drag behavior when the user mouses over the drag handle, and remove the behavior
+		    // when user mouses out. Why do it this way? Because if the drag behavior stays on all the time,
+		    // the user cannot select any text within the box.
+		    let pb = this.closest('.pagebox');
+		    if (!pb) return;
+		    d3.select(pb).call(self.pbDragger);
+		})
+		.on('mouseleave', function(){
+		    let pb = this.closest('.pagebox');
+		    if (!pb) return;
+		    d3.select(pb).on('.drag',null);
+		});
 
 	// 
         d3.select('#statusMessage')
