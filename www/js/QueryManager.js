@@ -26,7 +26,7 @@ let searchTypes = [{
     placeholder: "Reactome pathways names, IDs"
 },{
     method: "featuresById",
-    label: "...by nomenclature",
+    label: "...by symbol/ID",
     template: "",
     placeholder: "MGI names, synonyms, etc."
 }];
