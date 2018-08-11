@@ -175,9 +175,6 @@ class ZoomView extends SVGView {
 		  this.highlight();
 		  this.app.contextChanged();
 	      }
-	      else if (t.tagName == "rect" && tgt.attr('name') === 'zoomStripHandle' && d3.event.shiftKey) {
-	          this.app.setContext({ref:t.__data__.genome.name});
-	      }
 	  })
 	  .on("mouseover", () => {
 	      let tgt = d3.select(d3.event.target);
