@@ -17,12 +17,26 @@ class AuxDataManager {
     }
     //----------------------------------------------
     getAuxData (q, format) {
+	console.log('Query: ' + q);
 	format = format || 'jsonobjects';
 	let query = encodeURIComponent(q);
 	let url = this.url + `format=${format}&query=${query}`;
 	return d3json(url).then(data => data.results||[]);
     }
 
+    //----------------------------------------------
+    isIdentifier (q) {
+        let pts = q.split(':');
+        if (pts.length === 2 && pts[1].match(/^[0-9]+$/))
+	    return true;
+	if (q.toLowerCase().startsWith('r-mmu-'))
+	    return true;
+	return false;
+    }
+    //----------------------------------------------
+    addWildcards (q) {
+        return (this.isIdentifier(q) || q.indexOf('*')>=0) ? q : `*${q}*`;
+    }
     //----------------------------------------------
     // do a LOOKUP query for SequenceFeatures from MouseMine
     featuresByLookup (qryString) {
@@ -37,9 +51,10 @@ class AuxDataManager {
     }
     //----------------------------------------------
     featuresByOntologyTerm (qryString, termTypes) {
+	qryString = this.addWildcards(qryString);
         let q = `<query name="" model="genomic" 
 	  view="SequenceFeature.primaryIdentifier SequenceFeature.symbol" constraintLogic="A and B and C and D">
-	      <constraint code="A" path="SequenceFeature.ontologyAnnotations.ontologyTerm.parents" op="LOOKUP" value="*${qryString}*"/>
+	      <constraint code="A" path="SequenceFeature.ontologyAnnotations.ontologyTerm.parents" op="LOOKUP" value="${qryString}"/>
 	      <constraint code="B" path="SequenceFeature.organism.taxonId" op="=" value="10090"/>
 	      <constraint code="C" path="SequenceFeature.sequenceOntologyTerm.name" op="!=" value="transgene"/>
 	      <constraint code="D" path="SequenceFeature.ontologyAnnotations.ontologyTerm.ontology.name" op="ONE OF">
@@ -50,6 +65,7 @@ class AuxDataManager {
     }
     //----------------------------------------------
     featuresByPathwayTerm (qryString) {
+	qryString = this.addWildcards(qryString);
         let q = `<query name="" model="genomic" 
 	  view="Gene.primaryIdentifier Gene.symbol" constraintLogic="A and B">
 	      <constraint path="Gene.pathways" code="A" op="LOOKUP" value="${qryString}"/>
