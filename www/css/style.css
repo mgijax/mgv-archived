@@ -611,7 +611,6 @@ label > i.material-icons {
     fill-opacity: 0.3;
 }
 #zoomView svg .sBlock [name="layer0"] rect.block.confused {
-    fill: green;
 }
 #zoomView svg .sBlock [name="layer0"] rect.block.minus {
     fill: red;

@@ -208,7 +208,7 @@ class ZoomView extends SVGView {
 	    // see everything.
 	    if (e.ctrlKey) {
 		zd.deltaB += db;
-	        d3.select(z).select('g[name="sBlocks"]').attr('transform',`translate(${-zd.deltaB * self.ppb},0)`);
+	        d3.select(z).select('g[name="sBlocks"]').attr('transform',`translate(${-zd.deltaB * self.ppb},0)scale(${zd.xScale},1)`);
 		self.drawFiducials();
 		return;
 	    }
@@ -787,6 +787,8 @@ class ZoomView extends SVGView {
 	    gData.blocks = this.uniqifyBlocks(gData.blocks)
 	    // Each strip is independently scrollable. Init its offset (in bytes).
 	    gData.deltaB = 0;
+	    // Each strip is independently scalable. Init scale.
+	    gData.xScale = 1.0;
 	});
 	data = this.mergeSblockRuns(data);
 	data.forEach( gData => {
@@ -805,6 +807,7 @@ class ZoomView extends SVGView {
     }
 
     //----------------------------------------------
+    // Orders sblocks horizontally and translates them into position.
     layoutSBlocks (sblocks) {
 	// Sort the sblocks in each strip according to the current drawing mode.
 	let cmpField = this.dmode === 'comparison' ? 'index' : 'fIndex';
@@ -814,9 +817,11 @@ class ZoomView extends SVGView {
 	let bstart = []; // block start pos (in bp) assoc with pstart
 	let cchr = null;
 	let self = this;
+	let GAP  = 16;   // length of gap between blocks of diff chroms.
 	let dx;
 	let pend;
 	sblocks.each( function (b,i,j) { // b=block, i=index within strip, j=strip index
+	    let gd = this.__data__.genome;
 	    let blen = self.ppb * (b.end - b.start + 1); // total screen width of this sblock
 	    b.flip = b.ori === '-' && self.dmode === 'reference';
 	    b.xscale = d3.scale.linear().domain([b.start, b.end]).range( b.flip ? [blen, 0] : [0, blen] );
@@ -824,25 +829,43 @@ class ZoomView extends SVGView {
 	    if (i===0) {
 		// first block in each strip inits
 		pstart[j] = 0;
+		gd.pwidth = blen;
 		bstart[j] = b.start;
 		dx = 0;
 		cchr = b.chr;
 	    }
 	    else {
+		gd.pwidth += blen;
 		dx = b.chr === cchr ? pstart[j] + self.ppb * (b.start - bstart[j]) : Infinity;
 		if (dx < 0 || dx > self.maxSBgap) {
 		    // Changed chr or jumped a large gap
-		    pstart[j] = pend + 16;
+		    pstart[j] = pend + GAP;
 		    bstart[j] = b.start;
+		    gd.pwidth += GAP;
 		    dx = pstart[j];
 		    cchr = b.chr;
 		}
 	    }
-	    d3.select(this).attr("transform", `translate(${dx},0)`);
 	    pend = dx + blen;
+	    d3.select(this).attr("transform", `translate(${dx},0)`);
 	});
+	this.squish();
     }
 
+    //----------------------------------------------
+    // Scales each zoom strip horizontally to fit the width. Only scales down.
+    squish () {
+        let sbs = d3.selectAll('.zoomStrip [name="sBlocks"]');
+	let self = this;
+	sbs.each(function (sb,i) {
+	    if (sb.genome.pwidth > self.width) {
+	        let s = self.width / sb.genome.pwidth;
+		sb.xScale = s;
+		let t = d3.select(this);
+		t.attr('transform', ()=> `translate(${-sb.deltaB * self.ppb},0)scale(${sb.xScale},1)`);
+	    }
+	});
+    }
     //----------------------------------------------
     // Draws the zoom view panel with the given data.
     //
