@@ -13,7 +13,7 @@
 source config.sh
 
 datadir=${DIR}/data/genomedata
-outdir=${DIR}/data/blockfiles
+outdir="${datadir}"
 
 mkdir -p ${outdir}
 
@@ -30,13 +30,8 @@ lim=$((${#arr[@]} - 1))
 ofn="blocks.tsv"
 rm -f ${outdir}/${ofn}
 touch ${outdir}/${ofn}
+noheader="--noheader"
 for i in `seq 0 ${lim}`; do
-    noheader="--noheader"
-    if [ ${i} -eq 0 ]; then
-	# First time thru. Make sure file is empty. Also, generate header line.
-	noheader=""
-    fi
-    # extract the A genome name
     a=${arr[$i]}
     afn=$(basename "${a}")
     afn="${afn%.*}"
@@ -52,6 +47,8 @@ for i in `seq 0 ${lim}`; do
             # here we go...
 	    echo python sb.py ${noheader} --af ${a} --an ${an} --bf ${b} --bn ${bn} 
 	    python sb.py ${noheader} --af ${a} --an ${an} --bf ${b} --bn ${bn} >> ${outdir}/${ofn}
+	    # After the first time thru, stop generating header lines.
+	    noheader=""
         done
     fi
 done    
