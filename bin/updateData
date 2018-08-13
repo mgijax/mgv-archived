@@ -16,7 +16,7 @@ mkdir -p ${DDIR}
 mkdir -p ${SDIR}
 
 # generate genome list file (a simple table of genome names and labels)
-genomeList="${DIR}/data/genomeList.tsv"
+genomeList="${SDIR}/allGenomes.tsv"
 echo "name	label" > "${genomeList}"
 count=0
 for sn in "${ALL_GENOME_NAMES[@]}"
@@ -28,7 +28,7 @@ done
 
 # copy the genomeSets file to the dataDir. This defines named sets of genomes
 # and will have cooresponding buttons in the browser for easy selection.
-cp "${BDIR}/genomeSets.tsv" "${DIR}/data/genomeSets.tsv"
+cp "${BDIR}/genomeSets.tsv" "${SDIR}/genomeSets.tsv"
 
 # generate ENSEMBL to MGI id mapping file
 ensemblMappingFile="${DDIR}/ensembl2mgi.tsv"
@@ -60,10 +60,6 @@ function download {
        | sort -k 1,1 -k 4,4n \
        | python "${BDIR}/prepGenomeFile.py" "$ismgi" -m "${ensemblMappingFile}" -o "${featFile}" -c "${chrFile}" 
 }
-
-#FIXME: move!
-cat ${SDIR}/*features.tsv | grep -v ^chromosome | cut -f 9,10,1-4 | sort -k 5,5 > ${SDIR}/byGenologId.tsv 
-sort -k 6,6 ${SDIR}/byGenologId.tsv | grep -v '[.]$' > ${SDIR}/byCanonicalId.tsv
 
 # main loop
 for sn in "${ALL_GENOME_NAMES[@]}"
