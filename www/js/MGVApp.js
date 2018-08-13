@@ -117,7 +117,7 @@ class MGVApp extends Component {
 
 	// Things are all wired up. Now let's get some data.
 	// Start with the file of all the genomes.
-	d3tsv("./data/genomeList.tsv").then(data => {
+	d3tsv("./data/genomedata/allGenomes.tsv").then(data => {
 	    // create Genome objects from the raw data.
 	    this.allGenomes   = data.map(g => new Genome(g));
 	    this.allGenomes.sort( (a,b) => {
@@ -230,7 +230,7 @@ class MGVApp extends Component {
 	    gNames = gNames.concat(selectedNames.filter(n => gNames.indexOf(n) === -1));
 	    self.setContext({ genomes: gNames });
 	});
-	d3tsv("./data/genomeSets.tsv").then(sets => {
+	d3tsv("./data/genomedata/genomeSets.tsv").then(sets => {
 	    // Create selection buttons.
 	    sets.forEach( s => s.genomes = s.genomes.split(",") );
 	    let cgb = d3.select('#compGenomesBox').selectAll('button').data(sets);
@@ -784,6 +784,7 @@ class MGVApp extends Component {
 	// show this list as tick marks in the genome view
 	this.genomeView.drawTicks(lst ? lst.ids : []);
 	this.genomeView.drawTitle();
+	this.zoomView.highlight();
 	//
 	if (goToFirst) this.goToNextListElement();
     }
