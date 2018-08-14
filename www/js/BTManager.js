@@ -96,6 +96,11 @@ class BTManager {
 	let ranges = blkTrans.translate(fromGenome, chr, start, end, inverted);
 	return ranges;
     }
+    //----------------------------------------------
+    clearCachedData () {
+	console.log("BTManager: Cache cleared.")
+        return this.blockStore.clear();
+    }
 } // end class BTManager
 
 export { BTManager };

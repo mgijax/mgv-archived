@@ -94,7 +94,7 @@ class ZoomView extends SVGView {
             label: "Clear cache", 
 	    icon: "delete_sweep",
 	    tooltip: "Delete cached features. Data will be reloaded from the server on next use.",
-	    handler: ()=> this.app.clearCachedData()
+	    handler: ()=> this.app.clearCachedData(true)
 	}]);
 	this.root
 	  .on("click", () => {

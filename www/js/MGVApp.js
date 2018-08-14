@@ -1,4 +1,4 @@
-import { parseCoords, formatCoords, d3tsv, initOptList, same, clip } from './utils';
+import { parseCoords, formatCoords, d3tsv, d3json, initOptList, same, clip } from './utils';
 import { Genome }          from './Genome';
 import { Component }       from './Component';
 import { FeatureManager }  from './FeatureManager';
@@ -117,34 +117,49 @@ class MGVApp extends Component {
 
 	// Things are all wired up. Now let's get some data.
 	// Start with the file of all the genomes.
-	d3tsv("./data/genomedata/allGenomes.tsv").then(data => {
-	    // create Genome objects from the raw data.
-	    this.allGenomes   = data.map(g => new Genome(g));
-	    this.allGenomes.sort( (a,b) => {
-	        return a.label < b.label ? -1 : a.label > b.label ? +1 : 0;
+	this.checkTimestamp().then( () => {
+	    d3tsv("./data/genomedata/allGenomes.tsv").then(data => {
+		// create Genome objects from the raw data.
+		this.allGenomes   = data.map(g => new Genome(g));
+		this.allGenomes.sort( (a,b) => {
+		    return a.label < b.label ? -1 : a.label > b.label ? +1 : 0;
+		});
+		//
+		// build a name->Genome index
+		this.nl2genome = {}; // also build the combined list at the same time...
+		this.name2genome  = this.allGenomes
+		    .reduce((acc,g) => { this.nl2genome[g.name] = acc[g.name] = g; return acc; }, {});
+		// build a label->Genome index
+		this.label2genome = this.allGenomes
+		    .reduce((acc,g) => { this.nl2genome[g.label] = acc[g.label] = g; return acc; }, {});
+
+		// Now preload all the chromosome files for all the genomes
+		let cdps = this.allGenomes.map(g => d3tsv(`./data/genomedata/${g.name}-chromosomes.tsv`));
+		return Promise.all(cdps);
+	    })
+	    .then( data => {
+
+		//
+		this.processChromosomes(data);
+		this.initDomPart2();
+		//
+		// FINALLY! We are ready to draw the initial scene.
+		this.setContext(this.initialCfg);
+
 	    });
-	    //
-	    // build a name->Genome index
-	    this.nl2genome = {}; // also build the combined list at the same time...
-	    this.name2genome  = this.allGenomes
-	        .reduce((acc,g) => { this.nl2genome[g.name] = acc[g.name] = g; return acc; }, {});
-	    // build a label->Genome index
-	    this.label2genome = this.allGenomes
-	        .reduce((acc,g) => { this.nl2genome[g.label] = acc[g.label] = g; return acc; }, {});
-
-	    // Now preload all the chromosome files for all the genomes
-	    let cdps = this.allGenomes.map(g => d3tsv(`./data/genomedata/${g.name}-chromosomes.tsv`));
-	    return Promise.all(cdps);
-	})
-	.then( data => {
-
-	    //
-	    this.processChromosomes(data);
-            this.initDomPart2();
-	    //
-	    // FINALLY! We are ready to draw the initial scene.
-	    this.setContext(this.initialCfg);
-
+	});
+    }
+    //----------------------------------------------
+    checkTimestamp () {
+        let tStore = new KeyStore('timestamp');
+	return d3tsv('./data/genomedata/TIMESTAMP.tsv').then( ts => {
+	    let newTimeStamp =  new Date(Date.parse(ts[0].TIMESTAMP));
+	    return tStore.get('TIMESTAMP').then( oldTimeStamp => {
+	        if (!oldTimeStamp || newTimeStamp > oldTimeStamp) {
+		    tStore.put('TIMESTAMP',newTimeStamp);
+		    return this.clearCachedData();
+		}
+	    })
 	});
     }
     //----------------------------------------------
@@ -932,9 +947,10 @@ class MGVApp extends Component {
 	window.open(linkUrl, "_blank");
     }
     //----------------------------------------------
-    clearCachedData () {
-	if (window,confirm('Delete all cached data. Are you sure?')) {
+    clearCachedData (ask) {
+	if (!ask || window.confirm('Delete all cached data. Are you sure?')) {
 	    this.featureManager.clearCachedData();
+	    this.translator.clearCachedData();
 	}
     }
 } // end class MGVApp

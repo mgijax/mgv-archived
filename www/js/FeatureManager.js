@@ -21,7 +21,7 @@ class FeatureManager {
 	this.mineFeatureCache = {};	// auxiliary info pulled from MouseMine 
 	this.loadedGenomes = new Set(); // the set of Genomes that have been fully loaded
 	//
-	this.fStore = new KeyStore('features'); // client side disk cache
+	this.fStore = new KeyStore('features'); // maps genome name -> list of features
     }
  
     //----------------------------------------------
