@@ -7,32 +7,33 @@
 
 source config.sh
 
-BDIR="${DIR}/bin"
-DDIR="${DIR}/data/downloads"
-SDIR="${DIR}/data/genomedata"
-LOG="${DIR}/data/LOG"
-
 mkdir -p ${DDIR}
 mkdir -p ${SDIR}
 
-# generate genome list file (a simple table of genome names and labels)
-genomeList="${SDIR}/allGenomes.tsv"
-echo "name	label" > "${genomeList}"
-count=0
-for sn in "${ALL_GENOME_NAMES[@]}"
-do : 
-    slbl="${ALL_GENOME_LABELS[count]}"
-    echo "${sn}	${slbl}" >> "${genomeList}"
-    count=$(expr $count + 1)
-done
+function generateGenomeList {
+    # generate genome list file (a simple table of genome names and labels)
+    genomeList="${SDIR}/allGenomes.tsv"
+    echo "name	label" > "${genomeList}"
+    count=0
+    for sn in "${ALL_GENOME_NAMES[@]}"
+    do : 
+	slbl="${ALL_GENOME_LABELS[count]}"
+	echo "${sn}	${slbl}" >> "${genomeList}"
+	count=$(expr $count + 1)
+    done
+}
 
-# copy the genomeSets file to the dataDir. This defines named sets of genomes
-# and will have cooresponding buttons in the browser for easy selection.
-cp "${BDIR}/genomeSets.tsv" "${SDIR}/genomeSets.tsv"
+function copyGenomeSets {
+    # copy the genomeSets file to the dataDir. This defines named sets of genomes
+    # and will have cooresponding buttons in the browser for easy selection.
+    cp "${BDIR}/genomeSets.tsv" "${SDIR}/genomeSets.tsv"
+}
 
 # generate ENSEMBL to MGI id mapping file
-ensemblMappingFile="${DDIR}/ensembl2mgi.tsv"
-python "${BDIR}/getEnsemblMgiMapping.py" > "${ensemblMappingFile}"
+function generateMappingFile {
+    ensemblMappingFile="${DDIR}/ensembl2mgi.tsv"
+    python "${BDIR}/getEnsemblMgiMapping.py" > "${ensemblMappingFile}"
+}
 
 function download {
    genome=$1
@@ -58,21 +59,37 @@ function download {
        | grep -v "Parent=" \
        | grep -v biological_region \
        | sort -k 1,1 -k 4,4n \
-       | python "${BDIR}/prepGenomeFile.py" "$ismgi" -m "${ensemblMappingFile}" -o "${featFile}" -c "${chrFile}" 
+       | python "${BDIR}/prepGenomeFile.py" -s "${SIZELIMIT}" "$ismgi" -m "${ensemblMappingFile}" -o "${featFile}" -c "${chrFile}" 
 }
 
-# main loop
-for sn in "${ALL_GENOME_NAMES[@]}"
-do : 
-    # For every genome name, there is an env var of that name containing the file name for that genome
-    # This gets the file name.
-    eval fname=\$$sn
-    # call the download function for this pair
-    download "${sn}" "${fname}"
-    echo ${sn}
-done
+function generateFeatures {
+    for sn in "${ALL_GENOME_NAMES[@]}"
+    do : 
+	# For every genome name, there is an env var of that name containing the file name for that genome
+	# This gets the file name.
+	eval fname=\$$sn
+	# call the download function for this pair
+	download "${sn}" "${fname}"
+	echo ${sn}
+    done
+}
 
+function generateTimestamp {
+    # output timestamp
+    tsfile="${SDIR}"/TIMESTAMP.tsv
+    echo "TIMESTAMP" > "${tsfile}"
+    echo `date` >> "${tsfile}"
+}
+
+##
+## Main prog
+##
+
+copyGenomeSets
+generateGenomeList
+generateMappingFile
+generateFeatures
 ./generateBlockFiles
-
+generateTimestamp
 
 # THE END

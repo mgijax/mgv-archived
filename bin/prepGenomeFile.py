@@ -98,6 +98,14 @@ class Prep:
             help='File of ENSEMBL to MGI id mappings.')
 
         self.parser.add_argument(
+            '-s',
+            dest='sizeLimit',
+            metavar='N', 
+	    type=int,
+	    default=float('inf'),
+            help='Maximum allowed feature size, in Mb. Features above this size will be removed and reported. Default: no limit.')
+
+        self.parser.add_argument(
             '-o',
             dest="ofile",
             metavar='FILE', 
@@ -113,6 +121,8 @@ class Prep:
         """
         """
         self.args = self.parser.parse_args()
+	self.args.sizeLimit *= 1000000
+
 	if self.args.isMgi:
 	    self.processFeature = self.processMgiFeature
 	    self.finalize = self.finalizeMgi
@@ -268,6 +278,10 @@ class Prep:
 	    #
 	    f = self.processFeature(f)
 	    if f is None:
+	        continue
+	    if f.end - f.start + 1 > self.args.sizeLimit:
+		self.log('Feature size (%d) exceeds limit (%d). Skipped:\n%s' % \
+		    (f.end - f.start + 1, self.args.sizeLimit, str(f)))
 	        continue
 
 	    self.assignContig(f)

@@ -12,13 +12,11 @@
 
 source config.sh
 
-datadir=${DIR}/data/genomedata
-outdir="${datadir}"
-
+outdir="${SDIR}"
 mkdir -p ${outdir}
 
 # get the list of feature files
-declare -a arr=(`ls ${datadir}/mus_*-features.tsv`)
+declare -a arr=(`ls ${SDIR}/mus_*-features.tsv`)
 
 # 
 lim=$((${#arr[@]} - 1))
@@ -30,7 +28,7 @@ lim=$((${#arr[@]} - 1))
 ofn="blocks.tsv"
 rm -f ${outdir}/${ofn}
 touch ${outdir}/${ofn}
-noheader="--noheader"
+noheader=""
 for i in `seq 0 ${lim}`; do
     a=${arr[$i]}
     afn=$(basename "${a}")
@@ -48,7 +46,7 @@ for i in `seq 0 ${lim}`; do
 	    echo python sb.py ${noheader} --af ${a} --an ${an} --bf ${b} --bn ${bn} 
 	    python sb.py ${noheader} --af ${a} --an ${an} --bf ${b} --bn ${bn} >> ${outdir}/${ofn}
 	    # After the first time thru, stop generating header lines.
-	    noheader=""
+	    noheader="--noheader"
         done
     fi
 done    
