@@ -14,7 +14,8 @@
     <div id="header" class="pagebox flexrow">
 	<i class="material-icons button gear" title="Show/hide left column.">settings</i>
 	<div class="flexrow">
-	    <a target="_blank" title="Mouse Genome Informatics" href="http://www.informatics.jax.org//"><img name="mgilogo" src="http://www.informatics.jax.org/webshare/images/mgi_logo.gif" /></a>
+	    <a target="_blank" title="Mouse Genome Informatics" href="http://www.informatics.jax.org//">
+	    <img name="mgilogo" src="http://www.informatics.jax.org/webshare/images/mgi_logo.gif" /></a>
 	    <label class="spacer1">Multi Genome Viewer</label>
 	</div>    
 	<a target="_blank" href="http://www.informatics.jax.org/userhelp/MGV_help.shtml"><i class="material-icons button info" title="HEEEEEELP!">info</i></a>
@@ -29,20 +30,26 @@
 	<!-- Left column. -->
 	<div id="leftcolumn" name="leftcolumn" class="flexcolumn closable content-draggable">
 
-	    <!-- Reference strain. -->
-	    <div id="refGenomeBox" class="refGenome pagebox flexcolumn closable">
+	    <!-- Reference genomne. -->
+	    <div id="refGenomeBox" 
+	    title="Select one genome as the reference. The reference genome determines how coordinates are interpreted. It is drawn with a blue bar at the left end and with a transparent background."
+	    class="refGenome pagebox flexcolumn closable">
 		<label>Reference genome</label>
 		<select id="refGenome"></select>
 	    </div>
 
-	    <!-- Comparison strains. -->
-	    <div id="compGenomesBox" class="compGenomes pagebox flexcolumn closable">
+	    <!-- Comparison genomes. -->
+	    <div id="compGenomesBox" 
+	    title="Select one or more genomes to view. One will be the reference; the others are comparison genomes."
+	    class="compGenomes pagebox flexcolumn closable">
 		<label>Genomes</label>
 		<select id="compGenomes" size="10"></select>
 	    </div>
 
 	    <!-- Find genes (aka create lists). -->
-	    <div id="findGenesBox" class="pagebox flexcolumn closable">
+	    <div id="findGenesBox" 
+	    title="Search MouseMine for genes annotated to specified diseases, pathways, etc. Pick a search type, enter a search term and hit enter. Results are returned in a new list (see MyLists)."
+	    class="pagebox flexcolumn closable">
 		<label>Find genes</label>
 		<div class="flexcolumn">
 		    <select name="searchtype">
@@ -52,7 +59,9 @@
 	    </div>
 
 	    <!-- My lists -->
-	    <div id="mylists" class="pagebox flexcolumn closable">
+	    <div id="mylists" 
+	    title="Shows your current lists. A list simply contains identifiers. Click on a list to show its items in the genome view; click again to hide them. Click on the 'x' to delete a list. Click on the pencil to edit the list (see ListEditor)."
+	    class="pagebox flexcolumn closable">
 		<label>My lists</label>
 
 		<!-- All my lists -->
@@ -73,7 +82,9 @@
 	    </div>
 
 	    <!-- List Editor  -->
-	    <div id="listeditor" class="pagebox flexcolumn closable closed">
+	    <div id="listeditor" 
+	       title="Examine/modify the contents of a list. Create a new list. Combine lists with intersection, union, and difference."
+	       class="pagebox flexcolumn closable closed">
 		<label>List editor</label>
 		<form name="editform" class="flexcolumn">
 		    <!-- Name -->
@@ -125,13 +136,17 @@
 	    </div>
 
 	    <!-- Facet: feature type -->
-	    <div id="featureTypeBox" class="colorKey facet pagebox flexcolumn closable">
+	    <div id="featureTypeBox" class="colorKey facet pagebox flexcolumn closable"
+		title="Show/hide features by type. Click on a swatch to show that type. Click on multiple swatches to show multiple types. Unclicking all swatches has the same effect as click all."
+	    >
 		<label>Feature types</label>
 	    </div>
 
 	    <!-- Facet: has MGI id -->
-	    <div id="mgiFacetBox" class="mgiFacet facet pagebox flexcolumn closable">
-		<label>Has MGI ID?</label>
+	    <div id="mgiFacetBox" 
+		title="Show/hide features that are associated with known canonical genes."
+	        class="mgiFacet facet pagebox flexcolumn closable">
+		<label>Has canonical ID</label>
 		<div>
 		    <input type="radio" name="mgiFacet" value="yes" />
 		    <span>Yes</span>
@@ -147,7 +162,9 @@
 	    </div>
 
 	    <!-- Facet: is highlighted -->
-	    <div id="hiFacetBox" class="hiFacet facet pagebox flexcolumn closable">
+	    <div id="hiFacetBox" 
+		title="Show/hide features that are currently highlighted."
+		class="hiFacet facet pagebox flexcolumn closable">
 		<label>Is highlighted?</label>
 		<div>
 		    <input type="radio" name="hiFacet" value="yes" />
@@ -167,7 +184,9 @@
 	<!-- Middle column -->
 	<div id="middlecolumn" name="middlecolumn" class="flexcolumn spacer1 content-draggable">
 	    <!-- Genome view -->
-	    <div id="genomeView" class="pagebox flexcolumn closable">
+	    <div id="genomeView" 
+		title="When open, shows the reference genome's chromosomes as vertical lines. When closed, shows the current chromosome as a horizontal line. Click or drag on a chromosome to jump or zoom to that location. When displaying a list, red circles show positions of list items. Click on a circle to jump to that feature."
+	        class="pagebox flexcolumn closable">
 		<label><span class="title">Genome View</span> <span class="subtitle"></span></label>
 		<div name="svgcontainer" class="flexrow">
 		    <div name="scrollbuttons" class="flexcolumn">
@@ -178,12 +197,16 @@
 		</div>
 	    </div>
 	    <!-- Feature details -->
-	    <div id="featureDetails" class="pagebox flexcolumn closable closed">
+	    <div id="featureDetails" 
+		title="Shows details of a feature you click on. When open, shows details for genologs in all currently displayed genomes. When closed, shows only the feature in the genome that was clicked."
+	        class="pagebox flexcolumn closable closed">
 		<label>Feature details</label>
 		<table></table>
 	    </div>
 	    <!-- Zoom view -->
-	    <div id="zoomView" class="comparison pagebox flexcolumn closable">
+	    <div id="zoomView" 
+	       title="The main view. Shows features in the current region of the reference genome and all selection comparison genomes. Highlights feature in the view that are currently selected. Many controls for panning, zooming, selecting, etc. Most anything can be undone by hitting the browser's Back button."
+	       class="comparison pagebox flexcolumn closable">
 		<!-- Zoom controls -->
 		<div name="zoomcontrols" class="flexrow">
 		    <!-- menu -->

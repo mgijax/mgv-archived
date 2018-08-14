@@ -219,6 +219,20 @@ label > i.material-icons {
     display: inherit;
     opacity: 1;
 }
+.pagebox > .button.help {
+    position: absolute;
+    top: -1px;
+    right: 40px;
+    font-size: 18px;
+}
+
+.pagebox > .button.help::after {
+    content: "help_outline";
+}
+.pagebox.closable.closed > .button.help {
+    display: inherit;
+}
+
 
 /* -----------------------------------------
  * Status message

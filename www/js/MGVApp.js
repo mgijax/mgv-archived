@@ -170,10 +170,24 @@ class MGVApp extends Component {
 	// TODO: refactor pagebox, draggable, and friends into a framework module,
 	// 
 	this.pbDragger = this.getContentDragger();
+	// Add busy icon, currently invisibe.
 	d3.selectAll('.pagebox')
 	    .append('i')
 		.attr('class','material-icons busy rotating')
 	    ;
+	//
+	// If a pagebox has title text, append a help icon and move the text there
+	d3.selectAll('.pagebox[title]')
+	    .append('i')
+	        .attr('title', function(){
+		    let p = d3.select(this.parentNode);
+		    let t = p.attr('title');
+		    p.attr('title', null);
+		    return t;
+		})
+	        .attr('class', 'material-icons button help')
+		;
+	//
 	d3.selectAll('.closable')
 	    .append('i')
 		.attr('class','material-icons button close')
