@@ -221,7 +221,7 @@ class ZoomView extends SVGView {
 	    zd.deltaB = clip(zd.deltaB + db, -c.start, c.chromosome.length - c.end)
 	    // translate
 	    d3.select(this).selectAll('g.zoomStrip > g[name="sBlocks"]')
-		.attr('transform',`translate(${-zd.deltaB * self.ppb},0)`);
+		.attr('transform', cz => `translate(${-zd.deltaB * self.ppb},0)scale(${cz.xScale},1)`);
 	    self.drawFiducials();
 	    // Wait until wheel events have stopped for a while, then scroll the view.
 	    if (self.timeout)
