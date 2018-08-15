@@ -166,6 +166,7 @@ class MGVApp extends Component {
     // 
     initDom () {
 	self = this;
+	this.root = d3.select('#mgv');
 	//
 	// TODO: refactor pagebox, draggable, and friends into a framework module,
 	// 
@@ -177,15 +178,18 @@ class MGVApp extends Component {
 	    ;
 	//
 	// If a pagebox has title text, append a help icon to the label and move the text there
-	d3.selectAll('.pagebox[title] > label')
+	d3.selectAll('.pagebox[title]')
 	    .append('i')
+	        .attr('class', 'material-icons button help')
 	        .attr('title', function(){
-		    let p = d3.select(this.parentNode.parentNode);
+		    let p = d3.select(this.parentNode);
 		    let t = p.attr('title');
 		    p.attr('title', null);
 		    return t;
 		})
-	        .attr('class', 'material-icons help')
+		.on('click', function() {
+		    self.showStatus(d3.select(this).attr('title'), d3.event.clientX, d3.event.clientY);
+		})
 		;
 	//
 	d3.selectAll('.closable')
@@ -450,10 +454,32 @@ class MGVApp extends Component {
 	if (!isBusy) this.showStatus('')
     }
     //----------------------------------------------
-    showStatus (msg) {
+    showingStatus () {
+        return d3.select('#statusMessage').classed('showing');
+    }
+
+    //----------------------------------------------
+    showStatus (msg, nearX, nearY) {
+	let bb = this.root.node().getBoundingClientRect();
+	let _ = (n, len, nmax) => {
+	    if (n === undefined)
+	        return '50%';
+	    else if (typeof(n) === 'string')
+	        return n;
+	    else if ( n + len < nmax ) {
+	        return n + 'px';
+	    }
+	    else {
+	        return (nmax - len) + 'px';
+	    }
+	};
+	nearX = _(nearX, 250, bb.width);
+	nearY = _(nearY, 150, bb.height);
 	if (msg)
 	    d3.select('#statusMessage')
 		.classed('showing', true)
+		.style('left', nearX)
+		.style('top',  nearY)
 		.select('span')
 		    .text(msg);
 	else

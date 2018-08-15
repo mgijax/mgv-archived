@@ -219,13 +219,17 @@ label > i.material-icons {
     display: inherit;
     opacity: 1;
 }
-.pagebox i.help {
+.pagebox .button.help {
+    position: absolute;
+    top: -0.5px;
+    right: 40px;
+    font-size: 16px;
 }
 
-.pagebox i.help::after {
+.pagebox .button.help::after {
     content: "help_outline";
 }
-.pagebox.closable.closed i.help {
+.pagebox.closable.closed .button.help {
     display: inherit;
 }
 
@@ -237,16 +241,21 @@ label > i.material-icons {
 #statusMessage {
     background-color: #ddd;
     position: fixed;
-    left: 50%;
-    top: 50%;
     z-index: 100;
-    padding: 4px;
+    padding: 4px 8px;
     border: thin solid black;
     border-radius: 2px;
+    max-width: 250px;
     display: none;
 }
 #statusMessage.showing {
     display: flex;
+}
+#statusMessage .button.close {
+    position: absolute;
+    top: 0px;
+    right: 0px;
+    font-size: 14px;
 }
 
 /* -----------------------------------------
