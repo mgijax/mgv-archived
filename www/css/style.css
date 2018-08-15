@@ -219,17 +219,13 @@ label > i.material-icons {
     display: inherit;
     opacity: 1;
 }
-.pagebox > .button.help {
-    position: absolute;
-    top: -1px;
-    right: 40px;
-    font-size: 18px;
+.pagebox i.help {
 }
 
-.pagebox > .button.help::after {
+.pagebox i.help::after {
     content: "help_outline";
 }
-.pagebox.closable.closed > .button.help {
+.pagebox.closable.closed i.help {
     display: inherit;
 }
 
