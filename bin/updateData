@@ -58,7 +58,6 @@ function download {
        | grep -v "^#" \
        | grep -v "Parent=" \
        | grep -v biological_region \
-       | sort -k 1,1 -k 4,4n \
        | python "${BDIR}/prepGenomeFile.py" -s "${SIZELIMIT}" "$ismgi" -m "${ensemblMappingFile}" -o "${featFile}" -c "${chrFile}" 
 }
 

@@ -274,7 +274,16 @@ class Prep:
 
 	# main loop
 
-        for f in gff3.iterate(self.gffIn):
+	def chrSort (a,b) :
+	    ca = a[0]
+	    cb = b[0]
+	    if len(ca) == 1 and ca.isdigit(): ca = '0'+ca
+	    if len(cb) == 1 and cb.isdigit(): cb = '0'+cb
+	    c = cmp(ca,cb)
+	    return c if c else a.start - b.start
+	allFeats = list(gff3.iterate(self.gffIn))
+	allFeats.sort(chrSort)
+        for f in allFeats:
 	    #
 	    f = self.processFeature(f)
 	    if f is None:

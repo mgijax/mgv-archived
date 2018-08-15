@@ -462,8 +462,9 @@ class BlockCover:
 	    aok = _(cc[0], mergeOrders[0])
 	    bok = _(cc[1], mergeOrders[1])
 	    if not aok or not bok:
-	        log("Uncollapsible connected component.")
+	        #log("Uncollapsible connected component.")
 		#log(str(cc))
+		pass
 	#
 	self.mergeRanges ( mergeOrders[0] )
 	self.joinedTo.mergeRanges( mergeOrders[1] )
@@ -592,7 +593,8 @@ def generate(a, b):
 	csb = None # current synteny block
 	for cc in a.contigs.enumerateCCs():
 	    if len(cc[0]) > 1 or len(cc[1]) > 1:
-	        log("UNCOLLAPSED:" + str(cc)) 
+	        #log("UNCOLLAPSED:" + str(cc)) 
+		pass
 	    if csb and csb.canExtend(cc):
 	        csb.extend(cc)
 	    else:
