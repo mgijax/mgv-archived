@@ -948,6 +948,13 @@ class MGVApp extends Component {
 	ncs.append("span")
 	    .text(c => c.lbl);
     }
+    //----------------------------------------------
+    clearCachedData (ask) {
+	if (!ask || window.confirm('Delete all cached data. Are you sure?')) {
+	    this.featureManager.clearCachedData();
+	    this.translator.clearCachedData();
+	}
+    }
 
     //----------------------------------------------
     linkToMgiSnpReport () {
@@ -987,11 +994,21 @@ class MGVApp extends Component {
 	window.open(linkUrl, "_blank");
     }
     //----------------------------------------------
-    clearCachedData (ask) {
-	if (!ask || window.confirm('Delete all cached data. Are you sure?')) {
-	    this.featureManager.clearCachedData();
-	    this.translator.clearCachedData();
-	}
+    // Downloads DNA sequences of the specified type in FASTA format for the specified feature.
+    // If genomes is specified, lists the specific genomes to retrieve from; otherwise retrieves from all genomes.
+    // Args:
+    //     f (object) the feature
+    //     type (string) which sequences to download: 'genomic','exon','CDS',
+    //     genomes (list of strings) names of genomes to retrieve from. If not specified,
+    //         retrieves sequenecs from all available mouse genomes.
+    //
+    downloadFasta (f, type, genomes) {
+	let q = this.queryManager.auxDataManager.sequencesForFeature(f, type, genomes)
+	if (q) window.open(q,"_blank");
+    }
+    linkToReportPage (f) {
+        let u = this.queryManager.auxDataManager.linkToReportPage(f.mgiid || f.mgpid);
+	window.open(u, '_blank')
     }
 } // end class MGVApp
 

@@ -48,21 +48,26 @@ class BTManager {
 		console.log("Found blocks in cache.");
 	        return this.registerBlocks(aGenome, bGenome, data);
 	    }
+	    else if (this.serverRequest) {
+	        // if there is an outstanding request, wait until it's done and try again.
+		this.serverRequest.then(()=>this.getBlockFile(aGenome, bGenome));
+	    }
 	    else {
 		// Third, load from server.
 		let fn = `./data/genomedata/blocks.tsv`
 		console.log("Requesting block file from: " + fn);
-		return d3tsv(fn).then(blocks => {
-		      let rbs = blocks.reduce( (a,b) => {
-		          let k = b.aGenome + '-' + b.bGenome;
-			  if (!(k in a)) a[k] = [];
-			  a[k].push(b);
-			  return a;
-		      }, {});
-		      for (let n in rbs) {
-			  this.blockStore.set(n, rbs[n]);
-		      }
-		  });
+		this.serverRequest = d3tsv(fn).then(blocks => {
+		    let rbs = blocks.reduce( (a,b) => {
+		    let k = b.aGenome + '-' + b.bGenome;
+		    if (!(k in a)) a[k] = [];
+		        a[k].push(b);
+			return a;
+		    }, {});
+		    for (let n in rbs) {
+		        this.blockStore.set(n, rbs[n]);
+		    }
+		});
+		return this.serverRequest;
 	    }
 	});
     }

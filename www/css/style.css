@@ -224,6 +224,7 @@ label > i.material-icons {
     top: -0.5px;
     right: 40px;
     font-size: 16px;
+    border-radius: 8px;
 }
 
 .pagebox .button.help::after {

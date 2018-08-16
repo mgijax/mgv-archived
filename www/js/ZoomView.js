@@ -70,8 +70,8 @@ class ZoomView extends SVGView {
 	r.select("#panRightMore").on("click",
 	    () => { a.pan(+5*a.defaultPan) });
 
-	// Create context menu. 
-	this.initContextMenu([{
+	// 
+	this.cxtMenuCfg = [{
 	    name: "linkToSnps",
             label: "MGI SNPs", 
 	    icon: "open_in_new",
@@ -95,7 +95,39 @@ class ZoomView extends SVGView {
 	    icon: "delete_sweep",
 	    tooltip: "Delete cached features. Data will be reloaded from the server on next use.",
 	    handler: ()=> this.app.clearCachedData(true)
-	}]);
+	}];
+	//
+	this.fcxtMenuCfg = [{
+	    name: "toMouseMine",
+            label: "Feature@MouseMine", 
+	    icon: "open_in_new",
+	    tooltip: "Go to this feature in MouseMine.",
+	    handler: (f) => this.app.linkToReportPage(f)
+	},{
+	    name: "genomicSeqDownload",
+            label: "Genomic sequences", 
+	    icon: "cloud_download",
+	    tooltip: "Download genomic sequences for this feature from currently displayed genomes.",
+	    handler: (f) => { 
+		this.app.downloadFasta(f, 'genomic', this.app.vGenomes.map(vg=>vg.label));
+	    }
+	},{
+	    name: "cdsSeqDownload",
+            label: "CDS sequences", 
+	    icon: "cloud_download",
+	    tooltip: "Download coding sequences of this feature from currently displayed genomes.",
+	    handler: (f) => { 
+		this.app.downloadFasta(f, 'cds', this.app.vGenomes.map(vg=>vg.label));
+	    }
+	},{
+	    name: "exonSeqDownload",
+            label: "Exon sequences", 
+	    icon: "cloud_download",
+	    tooltip: "Download sequences for exons of this feature from currently displayed genomes.",
+	    handler: (f) => { 
+		this.app.downloadFasta(f, 'exon', this.app.vGenomes.map(vg=>vg.label));
+	    }
+	}];
 	this.root
 	  .on("click", () => {
 	      // click on background => hide context menu
@@ -106,13 +138,6 @@ class ZoomView extends SVGView {
 	      else
 		  this.hideContextMenu()
 	      
-	  })
-	  .on('contextmenu', function(){
-	      // right-click on a feature => feature context menu
-	      let tgt = d3.event.target;
-	      if (!tgt.classList.contains("feature")) return;
-	      d3.event.preventDefault();
-	      d3.event.stopPropagation();
 	  });
 
 	// Feature mouse event handlers.
@@ -124,7 +149,15 @@ class ZoomView extends SVGView {
 	        this.app.setContext({landmark:(f.canonical || f.ID), delta:0}, true);
 		return;
 	    }
-	    if (evt.shiftKey) {
+	    else if (evt.ctrlKey) {
+	        let cx = d3.event.clientX;
+	        let cy = d3.event.clientY;
+	        let bb = this.root.node().getBoundingClientRect();
+		evt.stopPropagation();
+		evt.preventDefault();
+		this.showContextMenu(this.fcxtMenuCfg, f, cx-bb.x, cy-bb.y);
+	    }
+	    else if (evt.shiftKey) {
 		if (this.hiFeats[id])
 		    delete this.hiFeats[id]
 		else
@@ -174,6 +207,15 @@ class ZoomView extends SVGView {
 		  this.hiFeats = {};
 		  this.highlight();
 		  this.app.contextChanged();
+	      }
+	  })
+	  .on("contextmenu", () => {
+	      let tgt = d3.select(d3.event.target);
+	      let f = tgt.data()[0];
+	      if (f instanceof Feature) {
+		  fClickHandler(f, d3.event);
+		  d3.event.stopPropagation();
+		  d3.event.preventDefault();
 	      }
 	  })
 	  .on("mouseover", () => {
@@ -252,7 +294,7 @@ class ZoomView extends SVGView {
 	      let cy = d3.event.clientY;
 	      let bb = d3.select(this)[0][0].getBoundingClientRect();
 	      d3.event.stopPropagation();
-	      self.showContextMenu(cx-bb.left,cy-bb.top);
+	      self.showContextMenu(self.cxtMenuCfg, self, cx-bb.left, cy-bb.top);
 	  });
 	// zoom coordinates box
 	this.root.select("#zoomCoords")
@@ -293,29 +335,6 @@ class ZoomView extends SVGView {
 	    });
     }
     //----------------------------------------------
-    // Args:
-    //     data (list of menuItem configs) Each config looks like {label:string, handler: function}
-    initContextMenu (data) {
-	this.cxtMenu.selectAll(".menuItem").remove(); // in case of re-init
-        let mitems = this.cxtMenu
-	  .selectAll(".menuItem")
-	  .data(data);
-	let news = mitems.enter()
-	  .append("div")
-	  .attr("class", "menuItem flexrow")
-	  .attr("name", d => d.name || null )
-	  .attr("title", d => d.tooltip || null );
-	news.append("label")
-	  .text(d => d.label)
-	  .on("click", d => {
-	      d.handler();
-	      this.hideContextMenu();
-	  });
-	news.append("i")
-	  .attr("class", "material-icons")
-	  .text( d=>d.icon );
-    }
-    //----------------------------------------------
     set highlighted (hls) {
 	if (typeof(hls) === "string")
 	    hls = [hls];
@@ -345,7 +364,32 @@ class ZoomView extends SVGView {
 	this.floatingText.text('');
     }
     //----------------------------------------------
-    showContextMenu (x,y) {
+    // Args:
+    //     items (list of menuItem configs) Each config looks like {label:string, handler: function}
+    //     obj (object) optional. Object to pass to handlers.
+    initContextMenu (items,obj) {
+	this.cxtMenu.selectAll(".menuItem").remove(); // in case of re-init
+        let mitems = this.cxtMenu
+	  .selectAll(".menuItem")
+	  .data(items);
+	let news = mitems.enter()
+	  .append("div")
+	  .attr("class", "menuItem flexrow")
+	  .attr("name", d => d.name || null )
+	  .attr("title", d => d.tooltip || null );
+	news.append("label")
+	  .text(d => d.label)
+	  .on("click", d => {
+	      d.handler(obj);
+	      this.hideContextMenu();
+	  });
+	news.append("i")
+	  .attr("class", "material-icons")
+	  .text( d=>d.icon );
+    }
+    //----------------------------------------------
+    showContextMenu (cfg,data,x,y) {
+        this.initContextMenu(cfg, data);
         this.cxtMenu
 	    .classed("showing", true)
 	    .style("left", `${x}px`)
@@ -545,40 +589,36 @@ class ZoomView extends SVGView {
 	d3.select("#zoomWSize")[0][0].value = Math.round(c.end - c.start + 1)
 	//
         let mgv = this.app;
-	// when the translator is ready, we can translate the ref coords to each genome and
-	// issue requests to load the features in those regions.
-	return mgv.translator.ready().then(function(){
-	    // Now issue requests for features. One request per genome, each request specifies one or more
-	    // coordinate ranges.
-	    // Wait for all the data to become available, then draw.
-	    //
-	    let promises = [];
+	// Issue requests for features. One request per genome, each request specifies one or more
+	// coordinate ranges.
+	// Wait for all the data to become available, then draw.
+	//
+	let promises = [];
 
-	    // First request is for the the reference genome. Get all the features in the range.
-	    promises.push(mgv.featureManager.getFeatures(mgv.rGenome, [{
-		// Need to simulate the results from calling the translator. 
-		// 
-		chr    : c.chr,
-		start  : c.start,
-		end    : c.end,
-		index  : 0,
-		fChr   : c.chr,
-		fStart : c.start,
-		fEnd   : c.end,
-		fIndex  : 0,
-		ori    : "+",
-		blockId: mgv.rGenome.name
-		}]));
-	    if (! self.root.classed("closed")) {
-		// Add a request for each comparison genome, using translated coordinates. 
-		mgv.cGenomes.forEach(cGenome => {
-		    let ranges = mgv.translator.translate( mgv.rGenome, c.chr, c.start, c.end, cGenome );
-		    let p = mgv.featureManager.getFeatures(cGenome, ranges);
-		    promises.push(p);
-		});
-	    }
-	    return Promise.all(promises)
-	});
+	// First request is for the the reference genome. Get all the features in the range.
+	promises.push(mgv.featureManager.getFeatures(mgv.rGenome, [{
+	    // Need to simulate the results from calling the translator. 
+	    // 
+	    chr    : c.chr,
+	    start  : c.start,
+	    end    : c.end,
+	    index  : 0,
+	    fChr   : c.chr,
+	    fStart : c.start,
+	    fEnd   : c.end,
+	    fIndex  : 0,
+	    ori    : "+",
+	    blockId: mgv.rGenome.name
+	    }]));
+	if (! self.root.classed("closed")) {
+	    // Add a request for each comparison genome, using translated coordinates. 
+	    mgv.cGenomes.forEach(cGenome => {
+		let ranges = mgv.translator.translate( mgv.rGenome, c.chr, c.start, c.end, cGenome );
+		let p = mgv.featureManager.getFeatures(cGenome, ranges);
+		promises.push(p);
+	    });
+	}
+	return Promise.all(promises)
     }
     // Updates the ZoomView to show the region around a landmark in each genome.
     //
@@ -665,12 +705,14 @@ class ZoomView extends SVGView {
     //
     update () {
 	let p;
-	if (this.app.cmode === 'mapped')
-	    p = this.updateViaMappedCoordinates(this.app.coords);
-	else
-	    p = this.updateViaLandmarkCoordinates(this.app.lcoords);
-	p.then( data => {
-	    this.draw(this.mungeData(data));
+	this.app.translator.ready().then(() => {
+	    if (this.app.cmode === 'mapped')
+		p = this.updateViaMappedCoordinates(this.app.coords);
+	    else
+		p = this.updateViaLandmarkCoordinates(this.app.lcoords);
+	    p.then( data => {
+		this.draw(this.mungeData(data));
+	    });
 	});
     }
 

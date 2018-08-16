@@ -87,6 +87,20 @@ function d3json(url) {
 }
 
 //----------------------------------------------
+// Promisifies a call to d3.text.
+// Args:
+//   url (string) The url of the text resource
+// Returns:
+//   a promise that resolves to the json object value, or rejects with an error
+function d3text(url) {
+    return new Promise(function(resolve, reject) {
+        d3.text(url, 'text/plain', function(error, val){
+            error ? reject({ status: error.status, statusText: error.statusText}) : resolve(val);
+        })  
+    }); 
+}
+
+//----------------------------------------------
 // Returns a deep copy of object o. 
 // Args:
 //   o  (object) Must be a JSON object (no curcular refs, no functions).
@@ -328,6 +342,7 @@ export {
     initOptList,
     d3tsv,
     d3json,
+    d3text,
     deepc,
     parseCoords,
     formatCoords,

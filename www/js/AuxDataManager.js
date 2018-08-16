@@ -1,8 +1,12 @@
-import { d3json } from './utils';
+import { d3json, d3text } from './utils';
+
+// ---------------------------------------------
+// This belongs in a config but for now...
+let MouseMine = 'test'; // one of: public, test, dev
 
 let MINES = {
     'dev' : 'http://bhmgimm-dev:8080/mousemine',
-    'test': 'http://bhmgimm-test.jax.org:8080/mousemine',
+    'test': 'http://test.mousemine.org/mousemine',
     'public' : 'http://www.mousemine.org/mousemine',
 };
 
@@ -10,17 +14,20 @@ let MINES = {
 // AuxDataManager - knows how to query an external source (i.e., MouseMine) for genes
 // annotated to different ontologies. 
 class AuxDataManager {
-    constructor (minename) {
-	if (!MINES[minename]) 
-	    throw "Unknown mine name: " + minename;
-        this.url = MINES[minename] + '/service/query/results?';
+    constructor () {
+	if (!MINES[MouseMine]) 
+	    throw "Unknown mine name: " + MouseMine;
+	this.baseUrl = MINES[MouseMine];
+        this.qUrl = this.baseUrl + '/service/query/results?';
+	this.rUrl = this.baseUrl + '/portal.do?class=SequenceFeature&externalids='
+	this.faUrl = this.baseUrl + '/service/query/results/fasta?';
     }
     //----------------------------------------------
     getAuxData (q, format) {
 	console.log('Query: ' + q);
 	format = format || 'jsonobjects';
 	let query = encodeURIComponent(q);
-	let url = this.url + `format=${format}&query=${query}`;
+	let url = this.qUrl + `format=${format}&query=${query}`;
 	return d3json(url).then(data => data.results||[]);
     }
 
@@ -94,6 +101,81 @@ class AuxDataManager {
 	    <constraint code="B" path="Exon.strain.name" op="=" value="${genome}"/>
 	    </query>`
 	return this.getAuxData(q,'json');
+    }
+    //----------------------------------------------
+    // Constructs a URL for linking to a MouseMine report page by id
+    linkToReportPage (ident) {
+        return this.rUrl + ident;
+    }
+    //----------------------------------------------
+    // Constructs a URL to retrieve mouse sequences from MouseMine for the specified feature.
+    sequencesForFeature (f, type, genomes) {
+	let q;
+	let url;
+	let view;
+	let ident;
+        //
+	type = type ? type.toLowerCase() : 'genomic';
+	//
+	if (f.mgiid) {
+	    ident = f.mgiid;
+	    //
+	    let gs = ''
+	    let vals;
+	    if (genomes) {
+		vals = genomes.map((g) => `<value>${g}</value>`).join('');
+	    }
+	    switch (type) {
+	    case 'genomic':
+		view = 'Gene.canonical.primaryIdentifier';
+		gs = `<constraint path="Gene.strain.name" op="ONE OF">${vals}</constraint>`
+		q = `<query name="sequencesByCanonicalId" model="genomic" view="Gene.primaryIdentifier" >
+		    <constraint path="Gene.canonical.primaryIdentifier" op="=" value="${ident}"/>
+		    ${gs}</query>`;
+		break;
+	    case 'exon':
+		view = 'Exon.gene.canonical.primaryIdentifier';
+		gs = `<constraint path="Exon.strain.name" op="ONE OF">${vals}</constraint>`
+		q = `<query name="exonSequencesByCanonicalId" model="genomic" view="Exon.primaryIdentifier" >
+		    <constraint path="Exon.gene.canonical.primaryIdentifier" op="=" value="${ident}"/>
+		    ${gs}</query>`;
+	        break;
+	    case 'cds':
+		view = 'CDS.gene.canonical.primaryIdentifier';
+		gs = `<constraint path="CDS.strain.name" op="ONE OF">${vals}</constraint>`
+		q = `<query name="cdsSequencesByCanonicalId" model="genomic" view="CDS.primaryIdentifier" >
+		    <constraint path="CDS.gene.canonical.primaryIdentifier" op="=" value="${ident}"/>
+		    ${gs}</query>`;
+	        break;
+	    }
+	}
+	else {
+	    ident = f.mgpid;
+	    view = ''
+	    switch (type) {
+	    case 'genomic':
+		q = `<query name="sequencesById" model="genomic" view="Gene.primaryIdentifier" >
+		    <constraint path="Gene.primaryIdentifier" op="=" value="${ident}"/>
+		  </query>`;
+		break;
+	    case 'exon':
+		q = `<query name="exonSequencesById" model="genomic" view="Exon.primaryIdentifier" >
+		    <constraint path="Exon.gene.primaryIdentifier" op="=" value="${ident}"/>
+		  </query>`;
+	        break;
+	    case 'cds':
+		q = `<query name="cdsSequencesById" model="genomic" view="CDS.primaryIdentifier" >
+		    <constraint path="CDS.gene.primaryIdentifier" op="=" value="${ident}"/>
+		  </query>`;
+	        break;
+	    }
+	}
+	if (!q) return null;
+	console.log(q, view);
+	url = this.faUrl + `query=${encodeURIComponent(q)}`;
+	if (view)
+            url += `&view=${encodeURIComponent(view)}`;
+	return url;
     }
 }
 
