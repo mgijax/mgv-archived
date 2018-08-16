@@ -70,7 +70,7 @@ class ZoomView extends SVGView {
 	r.select("#panRightMore").on("click",
 	    () => { a.pan(+5*a.defaultPan) });
 
-	// 
+	// Config for menu under menu button
 	this.cxtMenuCfg = [{
 	    name: "linkToSnps",
             label: "MGI SNPs", 
@@ -96,7 +96,8 @@ class ZoomView extends SVGView {
 	    tooltip: "Delete cached features. Data will be reloaded from the server on next use.",
 	    handler: ()=> this.app.clearCachedData(true)
 	}];
-	//
+
+	// config for a feature's context menu
 	this.fcxtMenuCfg = [{
 	    name: "toMouseMine",
             label: "Feature@MouseMine", 
@@ -116,6 +117,7 @@ class ZoomView extends SVGView {
             label: "CDS sequences", 
 	    icon: "cloud_download",
 	    tooltip: "Download coding sequences of this feature from currently displayed genomes.",
+	    disabler: (f) => f.biotype.indexOf('protein') === -1, // disable if f is not protein coding
 	    handler: (f) => { 
 		this.app.downloadFasta(f, 'cds', this.app.vGenomes.map(vg=>vg.label));
 	    }
@@ -124,6 +126,7 @@ class ZoomView extends SVGView {
             label: "Exon sequences", 
 	    icon: "cloud_download",
 	    tooltip: "Download sequences for exons of this feature from currently displayed genomes.",
+	    disabler: (f) => f.biotype.indexOf('protein') === -1,
 	    handler: (f) => { 
 		this.app.downloadFasta(f, 'exon', this.app.vGenomes.map(vg=>vg.label));
 	    }
@@ -364,9 +367,6 @@ class ZoomView extends SVGView {
 	this.floatingText.text('');
     }
     //----------------------------------------------
-    // Args:
-    //     items (list of menuItem configs) Each config looks like {label:string, handler: function}
-    //     obj (object) optional. Object to pass to handlers.
     initContextMenu (items,obj) {
 	this.cxtMenu.selectAll(".menuItem").remove(); // in case of re-init
         let mitems = this.cxtMenu
@@ -375,11 +375,14 @@ class ZoomView extends SVGView {
 	let news = mitems.enter()
 	  .append("div")
 	  .attr("class", "menuItem flexrow")
+	  .classed("disabled", d => d.disabler ? d.disabler(obj) : false)
 	  .attr("name", d => d.name || null )
 	  .attr("title", d => d.tooltip || null );
 	news.append("label")
 	  .text(d => d.label)
 	  .on("click", d => {
+	      if (d.disabler && d.disabler(obj))
+	          return;
 	      d.handler(obj);
 	      this.hideContextMenu();
 	  });

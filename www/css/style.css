@@ -283,6 +283,13 @@ label > i.material-icons {
     color: white;
     background-color: #2076b4;
 }
+.menuItem.disabled {
+    opacity: 0.5;
+}
+.menuItem.disabled:hover {
+    color: inherit;
+    background-color: inherit;
+}
 
 /* -----------------------------------------
  * Feature details
