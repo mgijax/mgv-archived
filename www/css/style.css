@@ -279,6 +279,12 @@ label > i.material-icons {
 .menuItem label {
     font-weight: normal;
 }
+.menuItem.menuTitle label {
+    font-weight: bold;
+}
+.menuItem.menuTitle {
+    border-bottom: thin solid;
+}
 .menuItem:hover {
     color: white;
     background-color: #2076b4;

@@ -26,18 +26,90 @@ class ZoomView extends SVGView {
       // hiFeats is an obj whose keys are the IDs
       this.hiFeats = (initialHi || []).reduce( (a,v) => { a[v]=v; return a; }, {} );
       //
-      this.fiducials = this.svg.insert("g",":first-child") // 
-        .attr("class","fiducials");
-      this.stripsGrp = this.svgMain.append("g")
-        .attr("class","strips");
-      this.axis = this.svgMain.append("g")
-        .attr("class","axis");
-      this.floatingText = this.svgMain.append("text")
-        .attr("class","floatingText");
+      this.fiducials = this.svg.insert('g',':first-child') // 
+        .attr('class','fiducials');
+      this.stripsGrp = this.svgMain.append('g')
+        .attr('class','strips');
+      this.axis = this.svgMain.append('g')
+        .attr('class','axis');
+      this.floatingText = this.svgMain.append('text')
+        .attr('class','floatingText');
       this.cxtMenu = this.root.select('[name="cxtMenu"]');
       //
       this.dragging = null;
       this.dragger = this.getDragger();
+      //
+	// Config for menu under menu button
+	this.cxtMenuCfg = [{
+	    name: 'linkToSnps',
+	    label: 'MGI SNPs', 
+	    icon: 'open_in_new',
+	    tooltip: 'View SNPs at MGI for the current strains in the current region. (Some strains not available.)',
+	    handler: ()=> this.app.linkToMgiSnpReport()
+	},{
+	    name: 'linkToQtl',
+	    label: 'MGI QTLs', 
+	    icon:  'open_in_new',
+	    tooltip: 'View QTL at MGI that overlap the current region.',
+	    handler: ()=> this.app.linkToMgiQTLs()
+	},{
+	    name: 'linkToJbrowse',
+	    label: 'MGI JBrowse', 
+	    icon: 'open_in_new',
+	    tooltip: 'Open MGI JBrowse (C57BL/6J GRCm38) with the current coordinate range.',
+	    handler: ()=> this.app.linkToMgiJBrowse()
+	},{
+	    name: 'clearCache',
+	    label: 'Clear cache', 
+	    icon: 'delete_sweep',
+	    tooltip: 'Delete cached features. Data will be reloaded from the server on next use.',
+	    handler: ()=> this.app.clearCachedData(true)
+	}];
+
+	// config for a feature's context menu
+	this.fcxtMenuCfg = [{
+	    name: 'menuTitle',
+	    label: (d) => `${d.symbol || d.mgpid}`, 
+	    cls: 'menuTitle'
+	},{
+	    name: 'lineUpOnFeature',
+	    label: 'Line up on this feature.',
+	    icon: 'format_align_center',
+	    tooltip: 'Aligns the displayed genomes around this feature.',
+	    handler: (f) => { this.app.setContext({landmark:f.mgiid||f.mgpid, delta:0, highlight:[f.mgiid||f.mgpid]}) }
+	},{
+	    name: 'toMouseMine',
+	    label: 'Feature@MouseMine', 
+	    icon: 'open_in_new',
+	    tooltip: 'Go to this feature in MouseMine.',
+	    handler: (f) => this.app.linkToReportPage(f)
+	},{
+	    name: 'genomicSeqDownload',
+	    label: 'Genomic sequences', 
+	    icon: 'cloud_download',
+	    tooltip: 'Download genomic sequences for this feature from currently displayed genomes.',
+	    handler: (f) => { 
+		this.app.downloadFasta(f, 'genomic', this.app.vGenomes.map(vg=>vg.label));
+	    }
+	},{
+	    name: 'cdsSeqDownload',
+	    label: 'CDS sequences', 
+	    icon: 'cloud_download',
+	    tooltip: 'Download coding sequences of this feature from currently displayed genomes.',
+	    disabler: (f) => f.biotype.indexOf('protein') === -1, // disable if f is not protein coding
+	    handler: (f) => { 
+		this.app.downloadFasta(f, 'cds', this.app.vGenomes.map(vg=>vg.label));
+	    }
+	},{
+	    name: 'exonSeqDownload',
+	    label: 'Exon sequences', 
+	    icon: 'cloud_download',
+	    tooltip: 'Download sequences for exons of this feature from currently displayed genomes.',
+	    disabler: (f) => f.type.indexOf('gene') === -1,
+	    handler: (f) => { 
+		this.app.downloadFasta(f, 'exon', this.app.vGenomes.map(vg=>vg.label));
+	    }
+	}];
       //
       this.initDom();
     }
@@ -51,96 +123,35 @@ class ZoomView extends SVGView {
 	    .on('click', () => this.update());
 
 	// zoom controls
-	r.select("#zoomOut").on("click",
+	r.select('#zoomOut').on('click',
 	    () => { a.zoom(a.defaultZoom) });
-	r.select("#zoomIn") .on("click",
+	r.select('#zoomIn') .on('click',
 	    () => { a.zoom(1/a.defaultZoom) });
-	r.select("#zoomOutMore").on("click",
+	r.select('#zoomOutMore').on('click',
 	    () => { a.zoom(2*a.defaultZoom) });
-	r.select("#zoomInMore") .on("click",
+	r.select('#zoomInMore') .on('click',
 	    () => { a.zoom(1/(2*a.defaultZoom)) });
 
 	// pan controls
-	r.select("#panLeft") .on("click",
+	r.select('#panLeft') .on('click',
 	    () => { a.pan(-a.defaultPan) });
-	r.select("#panRight").on("click",
+	r.select('#panRight').on('click',
 	    () => { a.pan(+a.defaultPan) });
-	r.select("#panLeftMore") .on("click",
+	r.select('#panLeftMore') .on('click',
 	    () => { a.pan(-5*a.defaultPan) });
-	r.select("#panRightMore").on("click",
+	r.select('#panRightMore').on('click',
 	    () => { a.pan(+5*a.defaultPan) });
 
-	// Config for menu under menu button
-	this.cxtMenuCfg = [{
-	    name: "linkToSnps",
-            label: "MGI SNPs", 
-	    icon: "open_in_new",
-	    tooltip: "View SNPs at MGI for the current strains in the current region. (Some strains not available.)",
-	    handler: ()=> this.app.linkToMgiSnpReport()
-	},{
-	    name: "linkToQtl",
-            label: "MGI QTLs", 
-	    icon:  "open_in_new",
-	    tooltip: "View QTL at MGI that overlap the current region.",
-	    handler: ()=> this.app.linkToMgiQTLs()
-	},{
-	    name: "linkToJbrowse",
-            label: "MGI JBrowse", 
-	    icon: "open_in_new",
-	    tooltip: "Open MGI JBrowse (C57BL/6J GRCm38) with the current coordinate range.",
-	    handler: ()=> this.app.linkToMgiJBrowse()
-	},{
-	    name: "clearCache",
-            label: "Clear cache", 
-	    icon: "delete_sweep",
-	    tooltip: "Delete cached features. Data will be reloaded from the server on next use.",
-	    handler: ()=> this.app.clearCachedData(true)
-	}];
-
-	// config for a feature's context menu
-	this.fcxtMenuCfg = [{
-	    name: "toMouseMine",
-            label: "Feature@MouseMine", 
-	    icon: "open_in_new",
-	    tooltip: "Go to this feature in MouseMine.",
-	    handler: (f) => this.app.linkToReportPage(f)
-	},{
-	    name: "genomicSeqDownload",
-            label: "Genomic sequences", 
-	    icon: "cloud_download",
-	    tooltip: "Download genomic sequences for this feature from currently displayed genomes.",
-	    handler: (f) => { 
-		this.app.downloadFasta(f, 'genomic', this.app.vGenomes.map(vg=>vg.label));
-	    }
-	},{
-	    name: "cdsSeqDownload",
-            label: "CDS sequences", 
-	    icon: "cloud_download",
-	    tooltip: "Download coding sequences of this feature from currently displayed genomes.",
-	    disabler: (f) => f.biotype.indexOf('protein') === -1, // disable if f is not protein coding
-	    handler: (f) => { 
-		this.app.downloadFasta(f, 'cds', this.app.vGenomes.map(vg=>vg.label));
-	    }
-	},{
-	    name: "exonSeqDownload",
-            label: "Exon sequences", 
-	    icon: "cloud_download",
-	    tooltip: "Download sequences for exons of this feature from currently displayed genomes.",
-	    disabler: (f) => f.biotype.indexOf('protein') === -1,
-	    handler: (f) => { 
-		this.app.downloadFasta(f, 'exon', this.app.vGenomes.map(vg=>vg.label));
-	    }
-	}];
+	//
 	this.root
-	  .on("click", () => {
+	  .on('click', () => {
 	      // click on background => hide context menu
 	      let tgt = d3.event.target;
-	      if (tgt.tagName.toLowerCase() === "i" && tgt.innerHTML === "menu")
+	      if (tgt.tagName.toLowerCase() === 'i' && tgt.innerHTML === 'menu')
 		  // exception: the context menu button itself
 	          return;
 	      else
 		  this.hideContextMenu()
-	      
 	  });
 
 	// Feature mouse event handlers.
@@ -150,12 +161,11 @@ class ZoomView extends SVGView {
 	    if (evt.metaKey) {
 		this.hiFeats[id] = id;
 	        this.app.setContext({landmark:(f.canonical || f.ID), delta:0}, true);
-		return;
 	    }
 	    else if (evt.ctrlKey) {
 	        let cx = d3.event.clientX;
 	        let cy = d3.event.clientY;
-	        let bb = this.root.node().getBoundingClientRect();
+	        let bb = this.root.select('[name="zoomcontrols"] > .menu > .button').node().getBoundingClientRect();
 		evt.stopPropagation();
 		evt.preventDefault();
 		this.showContextMenu(this.fcxtMenuCfg, f, cx-bb.x, cy-bb.y);
@@ -196,23 +206,27 @@ class ZoomView extends SVGView {
 
 	// 
         this.svg
-	  .on("click", () => {
+	  .on('click', () => {
 	      let t = d3.event.target;
 	      let tgt = d3.select(t);
-	      if (t.tagName == "rect" && t.classList.contains("feature")) {
+	      if (t.tagName == 'rect' && t.classList.contains('feature')) {
 		  // user clicked on a feature
 		  fClickHandler(t.__data__, d3.event);
 		  this.highlight();
 	          this.app.contextChanged();
 	      }
-	      else if (t.tagName == "rect" && t.classList.contains("block") && !d3.event.shiftKey) {
-		  // user clicked on a synteny block background
+	      else if (!d3.event.shiftKey && 
+	          (t.tagName === 'svg' 
+		  || t.tagName == 'rect' && t.classList.contains('block')
+		  || t.tagName == 'rect' && t.classList.contains('underlay')
+		  )){
+		  // user clicked on background
 		  this.hiFeats = {};
 		  this.highlight();
 		  this.app.contextChanged();
 	      }
 	  })
-	  .on("contextmenu", () => {
+	  .on('contextmenu', () => {
 	      let tgt = d3.select(d3.event.target);
 	      let f = tgt.data()[0];
 	      if (f instanceof Feature) {
@@ -221,14 +235,14 @@ class ZoomView extends SVGView {
 		  d3.event.preventDefault();
 	      }
 	  })
-	  .on("mouseover", () => {
+	  .on('mouseover', () => {
 	      let tgt = d3.select(d3.event.target);
 	      let f = tgt.data()[0];
 	      if (f instanceof Feature) {
 		  fMouseOverHandler(f);
 	      }
 	  })
-	  .on("mouseout", () => {
+	  .on('mouseout', () => {
 	      let tgt = d3.select(d3.event.target);
 	      let f = tgt.data()[0];
 	      if (f instanceof Feature) {
@@ -290,29 +304,29 @@ class ZoomView extends SVGView {
 
 
 	// Button: Drop down menu in zoom view
-	this.root.select(".menu > .button")
-	  .on("click", function () {
+	this.root.select('.menu > .button')
+	  .on('click', function () {
 	      // show context menu at mouse event coordinates
 	      let cx = d3.event.clientX;
 	      let cy = d3.event.clientY;
 	      let bb = d3.select(this)[0][0].getBoundingClientRect();
 	      d3.event.stopPropagation();
-	      self.showContextMenu(self.cxtMenuCfg, self, cx-bb.left, cy-bb.top);
+	      self.showContextMenu(self.cxtMenuCfg, null, cx-bb.left, cy-bb.top);
 	  });
 	// zoom coordinates box
-	this.root.select("#zoomCoords")
+	this.root.select('#zoomCoords')
 	    .call(zcs => zcs[0][0].value = formatCoords(this.app.coords))
-	    .on("click", function () { this.select(); })
-	    .on("change", function () { self.app.setCoordinates(this.value); });
+	    .on('click', function () { this.select(); })
+	    .on('change', function () { self.app.setCoordinates(this.value); });
 
 	// zoom window size box
-	this.root.select("#zoomWSize")
-	    .on("click", function () { this.select(); })
-	    .on("change", function() {
+	this.root.select('#zoomWSize')
+	    .on('click', function () { this.select(); })
+	    .on('change', function() {
 	        let ws = parseInt(this.value);
 		let c = self.app.coords;
 		if (isNaN(ws) || ws < 100) {
-		    alert("Invalid window size. Please enter an integer >= 100.");
+		    alert('Invalid window size. Please enter an integer >= 100.');
 		    this.value = Math.round(c.end - c.start + 1);
 		}
 		else {
@@ -329,7 +343,7 @@ class ZoomView extends SVGView {
 	    });
 	// zoom drawing mode 
 	this.root.selectAll('div[name="zoomDmode"] .button')
-	    .on("click", function() {
+	    .on('click', function() {
 		let r = self.root;
 		let isC = r.classed('comparison');
 		r.classed('comparison', !isC);
@@ -339,7 +353,7 @@ class ZoomView extends SVGView {
     }
     //----------------------------------------------
     set highlighted (hls) {
-	if (typeof(hls) === "string")
+	if (typeof(hls) === 'string')
 	    hls = [hls];
 	//
 	this.hiFeats = {};
@@ -368,40 +382,49 @@ class ZoomView extends SVGView {
     }
     //----------------------------------------------
     initContextMenu (items,obj) {
-	this.cxtMenu.selectAll(".menuItem").remove(); // in case of re-init
+	this.cxtMenu.selectAll('.menuItem').remove(); // in case of re-init
         let mitems = this.cxtMenu
-	  .selectAll(".menuItem")
+	  .selectAll('.menuItem')
 	  .data(items);
 	let news = mitems.enter()
-	  .append("div")
-	  .attr("class", "menuItem flexrow")
-	  .classed("disabled", d => d.disabler ? d.disabler(obj) : false)
-	  .attr("name", d => d.name || null )
-	  .attr("title", d => d.tooltip || null );
-	news.append("label")
-	  .text(d => d.label)
-	  .on("click", d => {
+	  .append('div')
+	  .attr('class', (d) => `menuItem flexrow ${d.cls||''}`)
+	  .classed('disabled', d => d.disabler ? d.disabler(obj) : false)
+	  .attr('name', d => d.name || null )
+	  .attr('title', d => d.tooltip || null );
+	news.append('label')
+	  .text(d => typeof(d.label) === 'function' ? d.label(obj) : d.label)
+	  .on('click', d => {
 	      if (d.disabler && d.disabler(obj))
 	          return;
 	      d.handler(obj);
 	      this.hideContextMenu();
 	  });
-	news.append("i")
-	  .attr("class", "material-icons")
+	news.append('i')
+	  .attr('class', 'material-icons')
 	  .text( d=>d.icon );
     }
     //----------------------------------------------
-    showContextMenu (cfg,data,x,y) {
-        this.initContextMenu(cfg, data);
+    showContextMenu (cfg,f,x,y) {
+        this.initContextMenu(cfg, f);
         this.cxtMenu
-	    .classed("showing", true)
-	    .style("left", `${x}px`)
-	    .style("top", `${y}px`)
+	    .classed('showing', true)
+	    .style('left', `${x}px`)
+	    .style('top', `${y}px`)
 	    ;
+	if (f) {
+	    this.cxtMenu.on('mouseenter', ()=>this.highlight(f));
+	    this.cxtMenu.on('mouseleave', ()=> {
+	        this.highlight();
+		this.hideContextMenu();
+	    });
+	}
     }
     //----------------------------------------------
     hideContextMenu () {
-        this.cxtMenu.classed("showing", false);
+        this.cxtMenu.classed('showing', false);
+	this.cxtMenu.on('mouseenter', null);
+	this.cxtMenu.on('mouseleave', null);
     }
 
     //----------------------------------------------
@@ -420,7 +443,7 @@ class ZoomView extends SVGView {
     // Returns the names of the currently displayed genomes (stripes) in top-to-bottom order.
     //
     getGenomeYOrder () {
-        let strips = this.svgMain.selectAll(".zoomStrip");
+        let strips = this.svgMain.selectAll('.zoomStrip');
         let ss = strips[0].map(g=> {
 	    let bb = g.getBoundingClientRect();
 	    return [bb.y, g.__data__.genome.name];
@@ -457,8 +480,8 @@ class ZoomView extends SVGView {
 	this.genomes = removeDups(ns).map(n=> this.app.name2genome[n] ).filter(x=>x);
         this.genomes.forEach( (g,i) => {
 	    let strip = d3.select(`#zoomView .zoomStrip[name="${g.name}"]`);
-	    if (!strip.classed("dragging"))
-	        strip.attr("transform", `translate(0,${g.zoomY})`);
+	    if (!strip.classed('dragging'))
+	        strip.attr('transform', `translate(0,${g.zoomY})`);
 	});
     }
 
@@ -471,27 +494,27 @@ class ZoomView extends SVGView {
 	  .origin(function(d,i){
 	      return this.getBoundingClientRect();
 	  })
-          .on("dragstart.z", function(g) {
+          .on('dragstart.z', function(g) {
 	      let t = d3.event.sourceEvent.target;
-	      if (d3.event.sourceEvent.shiftKey || d3.select(t).attr("name") !== 'zoomStripHandle'){
+	      if (d3.event.sourceEvent.shiftKey || d3.select(t).attr('name') !== 'zoomStripHandle'){
 	          return false;
 	      }
 	      d3.event.sourceEvent.stopPropagation();
-	      let strip = this.closest(".zoomStrip");
-	      self.dragging = d3.select(strip).classed("dragging", true);
+	      let strip = this.closest('.zoomStrip');
+	      self.dragging = d3.select(strip).classed('dragging', true);
 	  })
-	  .on("drag.z", function (g) {
+	  .on('drag.z', function (g) {
 	      if (!self.dragging) return;
 	      let mx = d3.mouse(self.svgMain[0][0])[0];
 	      let my = d3.mouse(self.svgMain[0][0])[1];
-	      self.dragging.attr("transform", `translate(0, ${my})`);
+	      self.dragging.attr('transform', `translate(0, ${my})`);
 	      self.setGenomeYOrder(self.getGenomeYOrder());
 	      self.drawFiducials();
 	  })
-	  .on("dragend.z", function (g) {
+	  .on('dragend.z', function (g) {
 	      if (!self.dragging) return;
 	      //
-	      self.dragging.classed("dragging", false);
+	      self.dragging.classed('dragging', false);
 	      self.dragging = null;
 	      self.setGenomeYOrder(self.getGenomeYOrder());
 	      self.app.setContext({ genomes: self.getGenomeYOrder() });
@@ -502,7 +525,7 @@ class ZoomView extends SVGView {
 
     //----------------------------------------------
     clearBrushes () {
-	this.root.selectAll("g.brush")
+	this.root.selectAll('g.brush')
 	    .each( function (b) {
 	        b.brush.clear();
 		d3.select(this).call(b.brush);
@@ -575,9 +598,9 @@ class ZoomView extends SVGView {
 	this.currentHLG = g;
 	//
 	this.svgMain.selectAll('.zoomStrip')
-	    .classed("highlighted", d => d.genome === g);
+	    .classed('highlighted', d => d.genome === g);
 	this.svgMain.selectAll('.zoomStripHandle')
-	    .classed("highlighted", d => d.genome === g);
+	    .classed('highlighted', d => d.genome === g);
 	this.app.showBlocks(g);
     }
 
@@ -588,8 +611,8 @@ class ZoomView extends SVGView {
     updateViaMappedCoordinates (coords) {
 	let self = this;
 	let c = (coords || this.app.coords);
-	d3.select("#zoomCoords")[0][0].value = formatCoords(c.chr, c.start, c.end);
-	d3.select("#zoomWSize")[0][0].value = Math.round(c.end - c.start + 1)
+	d3.select('#zoomCoords')[0][0].value = formatCoords(c.chr, c.start, c.end);
+	d3.select('#zoomWSize')[0][0].value = Math.round(c.end - c.start + 1)
 	//
         let mgv = this.app;
 	// Issue requests for features. One request per genome, each request specifies one or more
@@ -610,10 +633,10 @@ class ZoomView extends SVGView {
 	    fStart : c.start,
 	    fEnd   : c.end,
 	    fIndex  : 0,
-	    ori    : "+",
+	    ori    : '+',
 	    blockId: mgv.rGenome.name
 	    }]));
-	if (! self.root.classed("closed")) {
+	if (! self.root.classed('closed')) {
 	    // Add a request for each comparison genome, using translated coordinates. 
 	    mgv.cGenomes.forEach(cGenome => {
 		let ranges = mgv.translator.translate( mgv.rGenome, c.chr, c.start, c.end, cGenome );
@@ -661,8 +684,8 @@ class ZoomView extends SVGView {
 	    } ;
 	    if (f.genome === mgv.rGenome) {
 		let c = this.app.coords = range;
-		d3.select("#zoomCoords")[0][0].value = formatCoords(c.chr, c.start, c.end);
-		d3.select("#zoomWSize")[0][0].value = Math.round(c.end - c.start + 1)
+		d3.select('#zoomCoords')[0][0].value = formatCoords(c.chr, c.start, c.end);
+		d3.select('#zoomWSize')[0][0].value = Math.round(c.end - c.start + 1)
 	    }
 	    return range;
 	});
@@ -684,7 +707,7 @@ class ZoomView extends SVGView {
 		    fStart : r.start,
 		    fEnd   : r.end,
 		    fIndex  : 0,
-		    ori    : "+",
+		    ori    : '+',
 		    blockId: mgv.rGenome.name
 		}];
 	    }
@@ -892,7 +915,7 @@ class ZoomView extends SVGView {
 		}
 	    }
 	    pend = dx + blen;
-	    d3.select(this).attr("transform", `translate(${dx},0)`);
+	    d3.select(this).attr('transform', `translate(${dx},0)`);
 	});
 	this.squish();
     }
@@ -918,15 +941,15 @@ class ZoomView extends SVGView {
 	// 
 	let self = this;
         // Is ZoomView currently closed?
-	let closed = this.root.classed("closed");
+	let closed = this.root.classed('closed');
 	// reset the svg size based on number of strips
 	let totalHeight = (this.stripHeight+this.stripGap) * data.length + 20;
 	this.svg
-	    .attr("height", totalHeight);
+	    .attr('height', totalHeight);
 
 	// Show ref genome name
-	d3.select("#zoomView .zoomCoords label")
-	    .text(this.app.rGenome.label + " coords");
+	d3.select('#zoomView .zoomCoords label')
+	    .text(this.app.rGenome.label + ' coords');
 	
 	// the reference genome block (always just 1 of these).
 	let rData = data.filter(dd => dd.genome === this.app.rGenome)[0];
@@ -945,7 +968,7 @@ class ZoomView extends SVGView {
         // -----------------------------------------------------
 	this.axisFunc = d3.svg.axis()
 	    .scale(this.xscale)
-	    .orient("top")
+	    .orient('top')
 	    .outerTickSize(2)
 	    .ticks(5)
 	    .tickSize(5)
@@ -956,27 +979,27 @@ class ZoomView extends SVGView {
 	// zoom strips (one per genome)
         // -----------------------------------------------------
         let zstrips = this.stripsGrp
-	        .selectAll("g.zoomStrip")
+	        .selectAll('g.zoomStrip')
 		.data(data, d => d.genome.name);
 	// Create the group
 	let newzs = zstrips.enter()
-	        .append("g")
-		.attr("class","zoomStrip")
-		.attr("name", d => d.genome.name)
-		.on("click", function (g) {
+	        .append('g')
+		.attr('class','zoomStrip')
+		.attr('name', d => d.genome.name)
+		.on('click', function (g) {
 		    self.highlightStrip(g.genome, this);
 		})
 		.call(this.dragger)
 		;
 	//
 	// Strip label
-	newzs.append("text")
-	    .attr("name", "genomeLabel")
+	newzs.append('text')
+	    .attr('name', 'genomeLabel')
 	    .text( d => d.genome.label)
-	    .attr("x", 0)
-	    .attr("y", this.blockHeight/2 + 20)
-	    .attr("font-family","sans-serif")
-	    .attr("font-size", 10)
+	    .attr('x', 0)
+	    .attr('y', this.blockHeight/2 + 20)
+	    .attr('font-family','sans-serif')
+	    .attr('font-size', 10)
 	    ;
 	newzs.append('rect')
 	    .attr('class','underlay')
@@ -985,21 +1008,21 @@ class ZoomView extends SVGView {
 	    .style('width','100%')
 	    .style('opacity',0)
 	    ;
-	newzs.append("g")
-	    .attr("name", "sBlocks");
-	newzs.append("rect")
-	    .attr("name", "zoomStripHandle")
-	    .attr("x", -15)
-	    .attr("y", -this.blockHeight / 2)
-	    .attr("width", 15)
-	    .attr("height", this.blockHeight)
+	newzs.append('g')
+	    .attr('name', 'sBlocks');
+	newzs.append('rect')
+	    .attr('name', 'zoomStripHandle')
+	    .attr('x', -15)
+	    .attr('y', -this.blockHeight / 2)
+	    .attr('width', 15)
+	    .attr('height', this.blockHeight)
 	    ;
 	zstrips
-	    .classed("reference", d => d.genome === this.app.rGenome)
-	    .attr("transform", g => `translate(0,${closed ? this.topOffset : g.genome.zoomY})`)
+	    .classed('reference', d => d.genome === this.app.rGenome)
+	    .attr('transform', g => `translate(0,${closed ? this.topOffset : g.genome.zoomY})`)
 	    ;
         zstrips.exit()
-	    .on(".drag", null)
+	    .on('.drag', null)
 	    .remove();
 	//
         zstrips.select('g[name="sBlocks"]')
@@ -1009,12 +1032,12 @@ class ZoomView extends SVGView {
         let sblocks = zstrips.select('[name="sBlocks"]').selectAll('g.sBlock')
 	    .data(d=>d.blocks, b => b.blockId);
 	let newsbs = sblocks.enter()
-	    .append("g")
-	    .attr("class", "sBlock")
-	    .attr("name", b=>b.index)
+	    .append('g')
+	    .attr('class', 'sBlock')
+	    .attr('name', b=>b.index)
 	    ;
-	let l0 = newsbs.append("g").attr("name", "layer0");
-	let l1 = newsbs.append("g").attr("name", "layer1");
+	let l0 = newsbs.append('g').attr('name', 'layer0');
+	let l1 = newsbs.append('g').attr('name', 'layer1');
 
 	//
 	this.layoutSBlocks(sblocks);
@@ -1027,42 +1050,42 @@ class ZoomView extends SVGView {
         sbrects.enter().append('rect') ;
 	sbrects.exit().remove();
 	sbrects
-	   .attr("class", b => "block " + 
-	       (b.ori==="+" ? "plus" : b.ori==="-" ? "minus": "confused") + 
-	       (b.chr !== b.fChr ? " translocation" : ""))
-	   .attr("x",     b => b.xscale(b.flip ? b.end : b.start))
-	   .attr("y",     b => -this.blockHeight / 2)
-	   .attr("width", b => Math.max(4, Math.abs(b.xscale(b.end)-b.xscale(b.start))))
-	   .attr("height",this.blockHeight);
+	   .attr('class', b => 'block ' + 
+	       (b.ori==='+' ? 'plus' : b.ori==='-' ? 'minus': 'confused') + 
+	       (b.chr !== b.fChr ? ' translocation' : ''))
+	   .attr('x',     b => b.xscale(b.flip ? b.end : b.start))
+	   .attr('y',     b => -this.blockHeight / 2)
+	   .attr('width', b => Math.max(4, Math.abs(b.xscale(b.end)-b.xscale(b.start))))
+	   .attr('height',this.blockHeight);
 	   ;
 
 	// the axis line
-	l0.append("line").attr("class","axis");
+	l0.append('line').attr('class','axis');
 	
-	sblocks.select("line.axis")
-	    .attr("x1", b => b.xscale(b.start))
-	    .attr("y1", 0)
-	    .attr("x2", b => b.xscale(b.end))
-	    .attr("y2", 0)
+	sblocks.select('line.axis')
+	    .attr('x1', b => b.xscale(b.start))
+	    .attr('y1', 0)
+	    .attr('x2', b => b.xscale(b.end))
+	    .attr('y2', 0)
 	    ;
 	// label
-	l0.append("text")
-	    .attr("class","blockLabel") ;
+	l0.append('text')
+	    .attr('class','blockLabel') ;
 	// brush
-	l0.append("g").attr("class","brush");
+	l0.append('g').attr('class','brush');
 	//
 	sblocks.exit().remove();
 
 	// synteny block labels
-	sblocks.select("text.blockLabel")
+	sblocks.select('text.blockLabel')
 	    .text( b => b.chr )
-	    .attr("x", b => (b.xscale(b.start) + b.xscale(b.end))/2 )
-	    .attr("y", this.blockHeight / 2 + 10)
+	    .attr('x', b => (b.xscale(b.start) + b.xscale(b.end))/2 )
+	    .attr('y', this.blockHeight / 2 + 10)
 	    ;
 
 	// brush
-	sblocks.select("g.brush")
-	    .attr("transform", b => `translate(0,${this.blockHeight / 2})`)
+	sblocks.select('g.brush')
+	    .attr('transform', b => `translate(0,${this.blockHeight / 2})`)
 	    .on('mousemove', function(b) {
 	        let cr = this.getBoundingClientRect();
 		let x = d3.event.clientX - cr.x;
@@ -1073,15 +1096,15 @@ class ZoomView extends SVGView {
 	    .each(function(b) {
 		if (!b.brush) {
 		    b.brush = d3.svg.brush()
-			.on("brushstart", function(){ self.bbStart( b, this ); })
-			.on("brush",      function(){ self.bbBrush( b, this ); })
-			.on("brushend",   function(){ self.bbEnd( b, this ); })
+			.on('brushstart', function(){ self.bbStart( b, this ); })
+			.on('brush',      function(){ self.bbBrush( b, this ); })
+			.on('brushend',   function(){ self.bbEnd( b, this ); })
 		}
 		b.brush.x(b.xscale).clear();
 		d3.select(this).call(b.brush);
 	    })
-	    .selectAll("rect")
-		.attr("height", 10);
+	    .selectAll('rect')
+		.attr('height', 10);
 
 	this.drawFeatures(sblocks);
 
@@ -1114,14 +1137,14 @@ class ZoomView extends SVGView {
 	    drawn.add(fid);
 	    return v;
 	};
-	let feats = sblocks.select('[name="layer1"]').selectAll(".feature")
+	let feats = sblocks.select('[name="layer1"]').selectAll('.feature')
 	    .data(d=>d.features.filter(filterDrawn), d=>d.mgpid);
 	feats.exit().remove();
 	//
-	let newFeats = feats.enter().append("rect")
-	    .attr("class", f => "feature" + (f.strand==="-" ? " minus" : " plus"))
-	    .attr("name", f => f.mgpid)
-	    .style("fill", f => self.app.cscale(f.getMungedType()))
+	let newFeats = feats.enter().append('rect')
+	    .attr('class', f => 'feature' + (f.strand==='-' ? ' minus' : ' plus'))
+	    .attr('name', f => f.mgpid)
+	    .style('fill', f => self.app.cscale(f.getMungedType()))
 	    ;
 	// NB: if you are looking for click handlers, they are at 
 
@@ -1142,14 +1165,14 @@ class ZoomView extends SVGView {
 	};
 	let fy = function (f) {
 	       let b = fBlock(this);
-	       if (f.strand == "+"){
+	       if (f.strand == '+'){
 		   if (b.flip) 
 		       return self.laneHeight*f.lane - self.featHeight; 
 		   else 
 		       return -self.laneHeight*f.lane;
 	       }
 	       else {
-		   // f.lane is negative for "-" strand
+		   // f.lane is negative for '-' strand
 		   if (b.flip) 
 		       return self.laneHeight*f.lane;
 		   else
@@ -1158,10 +1181,10 @@ class ZoomView extends SVGView {
 	   };
 
 	feats
-	  .attr("x", fx)
-	  .attr("width", fw)
-	  .attr("y", fy)
-	  .attr("height", this.featHeight)
+	  .attr('x', fx)
+	  .attr('width', fw)
+	  .attr('y', fy)
+	  .attr('height', this.featHeight)
 	  ;
     }
 
@@ -1190,18 +1213,18 @@ class ZoomView extends SVGView {
 	}
 
 	// Filter all features (rectangles) in the scene for those being highlighted.
-	// Along the way, build index mapping feature id to its "stack" of equivalent features,
+	// Along the way, build index mapping feature id to its 'stack' of equivalent features,
 	// i.e. a list of its genologs sorted by y coordinate.
 	//
 	this.stacks = {}; // fid -> [ rects ] 
 	let dh = this.blockHeight/2 - this.featHeight;
-        let feats = this.svgMain.selectAll(".feature")
+        let feats = this.svgMain.selectAll('.feature')
 	  // filter rect.features for those in the highlight list
 	  .filter(function(ff){
 	      // highlight ff if either id is in the list AND it's not been hidden
 	      let mgi = hiFeats[ff.mgiid];
 	      let mgp = hiFeats[ff.mgpid];
-	      let showing = d3.select(this).style("display") !== "none";
+	      let showing = d3.select(this).style('display') !== 'none';
 	      let hl = showing && (mgi || mgp);
 	      if (hl) {
 		  // for each highlighted feature, add its rectangle to the list
@@ -1211,9 +1234,9 @@ class ZoomView extends SVGView {
 	      }
 	      // 
 	      d3.select(this)
-		  .classed("highlight", hl)
-		  .classed("current", hl && currFeat && this.__data__.id === currFeat.id)
-		  .classed("extra", pulseCurrent && ff === currFeat)
+		  .classed('highlight', hl)
+		  .classed('current', hl && currFeat && this.__data__.id === currFeat.id)
+		  .classed('extra', pulseCurrent && ff === currFeat)
 	      return hl;
 	  })
 	  ;
@@ -1231,7 +1254,7 @@ class ZoomView extends SVGView {
 	for (let k in this.stacks) {
 	    // for each highlighted feature, sort the rectangles in its list by Y-coordinate
 	    let rects = this.stacks[k];
-	    rects.sort( (a,b) => parseFloat(a.getAttribute("y")) - parseFloat(b.getAttribute("y")) );
+	    rects.sort( (a,b) => parseFloat(a.getAttribute('y')) - parseFloat(b.getAttribute('y')) );
 	    rects.sort( (a,b) => {
 		return a.__data__.genome.zoomY - b.__data__.genome.zoomY;
 	    });
@@ -1239,7 +1262,7 @@ class ZoomView extends SVGView {
 	    // n pairs, where rect[i] is paired with rect[i+1]. The last pair consists of the last
 	    // rectangle paired with undefined. (We want this.)
 	    let pairs = rects.map((r, i) => [r,rects[i+1]]);
-	    // Add a class ("current") for the polygons associated with the mouseover feature so they
+	    // Add a class ('current') for the polygons associated with the mouseover feature so they
 	    // can be distinguished from others.
 	    data.push({ fid: k, rects: pairs, cls: (currFeat && currFeat.id === k ? 'current' : '') });
 	}
@@ -1247,27 +1270,27 @@ class ZoomView extends SVGView {
 	let self = this;
 	//
 	// put fiducial marks in their own group 
-	let fGrp = this.fiducials.classed("hidden", false);
+	let fGrp = this.fiducials.classed('hidden', false);
 
-	// Bind first level data to "featureMarks" groups
-	let ffGrps = fGrp.selectAll("g.featureMarks")
+	// Bind first level data to 'featureMarks' groups
+	let ffGrps = fGrp.selectAll('g.featureMarks')
 	    .data(data, d => d.fid);
-	ffGrps.enter().append("g")
-	    .attr("name", d => d.fid);
+	ffGrps.enter().append('g')
+	    .attr('name', d => d.fid);
 	ffGrps.exit().remove();
 	//
-	ffGrps.attr("class",d => "featureMarks " + (d.cls || ""))
+	ffGrps.attr('class',d => 'featureMarks ' + (d.cls || ''))
 
 	// -------------------------------------
 	// Draw the connector polygons.
 	// Bind second level data (rectangle pairs) to polygons in the group
-	let pgons = ffGrps.selectAll("polygon")
+	let pgons = ffGrps.selectAll('polygon')
 	    .data(d=>d.rects.filter(r => r[0] && r[1]));
-	pgons.enter().append("polygon")
-	    .attr("class","fiducial")
+	pgons.enter().append('polygon')
+	    .attr('class','fiducial')
 	    ;
 	//
-	pgons.attr("points", r => {
+	pgons.attr('points', r => {
 	    // polygon connects bottom corners of 1st rect to top corners of 2nd rect
 	    let c1 = coordsAfterTransform(r[0]); // transform coords for 1st rect
 	    let c2 = coordsAfterTransform(r[1]);  // transform coords for 2nd rect
@@ -1278,10 +1301,10 @@ class ZoomView extends SVGView {
 	})
 	//
 	// mousing over the fiducial highlights (as if the user had moused over the feature itself)
-	.on("mouseover", (p) => {
+	.on('mouseover', (p) => {
 	    this.highlight(p[0]);
 	})
-	.on("mouseout",  (p) => {
+	.on('mouseout',  (p) => {
 	    this.highlight();
 	});
 	//
@@ -1309,8 +1332,8 @@ class ZoomView extends SVGView {
 	labels.enter().append('text').attr('class','featLabel');
 	labels.exit().remove();
 	labels
-	  .attr("x", d => d.trect.x + d.trect.width/2 )
-	  .attr("y", d => d.rect.__data__.genome.zoomY - 12)
+	  .attr('x', d => d.trect.x + d.trect.width/2 )
+	  .attr('y', d => d.rect.__data__.genome.zoomY - 12)
 	  .text(d => {
 	       let f = d.rect.__data__;
 	       let sym = f.symbol || f.mgpid;
@@ -1324,10 +1347,10 @@ class ZoomView extends SVGView {
 	lblBoxes.enter().insert('rect','text').attr('class','featLabelBox');
 	lblBoxes.exit().remove();
 	lblBoxes
-	    .attr("x",      bb => bb.x-2)
-	    .attr("y",      bb => bb.y-1)
-	    .attr("width",  bb => bb.width+4)
-	    .attr("height", bb => bb.height+2)
+	    .attr('x',      bb => bb.x-2)
+	    .attr('y',      bb => bb.y-1)
+	    .attr('width',  bb => bb.width+4)
+	    .attr('height', bb => bb.height+2)
 	    ;
 	
 	// if there is a currFeat, move its fiducials to the end (so they're on top of everyone else)
@@ -1351,8 +1374,8 @@ class ZoomView extends SVGView {
     }
     //----------------------------------------------
     hideFiducials () {
-	this.svgMain.select("g.fiducials")
-	    .classed("hidden", true);
+	this.svgMain.select('g.fiducials')
+	    .classed('hidden', true);
     }
 } // end class ZoomView
 
