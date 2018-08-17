@@ -267,6 +267,20 @@ class BlockCover:
         for i,b in enumerate(self.blocks):
 	    b.index = i
 
+    # Extends the start/end coordinates blocks in a cover so neighbors meet in the middle.
+    # The first block on a chromosome is extended to 0. The last block on a chromosome is NOT extended.
+    def gapFill (self) :
+	prev = None
+        for b in self.blocks:
+	    if prev is None or prev.chr != b.chr:
+		b.start = 0
+	        prev = b
+		continue
+	    delta = b.start - prev.end - 1
+	    prev.end += delta / 2
+	    b.start = prev.end + 1
+	    prev = b
+
     # Raises an exception if this is not a valid block cover.
     def validate (self):
 	n = 0
@@ -586,6 +600,9 @@ def generate(a, b):
 	# (Want every cc to be 1:1)
 	# CCs that cannot be turned into 1:1 are reported
 	a.contigs.collapseCCs()
+	# fill empty spaces between blocks in each cover
+	a.contigs.gapFill()
+	b.contigs.gapFill()
 	# sanity check: make sure covers are still valid
 	a.contigs.validate()
 	b.contigs.validate()
