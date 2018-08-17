@@ -27,12 +27,15 @@ class ListManager extends Component {
 	// Button: create list from current selection
 	this.root.select('.button[name="newfromselection"]')
 	    .on("click", () => {
-		let ids = Object.keys(this.app.zoomView.hiFeats); // FIXME - reachover
-		if (ids.length === 0) {
+		let ids = new Set(Object.keys(this.app.zoomView.hiFeats)); // FIXME - reachover
+		let lst = this.app.getCurrentList();
+		if (lst)
+		    ids = ids.union(lst.ids);
+		if (ids.size === 0) {
 		    alert("Nothing selected.");
 		    return;
 		}
-		let newlist = this.createList("selection", ids);
+		let newlist = this.createList("selection", Array.from(ids));
 		this.update(newlist);
 	    });
 
