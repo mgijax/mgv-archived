@@ -209,6 +209,10 @@ class ZoomView extends SVGView {
 	  .on('click', () => {
 	      let t = d3.event.target;
 	      let tgt = d3.select(t);
+	      if (this.dealWithUnwantedClickEvent) {
+	          this.dealWithUnwantedClickEvent = false;
+		  return;
+	      }
 	      if (t.tagName == 'rect' && t.classList.contains('feature')) {
 		  // user clicked on a feature
 		  fClickHandler(t.__data__, d3.event);
@@ -596,7 +600,9 @@ class ZoomView extends SVGView {
 	  // User dragged. Zoom in or out.
 	  this.app.setContext({ ref:g, chr: this.brushing.chr, start:xt[0], end:xt[1] });
       }
+      this.clearBrushes();
       this.brushing = null;
+      this.dealWithUnwantedClickEvent = true;
     }
     //----------------------------------------------
     highlightStrip (g, elt) {
@@ -765,7 +771,7 @@ class ZoomView extends SVGView {
 		nb.superBlock = true;
 		nb.features = bb.features.concat();
 		nb.sblocks = [bb];
-		nb.ori = '+';
+		nb.ori = '+'
 		return nb;
 	    };
 	    if (i === 0){
