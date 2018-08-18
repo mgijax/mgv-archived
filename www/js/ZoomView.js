@@ -12,11 +12,11 @@ class ZoomView extends SVGView {
       //
       this.minSvgHeight = 250;
       this.blockHeight = 60;
-      this.topOffset = 45;
+      this.topOffset = 15;
       this.featHeight = 8;	// height of a rectangle representing a feature
       this.laneGap = 2;	        // space between swim lanes
       this.laneHeight = this.featHeight + this.laneGap;
-      this.stripHeight = 75;    // height per genome in the zoom view
+      this.minStripHeight = 75;    // height per genome in the zoom view
       this.stripGap = 20;	// space between strips
       this.maxSBgap = 20;	// max gap allowed between blocks.
       this.dmode = 'comparison';// drawing mode. 'comparison' or 'reference'
@@ -433,7 +433,11 @@ class ZoomView extends SVGView {
     // Side effects:
     //     For each Genome, sets g.zoomY 
     set genomes (gs) {
-       gs.forEach( (g,i) => {g.zoomY = this.topOffset + i * (this.stripHeight + this.stripGap)} );
+       let offset = this.topOffset;
+       gs.forEach( g => {
+           g.zoomY = offset;
+	   offset += this.minStripHeight + this.stripGap;
+       });
        this._genomes = gs;
     }
     get genomes () {
@@ -473,15 +477,17 @@ class ZoomView extends SVGView {
     // Returns:
     //     nothing
     // Side effects:
-    //     Recalculates the Y-coordinates for each stripe based on the given order, then translates
+    //     Recalculates the Y-coordinates for each strip based on the given order, then translates
     //     each strip to its new position.
     //
     setGenomeYOrder (ns) {
 	this.genomes = removeDups(ns).map(n=> this.app.name2genome[n] ).filter(x=>x);
+	let o = this.topOffset;
         this.genomes.forEach( (g,i) => {
 	    let strip = d3.select(`#zoomView .zoomStrip[name="${g.name}"]`);
 	    if (!strip.classed('dragging'))
-	        strip.attr('transform', `translate(0,${g.zoomY})`);
+	        strip.attr('transform', `translate(0,${o})`);
+	    o += strip.data()[0].stripHeight + this.stripGap;
 	});
     }
 
@@ -859,23 +865,28 @@ class ZoomView extends SVGView {
 	    gData.xScale = 1.0;
 	});
 	data = this.mergeSblockRuns(data);
+	// 
 	data.forEach( gData => {
+	  // minimum of 3 lanes on each side
+	  gData.maxLanesP = 3;
+	  gData.maxLanesN = 3;
 	  gData.blocks.forEach( sb=> {
-	    sb.maxLanesP = 0;
-	    sb.maxLanesN = 0;
 	    sb.features.forEach(f => {
 		if (f.lane > 0)
-		    sb.maxLanesP = Math.max(sb.maxLanesP, f.lane)
+		    gData.maxLanesP = Math.max(gData.maxLanesP, f.lane)
 		else
-		    sb.maxLanesN = Math.max(sb.maxLanesN, -f.lane)
+		    gData.maxLanesN = Math.max(gData.maxLanesN, -f.lane)
 	    });
 	  })
+	  gData.stripHeight = 15 + this.laneHeight * (gData.maxLanesP + gData.maxLanesN);
+	  gData.zeroOffset = this.laneHeight * gData.maxLanesP;
 	});
 	return data;
     }
 
     //----------------------------------------------
-    // Orders sblocks horizontally and translates them into position.
+    // Orders sblocks horizontally within each genome. Translates them into position.
+    //
     layoutSBlocks (sblocks) {
 	// Sort the sblocks in each strip according to the current drawing mode.
 	let cmpField = this.dmode === 'comparison' ? 'index' : 'fIndex';
@@ -942,11 +953,6 @@ class ZoomView extends SVGView {
 	let self = this;
         // Is ZoomView currently closed?
 	let closed = this.root.classed('closed');
-	// reset the svg size based on number of strips
-	let totalHeight = (this.stripHeight+this.stripGap) * data.length + 20;
-	this.svg
-	    .attr('height', totalHeight);
-
 	// Show ref genome name
 	d3.select('#zoomView .zoomCoords label')
 	    .text(this.app.rGenome.label + ' coords');
@@ -1017,10 +1023,22 @@ class ZoomView extends SVGView {
 	    .attr('width', 15)
 	    .attr('height', this.blockHeight)
 	    ;
-	zstrips
-	    .classed('reference', d => d.genome === this.app.rGenome)
-	    .attr('transform', g => `translate(0,${closed ? this.topOffset : g.genome.zoomY})`)
-	    ;
+	// translate strips into position
+	let offset = this.topOffset;
+	this.app.vGenomes.forEach( vg => {
+	    let s = this.stripsGrp.select(`.zoomStrip[name="${vg.name}"]`);
+	    s.classed('reference', d => d.genome === this.app.rGenome)
+	        .attr('transform', g => {
+		    //return `translate(0,${closed ? this.topOffset : g.genome.zoomY})`
+		    let o = offset + g.zeroOffset;
+		    g.zoomY = offset;
+		    offset += g.stripHeight + this.stripGap;
+		    return `translate(0,${closed ? this.topOffset : o})`
+		});
+	});
+	// reset the svg size based on strip widths
+	this.svg.attr('height', offset + 15);
+
         zstrips.exit()
 	    .on('.drag', null)
 	    .remove();
@@ -1333,7 +1351,7 @@ class ZoomView extends SVGView {
 	labels.exit().remove();
 	labels
 	  .attr('x', d => d.trect.x + d.trect.width/2 )
-	  .attr('y', d => d.rect.__data__.genome.zoomY - 12)
+	  .attr('y', d => d.rect.__data__.genome.zoomY+15)
 	  .text(d => {
 	       let f = d.rect.__data__;
 	       let sym = f.symbol || f.mgpid;
