@@ -1,6 +1,6 @@
 import { SVGView } from './SVGView';
 import { Feature } from './Feature';
-import { clip, parseCoords, formatCoords, coordsAfterTransform, removeDups } from './utils';
+import { prettyPrintBases, clip, parseCoords, formatCoords, coordsAfterTransform, removeDups } from './utils';
 
 // ---------------------------------------------
 class ZoomView extends SVGView {
@@ -76,7 +76,7 @@ class ZoomView extends SVGView {
 	    label: 'Align on this feature.',
 	    icon: 'format_align_center',
 	    tooltip: 'Aligns the displayed genomes around this feature.',
-	    handler: (f) => { this.app.setContext({landmark:f.mgiid||f.mgpid, delta:0, highlight:[f.mgiid||f.mgpid]}) }
+	    handler: (f) => { this.app.setContext({landmark:f.id, delta:0, highlight:[f.id]}) }
 	},{
 	    name: 'toMGI',
 	    label: 'Feature@MGI', 
@@ -259,7 +259,7 @@ class ZoomView extends SVGView {
 	    // only interested in horizontal motion events
 	    // occurring in a zoom strip.
 	    let e = d3.event;
-	    if (Math.abs(e.deltaX) < Math.abs(e.deltaY)) 
+	    if (Math.abs(e.deltaX) < Math.abs(e.deltaY) || Math.abs(e.deltaX) < 3) 
 	        return;
 	    e.stopPropagation();
 	    e.preventDefault();
@@ -746,10 +746,11 @@ class ZoomView extends SVGView {
     }
     //
     update (cfg) {
-	this.highlighted = cfg.highlight;
-	this.genomes = cfg.genomes;
-	this.dmode = cfg.dmode;
-	this.cmode = cfg.cmode;
+	this.cfg = cfg || this.cfg;
+	this.highlighted = this.cfg.highlight;
+	this.genomes = this.cfg.genomes;
+	this.dmode = this.cfg.dmode;
+	this.cmode = this.cfg.cmode;
 	this.app.translator.ready().then(() => {
 	    let p;
 	    if (this.cmode === 'mapped')
@@ -891,7 +892,9 @@ class ZoomView extends SVGView {
 		else
 		    gData.maxLanesN = Math.max(gData.maxLanesN, -f.lane)
 	    });
-	  })
+	  });
+	  if (gData.blocks.length > 1)
+	      gData.blocks = gData.blocks.filter(b=>b.features.length > 0);
 	  gData.stripHeight = 15 + this.laneHeight * (gData.maxLanesP + gData.maxLanesN);
 	  gData.zeroOffset = this.laneHeight * gData.maxLanesP;
 	});
@@ -975,11 +978,13 @@ class ZoomView extends SVGView {
 	if (this.cmode === 'landmark') {
 	    let rf = this.app.lcoords.landmarkRefFeat;
 	    let d = this.app.lcoords.delta;
-	    let dtxt = d ? ` (${d > 0 ? '+' : ''}${d}bp)` : '';
+	    let dtxt = d ? ` (${d > 0 ? '+' : ''}${prettyPrintBases(d)})` : '';
 	    lmtxt = `Aligned on ${rf.symbol || rf.id}${dtxt}`;
 	}
+	// disable the R/C button in landmark mode
 	this.root.selectAll('[name="zoomcontrols"] [name="zoomDmode"] .button')
 	    .attr('disabled', this.cmode === 'landmark' || null);
+	// display landmark text
 	d3.select('#zoomView .zoomCoords span').text( lmtxt );
 	
 	// the reference genome block (always just 1 of these).
@@ -1050,19 +1055,22 @@ class ZoomView extends SVGView {
 	    ;
 	// translate strips into position
 	let offset = this.topOffset;
+	let rHeight = 0;
 	this.app.vGenomes.forEach( vg => {
 	    let s = this.stripsGrp.select(`.zoomStrip[name="${vg.name}"]`);
 	    s.classed('reference', d => d.genome === this.app.rGenome)
-	        .attr('transform', g => {
+	        .attr('transform', d => {
 		    //return `translate(0,${closed ? this.topOffset : g.genome.zoomY})`
-		    let o = offset + g.zeroOffset;
-		    g.zoomY = offset;
-		    offset += g.stripHeight + this.stripGap;
-		    return `translate(0,${closed ? this.topOffset : o})`
+		    if (d.genome === this.app.rGenome)
+		        rHeight = d.stripHeight + d.zeroOffset;
+		    let o = offset + d.zeroOffset;
+		    d.zoomY = offset;
+		    offset += d.stripHeight + this.stripGap;
+		    return `translate(0,${closed ? this.topOffset+d.zeroOffset : o})`
 		});
 	});
 	// reset the svg size based on strip widths
-	this.svg.attr('height', offset + 15);
+	this.svg.attr('height', (closed ? rHeight : offset) + 15);
 
         zstrips.exit()
 	    .on('.drag', null)
@@ -1158,7 +1166,7 @@ class ZoomView extends SVGView {
 	// the positions of rectangles in the scene.
 	window.setTimeout(() => {
 	    this.highlight();
-	}, 50);
+	}, 150);
     };
 
     //----------------------------------------------
