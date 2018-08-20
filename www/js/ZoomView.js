@@ -78,6 +78,12 @@ class ZoomView extends SVGView {
 	    tooltip: 'Aligns the displayed genomes around this feature.',
 	    handler: (f) => { this.app.setContext({landmark:f.mgiid||f.mgpid, delta:0, highlight:[f.mgiid||f.mgpid]}) }
 	},{
+	    name: 'toMGI',
+	    label: 'Feature@MGI', 
+	    icon: 'open_in_new',
+	    tooltip: 'Go to this feature at MGI.',
+	    handler: (f) => { window.open(`http://www.informatics.jax.org/accession/${f.id}`, '_blank') }
+	},{
 	    name: 'toMouseMine',
 	    label: 'Feature@MouseMine', 
 	    icon: 'open_in_new',
