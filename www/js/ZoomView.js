@@ -81,13 +81,13 @@ class ZoomView extends SVGView {
 	    name: 'toMGI',
 	    label: 'Feature@MGI', 
 	    icon: 'open_in_new',
-	    tooltip: 'Go to this feature at MGI.',
+	    tooltip: 'See details for this feature at MGI.',
 	    handler: (f) => { window.open(`http://www.informatics.jax.org/accession/${f.id}`, '_blank') }
 	},{
 	    name: 'toMouseMine',
 	    label: 'Feature@MouseMine', 
 	    icon: 'open_in_new',
-	    tooltip: 'Go to this feature in MouseMine.',
+	    tooltip: 'See details for this feature at MouseMine.',
 	    handler: (f) => this.app.linkToReportPage(f)
 	},{
 	    name: 'genomicSeqDownload',
@@ -494,7 +494,7 @@ class ZoomView extends SVGView {
         this.genomes.forEach( (g,i) => {
 	    let strip = d3.select(`#zoomView .zoomStrip[name="${g.name}"]`);
 	    if (!strip.classed('dragging'))
-	        strip.attr('transform', `translate(0,${o})`);
+	        strip.attr('transform', gd => `translate(0,${o + gd.zeroOffset})`);
 	    o += strip.data()[0].stripHeight + this.stripGap;
 	});
     }
