@@ -8,6 +8,10 @@ body {
     font-size: 12px;
 }
 
+svg {
+    transition: height 0.5s;
+}
+
 ::placeholder {
     color: #aaa;
     font-style: italic;
@@ -674,6 +678,13 @@ label > i.material-icons {
 }
 #zoomView svg .zoomStrip:not(.dragging) {
     transition: transform 0.3s;
+}
+
+#zoomView div.zoomCoords span {
+    font-size: smaller;
+    position: absolute;
+    top: 17px;
+    left 0px;
 }
 
 /* R/N toggle - for showing/changing drawing mode between reference order and comparison (native) order */
