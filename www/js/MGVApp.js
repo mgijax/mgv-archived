@@ -759,10 +759,7 @@ class MGVApp extends Component {
 		delta: cfg.delta 
 	    };
 	    //
-	    this.zoomView.highlighted = cfg.highlight;
-	    this.zoomView.genomes = this.vGenomes;
-	    this.zoomView.dmode = cfg.dmode;
-	    this.zoomView.update();
+	    this.zoomView.update(cfg);
 	    //
 	    this.genomeView.redraw();
 	    this.genomeView.setBrushCoords(this.coords);

@@ -44,20 +44,15 @@ a {
     font-weight: bold;
     font-size: bigger;
 }
-.button:hover {
-    color: white;
-    background-color: rgb(31, 119, 180);
-    border-radius: 4px;
-}
 .button[disabled] {
     cursor: default;
     color: #ccc;
 }
-.button[disabled]:hover {
-    color: #ccc;
-    background-color: white !important;
+.button:hover:not([disabled]) {
+    color: white;
+    background-color: rgb(31, 119, 180);
+    border-radius: 4px;
 }
-
 .facet select option {
     margin: 0px;
 }

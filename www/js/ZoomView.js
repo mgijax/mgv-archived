@@ -73,7 +73,7 @@ class ZoomView extends SVGView {
 	    cls: 'menuTitle'
 	},{
 	    name: 'lineUpOnFeature',
-	    label: 'Line up on this feature.',
+	    label: 'Align on this feature.',
 	    icon: 'format_align_center',
 	    tooltip: 'Aligns the displayed genomes around this feature.',
 	    handler: (f) => { this.app.setContext({landmark:f.mgiid||f.mgpid, delta:0, highlight:[f.mgiid||f.mgpid]}) }
@@ -104,7 +104,7 @@ class ZoomView extends SVGView {
 	    name: 'exonSeqDownload',
 	    label: 'Exon sequences', 
 	    icon: 'cloud_download',
-	    tooltip: 'Download sequences for exons of this feature from currently displayed genomes.',
+	    tooltip: 'Download exon sequences of this feature from currently displayed genomes.',
 	    disabler: (f) => f.type.indexOf('gene') === -1,
 	    handler: (f) => { 
 		this.app.downloadFasta(f, 'exon', this.app.vGenomes.map(vg=>vg.label));
@@ -158,11 +158,7 @@ class ZoomView extends SVGView {
 	//
 	let fClickHandler = function (f, evt, preserve) {
 	    let id = f.mgiid || f.mgpid;
-	    if (evt.metaKey) {
-		this.hiFeats[id] = id;
-	        this.app.setContext({landmark:(f.canonical || f.ID), delta:0}, true);
-	    }
-	    else if (evt.ctrlKey) {
+	    if (evt.ctrlKey) {
 	        let cx = d3.event.clientX;
 	        let cy = d3.event.clientY;
 	        let bb = this.root.select('[name="zoomcontrols"] > .menu > .button').node().getBoundingClientRect();
@@ -348,6 +344,8 @@ class ZoomView extends SVGView {
 	// zoom drawing mode 
 	this.root.selectAll('div[name="zoomDmode"] .button')
 	    .on('click', function() {
+		if (d3.select(this).attr('disabled'))
+		    return;
 		let r = self.root;
 		let isC = r.classed('comparison');
 		r.classed('comparison', !isC);
@@ -741,10 +739,14 @@ class ZoomView extends SVGView {
 	return Promise.all(promises);
     }
     //
-    update () {
-	let p;
+    update (cfg) {
+	this.highlighted = cfg.highlight;
+	this.genomes = cfg.genomes;
+	this.dmode = cfg.dmode;
+	this.cmode = cfg.cmode;
 	this.app.translator.ready().then(() => {
-	    if (this.app.cmode === 'mapped')
+	    let p;
+	    if (this.cmode === 'mapped')
 		p = this.updateViaMappedCoordinates(this.app.coords);
 	    else
 		p = this.updateViaLandmarkCoordinates(this.app.lcoords);
@@ -962,6 +964,17 @@ class ZoomView extends SVGView {
 	// Show ref genome name
 	d3.select('#zoomView .zoomCoords label')
 	    .text(this.app.rGenome.label + ' coords');
+	// Show landmark label, if applicable
+	let lmtxt = '';
+	if (this.cmode === 'landmark') {
+	    let rf = this.app.lcoords.landmarkRefFeat;
+	    let d = this.app.lcoords.delta;
+	    let dtxt = d ? ` (${d > 0 ? '+' : ''}${d}bp)` : '';
+	    lmtxt = `Aligned on ${rf.symbol || rf.id}${dtxt}`;
+	}
+	this.root.selectAll('[name="zoomcontrols"] [name="zoomDmode"] .button')
+	    .attr('disabled', this.cmode === 'landmark' || null);
+	d3.select('#zoomView .zoomCoords span').text( lmtxt );
 	
 	// the reference genome block (always just 1 of these).
 	let rData = data.filter(dd => dd.genome === this.app.rGenome)[0];
