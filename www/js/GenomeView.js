@@ -143,6 +143,9 @@ class GenomeView extends SVGView {
 
 
 	let closed = this.root.classed("closed");
+	// set direction of the resize cursor.
+	chrs.selectAll('g[name="brush"] g.resize').style('cursor', closed ? 'ew-resize' : 'ns-resize')
+	//
 	if (closed) {
 	    // Reset the SVG size to be 1-chromosome wide.
 	    // Translate the chromosomes group so that the current chromosome appears in the svg area.
