@@ -224,13 +224,19 @@
 		    <!-- coordinates display/input -->
 		    <div class="zoomCoords flexrow">
 			<label>Ref Genome Coords</label>
-			<input id="zoomCoords" size="30" type="text"></input>
+			<div class="flexcolumn">
+			<input id="zoomCoords" size="30" type="text"
+			title="Enter coordinates (chr:start..end) or landmark (symbol or ID). Coordinates are relative to the reference genome and are mapped to corresponding region(s) in each comparison genome. Enter a landmark to find that feature and line up the displays."
+			></input>
 			<span></span>
+			</div>
 		    </div>
 		    <!-- coord window size display/input -->
 		    <div class="zoomWSize flexrow">
 			<label>Showing</label>
-			<input id="zoomWSize" size="10" type="text"></input>
+			<input id="zoomWSize" size="10" type="text"
+			title="Shows the width in bp of the currently displayed reference genome region. Enter a smaller value to zoom in, larger to zoom out (or just click the zoom buttons)."
+			></input>
 			<span>bp</span>
 		    </div>
 		    <div class = "flexrow">
