@@ -237,9 +237,9 @@ class ZoomView extends SVGView {
 	      let f = tgt.data()[0];
 	      if (f instanceof Feature) {
 		  fClickHandler(f, d3.event);
-		  d3.event.stopPropagation();
-		  d3.event.preventDefault();
 	      }
+	      d3.event.stopPropagation();
+	      d3.event.preventDefault();
 	  })
 	  .on('mouseover', () => {
 	      let tgt = d3.select(d3.event.target);
@@ -400,14 +400,19 @@ class ZoomView extends SVGView {
 	  .classed('disabled', d => d.disabler ? d.disabler(obj) : false)
 	  .attr('name', d => d.name || null )
 	  .attr('title', d => d.tooltip || null );
-	news.append('label')
-	  .text(d => typeof(d.label) === 'function' ? d.label(obj) : d.label)
-	  .on('click', d => {
+
+	let handler = d => {
 	      if (d.disabler && d.disabler(obj))
 	          return;
-	      d.handler(obj);
+	      d.handler && d.handler(obj);
 	      this.hideContextMenu();
-	  });
+	      d3.event.stopPropagation();
+	      d3.event.preventDefault();
+	};
+	news.append('label')
+	  .text(d => typeof(d.label) === 'function' ? d.label(obj) : d.label)
+	  .on('click', handler)
+	  .on('contextmenu', handler);
 	news.append('i')
 	  .attr('class', 'material-icons')
 	  .text( d=>d.icon );
