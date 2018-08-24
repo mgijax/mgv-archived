@@ -61,7 +61,7 @@ class QueryManager extends Component {
 		  this.app.listManager.update(lst);
 		  //
 		  this.app.zoomView.hiFeats = {};
-		  feats.forEach(f => this.app.zoomView.hiFeats[f.mgiid] = f.mgiid);
+		  feats.forEach(f => this.app.zoomView.hiFeats[f.canonical] = f.canonical);
 		  this.app.zoomView.highlight();
 		  //
 		  this.app.setCurrentList(lst,true);

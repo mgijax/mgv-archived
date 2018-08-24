@@ -27,21 +27,21 @@ class FeatureManager {
     //----------------------------------------------
     processFeature (genome, d) {
 	// If we've already got this one in the cache, return it.
-	let f = this.id2feat[d.mgpid];
+	let f = this.id2feat[d.ID];
 	if (f) return f;
 	// Create a new Feature
 	f = new Feature(d);
 	f.genome = genome
 	// Register it.
-	this.id2feat[f.mgpid] = f;
+	this.id2feat[f.ID] = f;
 	// genome cache
 	let gc = this.cache[genome.name] = (this.cache[genome.name] || {});
 	// chromosome cache (w/in genome)
 	let cc = gc[f.chr] = (gc[f.chr] || []);
 	cc.push(f);
 	//
-	if (f.mgiid && f.mgiid !== '.') {
-	    let lst = this.canonical2feats[f.mgiid] = (this.canonical2feats[f.mgiid] || []);
+	if (f.canonical && f.canonical !== '.') {
+	    let lst = this.canonical2feats[f.canonical] = (this.canonical2feats[f.canonical] || []);
 	    lst.push(f);
 	}
 	if (f.symbol && f.symbol !== '.') {

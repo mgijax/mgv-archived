@@ -95,7 +95,7 @@ class MGVApp extends Component {
 	this.initFeatTypeControl(ftFacet);
 
 	// Has-MGI-id facet
-	let mgiFacet = this.facetManager.addFacet("HasMgiId",    f => f.mgiid  ? "yes" : "no" );
+	let mgiFacet = this.facetManager.addFacet("HasCanonicalId",    f => f.canonical  ? "yes" : "no" );
 	d3.selectAll('input[name="mgiFacet"]').on("change", function(){
 	    mgiFacet.setValues(this.value === "" ? [] : [this.value]);
 	    self.zoomView.highlight();
@@ -1007,7 +1007,7 @@ class MGVApp extends Component {
 	if (q) window.open(q,"_blank");
     }
     linkToReportPage (f) {
-        let u = this.queryManager.auxDataManager.linkToReportPage(f.mgiid || f.mgpid);
+        let u = this.queryManager.auxDataManager.linkToReportPage(f.id);
 	window.open(u, '_blank')
     }
 } // end class MGVApp

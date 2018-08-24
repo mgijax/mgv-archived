@@ -35,9 +35,9 @@ class FeatureDetails extends Component {
 	// list of features to show in details area.
 	// the given feature and all equivalents in other genomes.
 	let flist = [f];
-	if (f.mgiid) {
+	if (f.canonical) {
 	    // FIXME: reachover
-	    flist = this.app.featureManager.getCachedFeaturesByCanonicalId(f.mgiid);
+	    flist = this.app.featureManager.getCachedFeaturesByCanonicalId(f.canonical);
 	}
 	// Got the list. Now order it the same as the displayed genomes
 	// build index of genome name -> feature in flist
@@ -47,10 +47,10 @@ class FeatureDetails extends Component {
 	//
 	let colHeaders = [
 	    // columns headers and their % widths
-	    ["MGI id"     ,10],
-	    ["MGI symbol" ,10],
+	    ["Canonical id"     ,10],
+	    ["Canonical symbol" ,10],
 	    ["Genome"     ,9],
-	    ["MGP id"     ,17],
+	    ["ID"     ,17],
 	    ["Type"       ,10.5],
 	    ["BioType"    ,18.5],
 	    ["Coordinates",18],
@@ -80,16 +80,16 @@ class FeatureDetails extends Component {
 	    // f is null if it doesn't exist for genome i 
 	    if (f) {
 		let link = "";
-		let mgiid = f.mgiid || "";
-		if (mgiid) {
-		    let url = `http://www.informatics.jax.org/accession/${mgiid}`;
-		    link = `<a target="_blank" href="${url}">${mgiid}</a>`;
+		let canonical = f.canonical || "";
+		if (canonical) {
+		    let url = `http://www.informatics.jax.org/accession/${canonical}`;
+		    link = `<a target="_blank" href="${url}">${canonical}</a>`;
 		}
 		cellData = [
-		    link || mgiid,
+		    link || canonical,
 		    f.symbol,
 		    f.genome.label,
-		    f.mgpid,
+		    f.ID,
 		    f.type,
 		    f.biotype,
 		    `${f.chr}:${f.start}..${f.end} (${f.strand})`,

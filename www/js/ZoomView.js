@@ -23,7 +23,7 @@ class ZoomView extends SVGView {
       this.wheelThreshold = 3;	// minimum wheel distance 
 
       //
-      // IDs of Features we're highlighting. May be mgpid  or mgiId
+      // IDs of Features we're highlighting. May be feature's ID  or canonical IDr./
       // hiFeats is an obj whose keys are the IDs
       this.hiFeats = (initialHi || []).reduce( (a,v) => { a[v]=v; return a; }, {} );
       //
@@ -70,7 +70,7 @@ class ZoomView extends SVGView {
 	// config for a feature's context menu
 	this.fcxtMenuCfg = [{
 	    name: 'menuTitle',
-	    label: (d) => `${d.symbol || d.mgpid}`, 
+	    label: (d) => `${d.symbol || d.ID}`, 
 	    cls: 'menuTitle'
 	},{
 	    name: 'lineUpOnFeature',
@@ -167,7 +167,7 @@ class ZoomView extends SVGView {
 	// Feature mouse event handlers.
 	//
 	let fClickHandler = function (f, evt, preserve) {
-	    let id = f.mgiid || f.mgpid;
+	    let id = f.id;
 	    if (evt.ctrlKey) {
 	        let cx = d3.event.clientX;
 	        let cy = d3.event.clientY;
@@ -865,7 +865,7 @@ class ZoomView extends SVGView {
     //     data = [ zoomStrip_data ]
     //     zoomStrip_data = { genome [ zoomBlock_data ] }
     //     zoomBlock_data = { xscale, chr, start, end, index, fChr, fStart, fEnd, fIndex, ori, [ feature_data ] }
-    //     feature_data = { mgpid, mgiid, symbol, chr, start, end, strand, type, biotype }
+    //     feature_data = { ID, canonical, symbol, chr, start, end, strand, type, biotype }
     //
     // Again, in English:
     //  - data is a list of items, one per strip to be displayed. Item[0] is data for the ref genome.
@@ -873,7 +873,7 @@ class ZoomView extends SVGView {
     //  - each strip item is an object containing a genome and a list of blocks. Item[0] always has 
     //    a single block.
     //  - each block is an object containing a chromosome, start, end, orientation, etc, and a list of features.
-    //  - each feature has chr,start,end,strand,type,biotype,mgpid
+    //  - each feature has chr,start,end,strand,type,biotype,ID
     //
     // Because SBlocks can be very fragmented, one contiguous region in the ref genome can turn into 
     // a bazillion tiny blocks in the comparison. The resulting rendering is jarring and unusable.
@@ -1192,27 +1192,25 @@ class ZoomView extends SVGView {
         let self = this;
 	//
 	// never draw the same feature twice in one rendering pass
-	let drawn = new Set();	// set of mgpids of drawn features
+	let drawn = new Set();	// set of IDs of drawn features
 	let filterDrawn = function (f) {
 	    // returns true if we've not seen this one before.
 	    // registers that we've seen it.
-	    let fid = f.mgpid;
+	    let fid = f.ID;
 	    let v = ! drawn.has(fid);
 	    drawn.add(fid);
 	    return v;
 	};
 	let feats = sblocks.select('[name="layer1"]').selectAll('.feature')
-	    .data(d=>d.features.filter(filterDrawn), d=>d.mgpid);
+	    .data(d=>d.features.filter(filterDrawn), d=>d.ID);
 	feats.exit().remove();
 	//
 	let newFeats = feats.enter().append('rect')
 	    .attr('class', f => 'feature' + (f.strand==='-' ? ' minus' : ' plus'))
-	    .attr('name', f => f.mgpid)
+	    .attr('name', f => f.ID)
 	    .style('fill', f => self.app.cscale(f.getMungedType()))
 	    ;
-	// NB: if you are looking for click handlers, they are at 
-
-	// draw the rectangles
+	// NB: if you are looking for click handlers, they are at the svg level (see initDom above).
 
 	// returns the synteny block containing this feature
 	let fBlock = function (featElt) {
@@ -1286,8 +1284,8 @@ class ZoomView extends SVGView {
 	  // filter rect.features for those in the highlight list
 	  .filter(function(ff){
 	      // highlight ff if either id is in the list AND it's not been hidden
-	      let mgi = hiFeats[ff.mgiid];
-	      let mgp = hiFeats[ff.mgpid];
+	      let mgi = hiFeats[ff.canonical];
+	      let mgp = hiFeats[ff.ID];
 	      let showing = d3.select(this).style('display') !== 'none';
 	      let hl = showing && (mgi || mgp);
 	      if (hl) {
@@ -1405,7 +1403,7 @@ class ZoomView extends SVGView {
 	  .attr('y', d => d.rect.__data__.genome.zoomY+15)
 	  .text(d => {
 	       let f = d.rect.__data__;
-	       let sym = f.symbol || f.mgpid;
+	       let sym = f.symbol || f.ID;
 	       return sym;
 	  });
 

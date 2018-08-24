@@ -18,6 +18,7 @@ class AuxDataManager {
 	if (!MINES[MouseMine]) 
 	    throw "Unknown mine name: " + MouseMine;
 	this.baseUrl = MINES[MouseMine];
+	console.log("MouseMine url:", this.baseUrl);
         this.qUrl = this.baseUrl + '/service/query/results?';
 	this.rUrl = this.baseUrl + '/portal.do?class=SequenceFeature&externalids='
 	this.faUrl = this.baseUrl + '/service/query/results/fasta?';
@@ -86,19 +87,40 @@ class AuxDataManager {
     featuresByPhenotype (qryString) { return this.featuresByOntologyTerm(qryString, ["Mammalian Phenotype","Disease Ontology"]); }
     featuresByPathway   (qryString) { return this.featuresByPathwayTerm(qryString); }
     //----------------------------------------------
+    // Returns a promise for all exons of features overlapping a specified range in the specifed genome.
+    // Equivalently: for every feature that overlaps the given range in the given genome, returns promise 
+    // for all its exons in that genome.
     exonsByRange	(genome, chr, start, end) {
 	let view = [
 	'Exon.gene.primaryIdentifier',
+	'Exon.transcripts.primaryIdentifier',
 	'Exon.primaryIdentifier',
 	'Exon.chromosome.primaryIdentifier',
 	'Exon.chromosomeLocation.start',
-	'Exon.chromosomeLocation.end'
+	'Exon.chromosomeLocation.end',
+	'Exon.strain.name'
 	].join(' ');
         let q = `<query model="genomic" view="${view}" constraintLogic="A and B">
-	    <constraint code="A" path="Exon.chromosomeLocation" op="OVERLAPS">
+	    <constraint code="A" path="Exon.gene.chromosomeLocation" op="OVERLAPS">
 		<value>${chr}:${start}..${end}</value>
 	    </constraint>
 	    <constraint code="B" path="Exon.strain.name" op="=" value="${genome}"/>
+	    </query>`
+	return this.getAuxData(q,'json');
+    }
+    // Returns a promise for all exons of all genologs of the specified canonical gene
+    exonsByCanonicalId	(ident) {
+	let view = [
+	'Exon.gene.primaryIdentifier',
+	'Exon.transcripts.primaryIdentifier',
+	'Exon.primaryIdentifier',
+	'Exon.chromosome.primaryIdentifier',
+	'Exon.chromosomeLocation.start',
+	'Exon.chromosomeLocation.end',
+	'Exon.strain.name'
+	].join(' ');
+        let q = `<query model="genomic" view="${view}" >
+	    <constraint code="A" path="Exon.gene.canonical.primaryIdentifier" op="=" value="${ident}" />
 	    </query>`
 	return this.getAuxData(q,'json');
     }
@@ -117,8 +139,8 @@ class AuxDataManager {
         //
 	type = type ? type.toLowerCase() : 'genomic';
 	//
-	if (f.mgiid) {
-	    ident = f.mgiid;
+	if (f.canonical) {
+	    ident = f.canonical
 	    //
 	    let gs = ''
 	    let vals;
@@ -150,7 +172,7 @@ class AuxDataManager {
 	    }
 	}
 	else {
-	    ident = f.mgpid;
+	    ident = f.ID;
 	    view = ''
 	    switch (type) {
 	    case 'genomic':

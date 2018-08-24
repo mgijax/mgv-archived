@@ -347,7 +347,7 @@ class GenomeView extends SVGView {
 
 	// the tick elements
         let feats = tGrps.selectAll(".feature")
-	    .data(d => d.features, d => d.mgpid);
+	    .data(d => d.features, d => d.ID);
 	//
 	let xAdj = f => (f.strand === "+" ? this.tickLength : -this.tickLength);
 	//

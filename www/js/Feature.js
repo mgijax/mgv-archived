@@ -23,7 +23,6 @@ class Feature {
         return this.mgiid;
     }
     get id () {
-	// FIXME: remove this method
         return this.mgiid || this.mgpid;
     }
     //----------------------------------------------
