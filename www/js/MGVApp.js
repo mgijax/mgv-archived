@@ -35,6 +35,9 @@ class MGVApp extends Component {
 	this.defaultZoom = 2;	// multiplier of current range width. Must be >= 1. 1 == no zoom.
 				// (zooming in uses 1/this amount)
 	this.defaultPan  = 0.15;// fraction of current range width
+	this.currListIndex = {};
+	this.currListCounter = 0;
+
 
 	// Coordinates may be specified in one of two ways: mapped or landmark. 
 	// Mapped coordinates are specified as chromosome+start+end. This coordinate range is defined relative to 
@@ -100,7 +103,7 @@ class MGVApp extends Component {
 
 	// Is-highlighted facet
 	let hiFacet = this.facetManager.addFacet("IsHi", f => {
-	    let ishi = this.zoomView.hiFeats[f.mgiid] || this.zoomView.hiFeats[f.mgpid];
+	    let ishi = this.zoomView.hiFeats[f.id] || this.currListIndex[f.id];
 	    return ishi ? "yes" : "no";
 	});
 	d3.selectAll('input[name="hiFacet"]').on("change", function(){

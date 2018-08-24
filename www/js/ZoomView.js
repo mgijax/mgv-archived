@@ -20,6 +20,7 @@ class ZoomView extends SVGView {
       this.stripGap = 20;	// space between strips
       this.maxSBgap = 20;	// max gap allowed between blocks.
       this.dmode = 'comparison';// drawing mode. 'comparison' or 'reference'
+      this.wheelThreshold = 3;	// minimum wheel distance 
 
       //
       // IDs of Features we're highlighting. May be mgpid  or mgiId
@@ -76,7 +77,10 @@ class ZoomView extends SVGView {
 	    label: 'Align on this feature.',
 	    icon: 'format_align_center',
 	    tooltip: 'Aligns the displayed genomes around this feature.',
-	    handler: (f) => { this.app.setContext({landmark:f.id, delta:0, highlight:[f.id]}) }
+	    handler: (f) => {
+		let ids = (new Set(Object.keys(this.hiFeats))).add(f.id);
+	        this.app.setContext({landmark:f.id, delta:0, highlight:Array.from(ids)})
+	    }
 	},{
 	    name: 'toMGI',
 	    label: 'Feature@MGI', 
@@ -256,29 +260,33 @@ class ZoomView extends SVGView {
 	      }
 	  })
 	  .on('wheel', function(d) {
-	    // only interested in horizontal motion events
-	    // occurring in a zoom strip.
 	    let e = d3.event;
-	    if (Math.abs(e.deltaX) < Math.abs(e.deltaY) || Math.abs(e.deltaX) < 3) 
+	    // let the browser handler vertical motion
+	    if (Math.abs(e.deltaX) < Math.abs(e.deltaY))
 	        return;
+	    // we handle horizontal motion.
 	    e.stopPropagation();
 	    e.preventDefault();
-	    //
+	    // filter out tiny motions
+	    if (Math.abs(e.deltaX) < this.wheelThreshold) 
+	        return;
+	    // get the zoom strip target, if it exists, else the ref zoom strip.
 	    let z = e.target.closest('g.zoomStrip') || d3.select('g.zoomStrip.reference')[0][0];
 	    if (!z) return;
 
 	    let db = e.deltaX / self.ppb; // delta in bases for this event
 	    let zd = z.__data__;
-	    // For comparison genomes, just translate the blocks by the wheel amount, so the user can 
-	    // see everything.
 	    if (e.ctrlKey) {
+		// Ctrl-wheel simply slides the strip horizontally (temporary)
+		// For comparison genomes, just translate the blocks by the wheel amount, so the user can 
+		// see everything.
 		zd.deltaB += db;
 	        d3.select(z).select('g[name="sBlocks"]').attr('transform',`translate(${-zd.deltaB * self.ppb},0)scale(${zd.xScale},1)`);
 		self.drawFiducials();
 		return;
 	    }
-	    // For the reference genome, translate the blocks and then actually scroll the view.
-	    // Also, limit the block translations by chromosome ends.
+
+	    // Normal wheel event = pan the view.
 	    //
 	    let c  = self.app.coords;
 	    // Limit delta by chr ends
@@ -1335,7 +1343,12 @@ class ZoomView extends SVGView {
 	    .attr('name', d => d.fid);
 	ffGrps.exit().remove();
 	//
-	ffGrps.attr('class',d => 'featureMarks ' + (d.cls || ''))
+	ffGrps.attr('class', d => {
+            let classes = ['featureMarks'];
+	    d.cls && classes.push(d.cls);
+	    this.app.currListIndex[d.fid] && classes.push('listItem')
+	    return classes.join(' ');
+	});
 
 	// -------------------------------------
 	// Draw the connector polygons.

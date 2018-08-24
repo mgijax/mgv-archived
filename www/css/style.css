@@ -744,6 +744,11 @@ label > i.material-icons {
    stroke-opacity: 0.3;
 }
 
+#zoomView .fiducials .featureMarks.listItem .fiducial {
+   stroke : orange;
+   fill: orange;
+}
+
 #zoomView .fiducials .current .fiducial {
    stroke : red;
    fill: red;
