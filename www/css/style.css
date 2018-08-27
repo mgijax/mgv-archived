@@ -34,8 +34,8 @@ a {
     stroke : blue;
     fill: blue;
 }
-[name="brush"]:hover > rect.background,
-.brush:hover > rect.background {
+[name="brush"] > rect.background,
+.brush > rect.background {
     visibility: visible !important;
     fill: blue;
     fill-opacity : 0.15;
