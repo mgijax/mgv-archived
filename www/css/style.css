@@ -34,11 +34,11 @@ a {
     stroke : blue;
     fill: blue;
 }
-[name="brush"]:hover > rect.background,
-.brush:hover > rect.background {
+[name="brush"] > rect.background,
+.brush > rect.background {
     visibility: visible !important;
-    fill: blue;
-    fill-opacity : 0.15;
+    fill: #888;
+    fill-opacity : 0.3;
 }
 
 .button {
@@ -483,6 +483,9 @@ label > i.material-icons {
     background-color: #557f9e;
     color: #eee;
 }
+#header img.logo {
+    height: 40px;
+}
 #header .flexrow label {
     position: relative;
     top: 4px;
@@ -659,20 +662,23 @@ label > i.material-icons {
 #zoomView svg .sBlock text {
    font-size: 12px;
 }
-#zoomView svg .zoomStrip rect[name="zoomStripHandle"] {
-  fill: #ccc;
-}
 #zoomView svg .zoomStrip.reference g.sBlock g[name="layer0"] rect.block {
   fill: none;
 }
-#zoomView svg .zoomStrip.reference rect[name="zoomStripHandle"] {
+#zoomView svg .zoomStrip rect.zoomStripEndCap {
+  fill: #ccc;
+}
+#zoomView svg .zoomStrip.reference rect.zoomStripEndCap {
     fill: blue;
 }
-#zoomView svg .zoomStrip rect[name="zoomStripHandle"]:hover {
+#zoomView svg .zoomStrip text.zoomStripHandle {
+   fill: gray; 
+}
+#zoomView svg .zoomStrip text.zoomStripHandle:hover {
    cursor: grab;
    cursor: -webkit-grab;
 }
-#zoomView svg .zoomStrip.dragging rect[name="zoomStripHandle"]:hover {
+#zoomView svg .zoomStrip.dragging text.zoomStripHandle:hover {
    cursor: grabbing;
    cursor: -webkit-grabbing;
 }

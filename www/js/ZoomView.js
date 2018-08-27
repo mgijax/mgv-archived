@@ -524,7 +524,7 @@ class ZoomView extends SVGView {
 	  })
           .on('dragstart.z', function(g) {
 	      let t = d3.event.sourceEvent.target;
-	      if (d3.event.sourceEvent.shiftKey || d3.select(t).attr('name') !== 'zoomStripHandle'){
+	      if (d3.event.sourceEvent.shiftKey || ! d3.select(t).classed('zoomStripHandle')){
 	          return false;
 	      }
 	      d3.event.sourceEvent.stopPropagation();
@@ -628,8 +628,6 @@ class ZoomView extends SVGView {
 	this.currentHLG = g;
 	//
 	this.svgMain.selectAll('.zoomStrip')
-	    .classed('highlighted', d => d.genome === g);
-	this.svgMain.selectAll('.zoomStripHandle')
 	    .classed('highlighted', d => d.genome === g);
 	this.app.showBlocks(g);
     }
@@ -1051,6 +1049,7 @@ class ZoomView extends SVGView {
 	    .attr('font-family','sans-serif')
 	    .attr('font-size', 10)
 	    ;
+	// Strip underlay
 	newzs.append('rect')
 	    .attr('class','underlay')
 	    .attr('y', -this.blockHeight/2)
@@ -1058,14 +1057,26 @@ class ZoomView extends SVGView {
 	    .style('width','100%')
 	    .style('opacity',0)
 	    ;
+	// Group for sBlocks
 	newzs.append('g')
 	    .attr('name', 'sBlocks');
+	// Strip end cap
 	newzs.append('rect')
-	    .attr('name', 'zoomStripHandle')
+	    .attr('class', 'material-icons zoomStripEndCap')
 	    .attr('x', -15)
 	    .attr('y', -this.blockHeight / 2)
 	    .attr('width', 15)
-	    .attr('height', this.blockHeight)
+	    .attr('height', this.blockHeight + 10)
+	    ;
+	// Strip drag-handle
+	newzs.append('text')
+	    .attr('class', 'material-icons zoomStripHandle')
+	    .style('font-size', '18px')
+	    .attr('x', -15)
+	    .attr('y', 9)
+	    .text('drag_indicator')
+	    .append('title')
+	        .text('Drag up/down to reorder the genomes.')
 	    ;
 	// translate strips into position
 	let offset = this.topOffset;
@@ -1112,7 +1123,7 @@ class ZoomView extends SVGView {
 	    d.sblocks.forEach(b=>b.xscale = d.xscale);
 	    return d.sblocks
 	    }, sb=>sb.index);
-        sbrects.enter().append('rect') ;
+        sbrects.enter().append('rect').append('title');
 	sbrects.exit().remove();
 	sbrects
 	   .attr('class', b => 'block ' + 
@@ -1123,6 +1134,13 @@ class ZoomView extends SVGView {
 	   .attr('width', b => Math.max(4, Math.abs(b.xscale(b.end)-b.xscale(b.start))))
 	   .attr('height',this.blockHeight);
 	   ;
+	sbrects.select('title')
+	   .text( b => {
+	       let adjectives = [];
+	       b.ori === '-' && adjectives.push('inverted');
+	       b.chr !== b.fChr && adjectives.push('translocated');
+	       return adjectives.length ? adjectives.join(', ') + ' block' : '';
+	   });
 
 	// the axis line
 	l0.append('line').attr('class','axis');
