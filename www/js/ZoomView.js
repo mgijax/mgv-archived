@@ -1074,6 +1074,8 @@ class ZoomView extends SVGView {
 	    .attr('x', -15)
 	    .attr('y', 9)
 	    .text('drag_indicator')
+	    .append('title')
+	        .text('Drag up/down to reorder the genomes.')
 	    ;
 	// translate strips into position
 	let offset = this.topOffset;
