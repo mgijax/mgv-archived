@@ -4,11 +4,8 @@ import {KeyStore} from './KeyStore';
 
 //----------------------------------------------
 // How the app loads feature data. Provides two calls:
-//   - get features in range
-//   - get features by id
 // Requests features from the server and registers them in a cache.
-// Interacts with the back end to load features; tries not to request
-// the same region twice.
+// Interacts with the back end to load features.
 //
 class FeatureManager {
     constructor (app) {
@@ -95,6 +92,14 @@ class FeatureManager {
 	    this.app.showStatus(`Loaded: ${genome.name}`);
 	    return true; 
 	});
+    }
+
+    //----------------------------------------------
+    // Returns a promise for all the exons of all genes that overlap the given range
+    // in the given genome.
+    ensureExonsByRange (genome, chr, start, end) {
+	let ep = this.app.auxDataManager.exonsByRange(genome, chr, start, end);
+
     }
 
     //----------------------------------------------

@@ -21,6 +21,7 @@ class ZoomView extends SVGView {
       this.maxSBgap = 20;	// max gap allowed between blocks.
       this.dmode = 'comparison';// drawing mode. 'comparison' or 'reference'
       this.wheelThreshold = 3;	// minimum wheel distance 
+      this.showFeatureDetails = false; // if true, show exon structure
 
       //
       // IDs of Features we're highlighting. May be feature's ID  or canonical IDr./
@@ -219,7 +220,7 @@ class ZoomView extends SVGView {
 	          this.dealWithUnwantedClickEvent = false;
 		  return;
 	      }
-	      if (t.tagName == 'rect' && t.classList.contains('feature')) {
+	      if (t.tagName == 'rect' && (t.classList.contains('feature') || t.parentNode.classList.contains('feature'))) {
 		  // user clicked on a feature
 		  fClickHandler(t.__data__, d3.event);
 		  this.highlight();
@@ -1187,6 +1188,9 @@ class ZoomView extends SVGView {
     // Args:
     //     sblocks (D3 selection of g.sblock nodes) - multilevel selection.
     //        Array (corresponding to strips) of arrays of synteny blocks.
+    //     detailed (boolean) if true, draws each feature in full detail (ie,
+    //        show exon structure if available). Otherwise (the default), draw
+    //        each feature as just a rectangle.
     //
     drawFeatures (sblocks) {
         let self = this;
@@ -1205,16 +1209,25 @@ class ZoomView extends SVGView {
 	    .data(d=>d.features.filter(filterDrawn), d=>d.ID);
 	feats.exit().remove();
 	//
-	let newFeats = feats.enter().append('rect')
-	    .attr('class', f => 'feature' + (f.strand==='-' ? ' minus' : ' plus'))
-	    .attr('name', f => f.ID)
-	    .style('fill', f => self.app.cscale(f.getMungedType()))
-	    ;
+	let newFeats;
+	if (this.showFeatureDetails) 
+	    newFeats = feats.enter().append('g')
+		.attr('class', f => 'feature' + (f.strand==='-' ? ' minus' : ' plus'))
+		.attr('name', f => f.ID)
+		.append('rect')
+		    .style('fill', f => self.app.cscale(f.getMungedType()))
+		    ;
+	else
+	    newFeats = feats.enter().append('rect')
+		.attr('class', f => 'feature' + (f.strand==='-' ? ' minus' : ' plus'))
+		.attr('name', f => f.ID)
+		.style('fill', f => self.app.cscale(f.getMungedType()))
+		;
 	// NB: if you are looking for click handlers, they are at the svg level (see initDom above).
 
 	// returns the synteny block containing this feature
 	let fBlock = function (featElt) {
-	    let blkElt = featElt.parentNode;
+	    let blkElt = featElt.closest('.sBlock');
 	    return blkElt.__data__;
 	}
 	let fx = function(f) {
@@ -1242,7 +1255,7 @@ class ZoomView extends SVGView {
 	       }
 	   };
 
-	feats
+	(this.showFeatureDetails ? feats.select('rect') : feats)
 	  .attr('x', fx)
 	  .attr('width', fw)
 	  .attr('y', fy)
@@ -1292,7 +1305,9 @@ class ZoomView extends SVGView {
 		  // for each highlighted feature, add its rectangle to the list
 		  let k = ff.id;
 		  if (!self.stacks[k]) self.stacks[k] = []
-		  self.stacks[k].push(this)
+		  // if showing feature details, .feature is a group with the rect as the first child.
+		  // otherwise, .feature is the rect itself.
+		  self.stacks[k].push(this.tagName === 'g' ? this.childNodes[0] : this)
 	      }
 	      // 
 	      d3.select(this)

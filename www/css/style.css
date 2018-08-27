@@ -701,19 +701,23 @@ label > i.material-icons {
 }
 
 
-#zoomView svg rect.feature {
+#zoomView svg rect.feature, 
+#zoomView svg .feature rec{
     fill : #aaa;
     stroke: none;
 }
-#zoomView svg rect.feature.highlight {
+#zoomView svg rect.feature.highlight,
+#zoomView svg .feature.highlight rect {
     outline-style: solid;
     outline-width: 2px;
     outline-color: #34ff9a;
 }
-#zoomView svg rect.feature.highlight.current {
+#zoomView svg rect.feature.highlight.current,
+#zoomView svg .feature.highlight.current rect {
     outline-color: #ffff00;
 }
-#zoomView svg rect.feature.highlight.extra {
+#zoomView svg rect.feature.highlight.extra,
+#zoomView svg .feature.highlight.extra rect {
     outline-width: 6px;
     animation: blinker 1s linear infinite;
 }

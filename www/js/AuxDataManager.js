@@ -12,7 +12,7 @@ let MINES = {
 
 // ---------------------------------------------
 // AuxDataManager - knows how to query an external source (i.e., MouseMine) for genes
-// annotated to different ontologies. 
+// annotated to different ontologies and for exons associated with specific genes or regions.
 class AuxDataManager {
     constructor () {
 	if (!MINES[MouseMine]) 
@@ -88,10 +88,9 @@ class AuxDataManager {
     featuresByPathway   (qryString) { return this.featuresByPathwayTerm(qryString); }
     //----------------------------------------------
     // Returns a promise for all exons of features overlapping a specified range in the specifed genome.
-    // Equivalently: for every feature that overlaps the given range in the given genome, returns promise 
-    // for all its exons in that genome.
     exonsByRange	(genome, chr, start, end) {
 	let view = [
+	'Exon.gene.canonical.primaryIdentifier',
 	'Exon.gene.primaryIdentifier',
 	'Exon.transcripts.primaryIdentifier',
 	'Exon.primaryIdentifier',
@@ -111,6 +110,7 @@ class AuxDataManager {
     // Returns a promise for all exons of all genologs of the specified canonical gene
     exonsByCanonicalId	(ident) {
 	let view = [
+	'Exon.gene.canonical.primaryIdentifier',
 	'Exon.gene.primaryIdentifier',
 	'Exon.transcripts.primaryIdentifier',
 	'Exon.primaryIdentifier',
