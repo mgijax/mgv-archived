@@ -282,7 +282,7 @@ class ZoomView extends SVGView {
 	    e.stopPropagation();
 	    e.preventDefault();
 	    // filter out tiny motions
-	    if (Math.abs(e.deltaX) < this.cfg.wheelThreshold) 
+	    if (Math.abs(e.deltaX) < self.cfg.wheelThreshold) 
 	        return;
 	    // get the zoom strip target, if it exists, else the ref zoom strip.
 	    let z = e.target.closest('g.zoomStrip') || d3.select('g.zoomStrip.reference')[0][0];
@@ -327,7 +327,7 @@ class ZoomView extends SVGView {
 			});
 		    zd.deltaB = 0;
 		}
-	    }, 50);
+	    }, 100);
 	});
 
 
@@ -621,11 +621,25 @@ class ZoomView extends SVGView {
       }
       //
       if (Math.abs(xt[0] - xt[1]) <= 10) {
-	  // User clicked. Recenter view.
+	  // User clicked. Recenter view on the clicked coordinate. 
+	  // Whichever genome the user clicked in becomes the reference.
+	  // The clicked coordinate:
 	  let xmid = (xt[0] + xt[1])/2;
+	  // size of view
 	  let w = this.app.coords.end - this.app.coords.start + 1;
+	  // starting coordinate in clicked genome of new view
 	  let s = Math.round(xmid - w/2);
-	  this.app.setContext({ ref:g, chr: this.brushing.chr, start: s, end: s + w - 1 });
+	  //
+	  let newContext = { ref:g, chr: this.brushing.chr, start: s, end: s + w - 1 };
+	  if (this.cmode === 'landmark') {
+	      let lmf = this.context.landmarkFeats.filter(f => f.genome === this.brushing.genome)[0];
+	      if (lmf) {
+		  let m = (this.brushing.end + this.brushing.start) / 2;
+		  let dx = xmid - m;
+		  newContext = { ref:g, delta: this.context.delta+dx };
+	      }
+	  }
+	  this.app.setContext(newContext);
       }
       else {
 	  // User dragged. Zoom in or out.
@@ -1230,6 +1244,9 @@ class ZoomView extends SVGView {
 	// the positions of rectangles in the scene.
 	window.setTimeout(() => {
 	    this.highlight();
+	    window.setTimeout(() => {
+		this.highlight();
+	    }, 150);
 	}, 150);
     };
 
@@ -1477,6 +1494,7 @@ class ZoomView extends SVGView {
 	    ;
 	//
 	pgons.attr('points', r => {
+	    try {
 	    // polygon connects bottom corners of 1st rect to top corners of 2nd rect
 	    let c1 = coordsAfterTransform(r[0]); // transform coords for 1st rect
 	    let c2 = coordsAfterTransform(r[1]);  // transform coords for 2nd rect
@@ -1484,8 +1502,12 @@ class ZoomView extends SVGView {
 	    // four polygon points
 	    let s = `${c1.x},${c1.y+c1.height} ${c2.x},${c2.y} ${c2.x+c2.width},${c2.y} ${c1.x+c1.width},${c1.y+c1.height}`
 	    return s;
+	    }
+	    catch (e) {
+	        console.log("Caught error:", e);
+		return '';
+	    }
 	})
-	//
 	// mousing over the fiducial highlights (as if the user had moused over the feature itself)
 	.on('mouseover', (p) => {
 	    this.highlight(p[0]);
