@@ -166,6 +166,25 @@
 		</div>
 	    </div>
 
+	    <!-- Facet: is in currList -->
+	    <div id="inCurrList" 
+		title="Show/hide features that are in the currently displayed list."
+		class="inCurrListFacet facet pagebox flexcolumn closable">
+		<label>Is in current list</label>
+		<div>
+		    <input type="radio" name="inCurrListFacet" value="yes" />
+		    <span>Yes</span>
+		</div>
+		<div>
+		    <input type="radio" name="inCurrListFacet" value="no" />
+		    <span>No</span>
+		</div>
+		<div>
+		    <input type="radio" name="inCurrListFacet" value="" checked />
+		    <span>Don't care</span>
+		</div>
+	    </div>
+
 	    <!-- Facet: is highlighted -->
 	    <div id="hiFacetBox" 
 		title="Show/hide features that are currently highlighted."
@@ -281,7 +300,6 @@
 	</span>
 	<span><a tabindex="-1" href="https://github.com/JoelRichardson/mgv">MGV@GitHub</a></span>
     </div>
-
 
     <!-- Hidden form for submitting IDs to MGI batch query -->
     <form id="mgibatchform"

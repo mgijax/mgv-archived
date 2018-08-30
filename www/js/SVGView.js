@@ -65,7 +65,6 @@ class SVGView extends Component {
         this.setGeom({width: width - r.x})
 	return this;
     }
-
 } // end class SVGView
 
 export { SVGView };

@@ -88,41 +88,49 @@ class AuxDataManager {
     featuresByPathway   (qryString) { return this.featuresByPathwayTerm(qryString); }
     //----------------------------------------------
     // Returns a promise for all exons of features overlapping a specified range in the specifed genome.
-    exonsByRange	(genome, chr, start, end) {
-	let view = [
-	'Exon.gene.canonical.primaryIdentifier',
-	'Exon.gene.primaryIdentifier',
-	'Exon.transcripts.primaryIdentifier',
-	'Exon.primaryIdentifier',
-	'Exon.chromosome.primaryIdentifier',
-	'Exon.chromosomeLocation.start',
-	'Exon.chromosomeLocation.end',
-	'Exon.strain.name'
+    exonView () {
+	return [
+	    'Exon.gene.canonical.primaryIdentifier',
+	    'Exon.gene.primaryIdentifier',
+	    'Exon.transcripts.primaryIdentifier',
+	    'Exon.primaryIdentifier',
+	    'Exon.chromosome.primaryIdentifier',
+	    'Exon.chromosomeLocation.start',
+	    'Exon.chromosomeLocation.end',
+	    'Exon.strain.name'
 	].join(' ');
-        let q = `<query model="genomic" view="${view}" constraintLogic="A and B">
+    }
+    // Returns a promise for all exons from the given genome where the exon's gene overlaps the given coordinates.
+    exonsByRange	(genome, chr, start, end) {
+        let q = `<query model="genomic" view="${this.exonView()}" constraintLogic="A and B">
 	    <constraint code="A" path="Exon.gene.chromosomeLocation" op="OVERLAPS">
 		<value>${chr}:${start}..${end}</value>
 	    </constraint>
 	    <constraint code="B" path="Exon.strain.name" op="=" value="${genome}"/>
 	    </query>`
-	return this.getAuxData(q,'json');
+	return this.getAuxData(q);
     }
     // Returns a promise for all exons of all genologs of the specified canonical gene
     exonsByCanonicalId	(ident) {
-	let view = [
-	'Exon.gene.canonical.primaryIdentifier',
-	'Exon.gene.primaryIdentifier',
-	'Exon.transcripts.primaryIdentifier',
-	'Exon.primaryIdentifier',
-	'Exon.chromosome.primaryIdentifier',
-	'Exon.chromosomeLocation.start',
-	'Exon.chromosomeLocation.end',
-	'Exon.strain.name'
-	].join(' ');
-        let q = `<query model="genomic" view="${view}" >
+        let q = `<query model="genomic" view="${this.exonView()}" >
 	    <constraint code="A" path="Exon.gene.canonical.primaryIdentifier" op="=" value="${ident}" />
 	    </query>`
-	return this.getAuxData(q,'json');
+	return this.getAuxData(q);
+    }
+    // Returns a promise for all exons of the specified gene.
+    exonsByGeneId	(ident) {
+        let q = `<query model="genomic" view="${this.exonView()}" >
+	    <constraint code="A" path="Exon.gene.primaryIdentifier" op="=" value="${ident}" />
+	    </query>`
+	return this.getAuxData(q);
+    }
+    // Returns a promise for all exons of the specified gene.
+    exonsByGeneIds	(idents) {
+	let vals = idents.map(i => `<value>${i}</value>`).join('');
+        let q = `<query model="genomic" view="${this.exonView()}" >
+	    <constraint code="A" path="Exon.gene.primaryIdentifier" op="ONE OF">${vals}</constraint>
+	    </query>`
+	return this.getAuxData(q);
     }
     //----------------------------------------------
     // Constructs a URL for linking to a MouseMine report page by id
@@ -130,7 +138,7 @@ class AuxDataManager {
         return this.rUrl + ident;
     }
     //----------------------------------------------
-    // Constructs a URL to retrieve mouse sequences from MouseMine for the specified feature.
+    // Constructs a URL to retrieve mouse sequences of the specified type for the specified feature.
     sequencesForFeature (f, type, genomes) {
 	let q;
 	let url;
@@ -155,6 +163,13 @@ class AuxDataManager {
 		    <constraint path="Gene.canonical.primaryIdentifier" op="=" value="${ident}"/>
 		    ${gs}</query>`;
 		break;
+	    case 'transcript':
+		view = 'Transcript.gene.canonical.primaryIdentifier';
+		gs = `<constraint path="Transcript.strain.name" op="ONE OF">${vals}</constraint>`
+		q = `<query name="transcriptSequencesByCanonicalId" model="genomic" view="Transcript.primaryIdentifier" >
+		    <constraint path="Transcript.gene.canonical.primaryIdentifier" op="=" value="${ident}"/>
+		    ${gs}</query>`;
+	        break;
 	    case 'exon':
 		view = 'Exon.gene.canonical.primaryIdentifier';
 		gs = `<constraint path="Exon.strain.name" op="ONE OF">${vals}</constraint>`
@@ -180,6 +195,11 @@ class AuxDataManager {
 		    <constraint path="Gene.primaryIdentifier" op="=" value="${ident}"/>
 		  </query>`;
 		break;
+	    case 'transcript':
+		q = `<query name="transcriptSequencesById" model="genomic" view="Transcript.primaryIdentifier" >
+		    <constraint path="Transcript.gene.primaryIdentifier" op="=" value="${ident}"/>
+		  </query>`;
+	        break;
 	    case 'exon':
 		q = `<query name="exonSequencesById" model="genomic" view="Exon.primaryIdentifier" >
 		    <constraint path="Exon.gene.primaryIdentifier" op="=" value="${ident}"/>

@@ -636,7 +636,7 @@ label > i.material-icons {
 }
 #zoomView svg .zoomStrip.highlighted > text {
 }
-#zoomView svg .zoomStrip line {
+#zoomView svg .zoomStrip [name="layer0"] line {
     stroke: #aaa;
     fill: none;
 }
@@ -708,22 +708,26 @@ label > i.material-icons {
 
 
 #zoomView svg rect.feature, 
-#zoomView svg .feature rec{
+#zoomView svg .feature rect {
     fill : #aaa;
     stroke: none;
 }
+#zoomView svg rect.feature.detailed, 
+#zoomView svg .feature.detailed > rect {
+    fill-opacity : 0.3;
+}
 #zoomView svg rect.feature.highlight,
-#zoomView svg .feature.highlight rect {
+#zoomView svg .feature.highlight > rect {
     outline-style: solid;
     outline-width: 2px;
     outline-color: #34ff9a;
 }
 #zoomView svg rect.feature.highlight.current,
-#zoomView svg .feature.highlight.current rect {
+#zoomView svg .feature.highlight.current > rect {
     outline-color: #ffff00;
 }
 #zoomView svg rect.feature.highlight.extra,
-#zoomView svg .feature.highlight.extra rect {
+#zoomView svg .feature.highlight.extra > rect {
     outline-width: 6px;
     animation: blinker 1s linear infinite;
 }
@@ -751,7 +755,7 @@ label > i.material-icons {
    stroke : blue;
    fill: blue;
    fill-opacity: 0.3;
-   stroke-opacity: 0.3;
+   stroke-opacity: 0.6;
 }
 
 #zoomView .fiducials .featureMarks.listItem .fiducial {

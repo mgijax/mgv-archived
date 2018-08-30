@@ -21,23 +21,16 @@ class ZoomView extends SVGView {
       this.maxSBgap = 20;	// max gap allowed between blocks.
       this.dmode = 'comparison';// drawing mode. 'comparison' or 'reference'
       this.wheelThreshold = 3;	// minimum wheel distance 
+      // A feature may be rendered in one of two ways: as a simple rect, or as a group containing the 
+      // rect and other stuff like text, an axis line, etc.
       this.showFeatureDetails = false; // if true, show exon structure
+      this.featureDetailThreshold = 2000000; // if width <= thresh, draw feature details.
+      this.clearAll = false; // if true, remove/rerender all existing features on next draw
 
       //
       // IDs of Features we're highlighting. May be feature's ID  or canonical IDr./
       // hiFeats is an obj whose keys are the IDs
       this.hiFeats = (initialHi || []).reduce( (a,v) => { a[v]=v; return a; }, {} );
-      //
-      this.fiducials = this.svg.insert('g',':first-child') // 
-        .attr('class','fiducials');
-      this.stripsGrp = this.svgMain.append('g')
-        .attr('class','strips');
-      this.axis = this.svgMain.append('g')
-        .attr('class','axis');
-      this.floatingText = this.svgMain.append('text')
-        .attr('class','floatingText');
-      this.cxtMenu = this.root.select('[name="cxtMenu"]');
-      //
       this.dragging = null;
       this.dragger = this.getDragger();
       //
@@ -103,6 +96,14 @@ class ZoomView extends SVGView {
 		this.app.downloadFasta(f, 'genomic', this.app.vGenomes.map(vg=>vg.label));
 	    }
 	},{
+	    name: 'txpSeqDownload',
+	    label: 'Transcript sequences', 
+	    icon: 'cloud_download',
+	    tooltip: 'Download transcript sequences of this feature from currently displayed genomes.',
+	    handler: (f) => { 
+		this.app.downloadFasta(f, 'transcript', this.app.vGenomes.map(vg=>vg.label));
+	    }
+	},{
 	    name: 'cdsSeqDownload',
 	    label: 'CDS sequences', 
 	    icon: 'cloud_download',
@@ -129,6 +130,17 @@ class ZoomView extends SVGView {
         let self = this;
 	let r = this.root;
 	let a = this.app;
+        //
+        this.fiducials = this.svg.insert('g',':first-child')
+          .attr('class','fiducials');
+        this.stripsGrp = this.svgMain.append('g')
+          .attr('class','strips');
+        this.axis = this.svgMain.append('g')
+          .attr('class','axis');
+        this.floatingText = this.svgMain.append('text')
+          .attr('class','floatingText');
+        this.cxtMenu = this.root.select('[name="cxtMenu"]');
+        //
 	//
 	r.select('.button.close')
 	    .on('click', () => this.update());
@@ -226,6 +238,12 @@ class ZoomView extends SVGView {
 		  this.highlight();
 	          this.app.contextChanged();
 	      }
+	      else if (t.tagName == 'rect' && t.classList.contains('exon')) {
+		  // user clicked on a feature
+		  fClickHandler(t.__data__.feature, d3.event);
+		  this.highlight();
+	          this.app.contextChanged();
+	      }
 	      else if (!d3.event.shiftKey && 
 	          (t.tagName === 'svg' 
 		  || t.tagName == 'rect' && t.classList.contains('block')
@@ -240,6 +258,7 @@ class ZoomView extends SVGView {
 	  .on('contextmenu', () => {
 	      let tgt = d3.select(d3.event.target);
 	      let f = tgt.data()[0];
+	      f = f ? f.feature || f : f;
 	      if (f instanceof Feature) {
 		  fClickHandler(f, d3.event);
 	      }
@@ -249,6 +268,7 @@ class ZoomView extends SVGView {
 	  .on('mouseover', () => {
 	      let tgt = d3.select(d3.event.target);
 	      let f = tgt.data()[0];
+	      f = f ? f.feature || f : f;
 	      if (f instanceof Feature) {
 		  fMouseOverHandler(f);
 	      }
@@ -256,6 +276,7 @@ class ZoomView extends SVGView {
 	  .on('mouseout', () => {
 	      let tgt = d3.select(d3.event.target);
 	      let f = tgt.data()[0];
+	      f = f ? f.feature || f : f;
 	      if (f instanceof Feature) {
 		  fMouseOutHandler(f);
 	      }
@@ -633,11 +654,21 @@ class ZoomView extends SVGView {
     }
 
     //----------------------------------------------
+    // Based on the given coordinate range, sets the showFeatureDetails flag to true or false.
+    // Also sets the clearAll flag to true if the showFeatureDetails flag changed value.
+    //
+    setShowFeatureDetails (c) {
+	//
+	let prevSFD = this.showFeatureDetails;
+	this.showFeatureDetails = (c.end - c.start + 1) <= this.featureDetailThreshold;
+	this.clearAll = prevSFD !== this.showFeatureDetails;
+    }
+
+    //----------------------------------------------
     // Updates the ZoomView to show the given coordinate range from the reg genome and the corresponding
     // range(s) in each comparison genome.
     //
     updateViaMappedCoordinates (coords) {
-	let self = this;
 	let c = (coords || this.app.coords);
 	d3.select('#zoomCoords')[0][0].value = formatCoords(c.chr, c.start, c.end);
 	d3.select('#zoomWSize')[0][0].value = Math.round(c.end - c.start + 1)
@@ -649,8 +680,11 @@ class ZoomView extends SVGView {
 	//
 	let promises = [];
 
+	//
+	this.setShowFeatureDetails(c);
+
 	// First request is for the the reference genome. Get all the features in the range.
-	promises.push(mgv.featureManager.getFeatures(mgv.rGenome, [{
+	promises.push(mgv.featureManager.getFeaturesByRange(mgv.rGenome, [{
 	    // Need to simulate the results from calling the translator. 
 	    // 
 	    chr    : c.chr,
@@ -663,12 +697,12 @@ class ZoomView extends SVGView {
 	    fIndex  : 0,
 	    ori    : '+',
 	    blockId: mgv.rGenome.name
-	    }]));
-	if (! self.root.classed('closed')) {
+	}], this.showFeatureDetails));
+	if (! this.root.classed('closed')) {
 	    // Add a request for each comparison genome, using translated coordinates. 
 	    mgv.cGenomes.forEach(cGenome => {
 		let ranges = mgv.translator.translate( mgv.rGenome, c.chr, c.start, c.end, cGenome );
-		let p = mgv.featureManager.getFeatures(cGenome, ranges);
+		let p = mgv.featureManager.getFeaturesByRange(cGenome, ranges, this.showFeatureDetails);
 		promises.push(p);
 	    });
 	}
@@ -703,12 +737,13 @@ class ZoomView extends SVGView {
 	    let w     = c.length ? c.length : (f.length + 2*flank);
 	    let start = clip(Math.round(delta + f.start - flank), 1, clength);
 	    let end   = clip(Math.round(start + w), start, clength)
+	    let fdelta = (f.strand === '-' ? 1 : -1) * f.length / 2;
 	    let range = {
 		genome:	f.genome,
 		chr:	f.chr,
 		chromosome: f.genome.getChromosome(f.chr),
-		start:	start,
-		end:	end
+		start:	start + fdelta,
+		end:	end + fdelta
 	    } ;
 	    if (f.genome === mgv.rGenome) {
 		let c = this.app.coords = range;
@@ -726,6 +761,9 @@ class ZoomView extends SVGView {
 	    if (r.genome === mgv.rGenome){
 		// the ref genome range
 		rCoords = r;
+		//
+		this.setShowFeatureDetails(r);
+		//
 	        rrs = [{
 		    chr    : r.chr,
 		    start  : r.start,
@@ -743,14 +781,14 @@ class ZoomView extends SVGView {
 		// turn the single range into a range for each overlapping synteny block with the ref genome
 	        rrs = mgv.translator.translate(r.genome, r.chr, r.start, r.end, mgv.rGenome, true);
 	    }
-	    return mgv.featureManager.getFeatures(r.genome, rrs);
+	    return mgv.featureManager.getFeaturesByRange(r.genome, rrs, this.showFeatureDetails);
 	});
 	// For each genome where the landmark does not exist, compute a mapped range (as in mapped cmode).
 	if (!this.root.classed('closed'))
 	    mgv.cGenomes.forEach(g => {
 		if (! seenGenomes.has(g)) {
 		    let rrs = mgv.translator.translate(mgv.rGenome, rCoords.chr, rCoords.start, rCoords.end, g);
-		    promises.push( mgv.featureManager.getFeatures(g, rrs) );
+		    promises.push( mgv.featureManager.getFeaturesByRange(g, rrs, this.showFeatureDetails) );
 		}
 	    });
 	// When all the data is ready, draw.
@@ -1007,7 +1045,7 @@ class ZoomView extends SVGView {
 	this.xscale = d3.scale.linear()
 	    .domain([rBlock.start,rBlock.end])
 	    .range([0,this.width]);
-
+	//
 	// pixels per base
 	this.ppb = this.width / (this.app.coords.end - this.app.coords.start + 1);
 
@@ -1211,6 +1249,10 @@ class ZoomView extends SVGView {
     //        each feature as just a rectangle.
     //
     drawFeatures (sblocks) {
+	// before doing anything else...
+	if (this.clearAll)
+	    sblocks.selectAll('.feature').remove();
+	// ok, now that's taken care of...
         let self = this;
 	//
 	// never draw the same feature twice in one rendering pass
@@ -1223,24 +1265,36 @@ class ZoomView extends SVGView {
 	    drawn.add(fid);
 	    return v;
 	};
+	//
 	let feats = sblocks.select('[name="layer1"]').selectAll('.feature')
 	    .data(d=>d.features.filter(filterDrawn), d=>d.ID);
 	feats.exit().remove();
 	//
 	let newFeats;
-	if (this.showFeatureDetails) 
+	if (this.showFeatureDetails) {
+	    // draw detailed features
 	    newFeats = feats.enter().append('g')
-		.attr('class', f => 'feature' + (f.strand==='-' ? ' minus' : ' plus'))
+		.attr('class', f => 'feature detailed ' + (f.strand==='-' ? ' minus' : ' plus'))
 		.attr('name', f => f.ID)
-		.append('rect')
-		    .style('fill', f => self.app.cscale(f.getMungedType()))
-		    ;
-	else
+		;
+	    newFeats.append('rect')
+		.style('fill', f => self.app.cscale(f.getMungedType()))
+		;
+	    newFeats.append('line')
+	        .attr('class','axis')
+	        ;
+	    newFeats.append('g')
+	        .attr('class','exons')
+		;
+	}
+	else {
+	    // draw simple features
 	    newFeats = feats.enter().append('rect')
 		.attr('class', f => 'feature' + (f.strand==='-' ? ' minus' : ' plus'))
 		.attr('name', f => f.ID)
 		.style('fill', f => self.app.cscale(f.getMungedType()))
 		;
+	}
 	// NB: if you are looking for click handlers, they are at the svg level (see initDom above).
 
 	// returns the synteny block containing this feature
@@ -1248,14 +1302,18 @@ class ZoomView extends SVGView {
 	    let blkElt = featElt.closest('.sBlock');
 	    return blkElt.__data__;
 	}
+	// Returns the scene x coordinate for the given feature.
 	let fx = function(f) {
 	    let b = fBlock(this);
 	    return b.xscale(Math.max(f.start,b.start))
 	};
+	// Returns the scene width for the given feature.
 	let fw = function (f) {
 	    let b = fBlock(this);
+	    if (f.end < b.start || f.start > b.end) return 0;
 	    return Math.abs(b.xscale(Math.min(f.end,b.end)) - b.xscale(Math.max(f.start,b.start))) + 1;
 	};
+	// Returns the scene y coordinate (px) for the given feature.
 	let fy = function (f) {
 	       let b = fBlock(this);
 	       if (f.strand == '+'){
@@ -1273,12 +1331,46 @@ class ZoomView extends SVGView {
 	       }
 	   };
 
+	// Set position and size attributes of the overall feature rect.
 	(this.showFeatureDetails ? feats.select('rect') : feats)
 	  .attr('x', fx)
-	  .attr('width', fw)
 	  .attr('y', fy)
+	  .attr('width', fw)
 	  .attr('height', this.featHeight)
 	  ;
+
+	// draw detailed feature
+	if (this.showFeatureDetails) {
+	    // draw axis line
+	    feats.select('line')
+	        .attr('x1', fx)
+		.attr('y1', fy)
+		.attr('x2', function (f) { return fx.bind(this)(f) + fw.bind(this)(f) - 1 })
+		.attr('y2', fy)
+		.attr('transform',`translate(0,${this.featHeight/2})`)
+		.attr('stroke', f => this.app.cscale(f.getMungedType()))
+		;
+	    // draw exons
+	    let fData = feats.data();
+	    let geneIds = fData.map(f => f.ID);
+	    let egrps = feats.select('g.exons');
+	    let exons = egrps.selectAll('.exon')
+		.data(f => f.exons || [], e => e.ID)
+		;
+	    exons.enter().append('rect')
+		.attr('class','exon')
+		.style('fill', e => this.app.cscale(e.feature.getMungedType()))
+		.append('title')
+		    .text(e => e.ID)
+		    ;
+	    exons.exit().remove();
+	    exons.attr('name', e => e.primaryIdentifier)
+	        .attr('x', fx)
+	        .attr('y', function(e) {return fy.bind(this)(e.feature)})
+	        .attr('width', fw)
+	        .attr('height', this.featHeight)
+		;
+	}
     }
 
     //----------------------------------------------

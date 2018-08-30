@@ -76,9 +76,10 @@ class MGVApp extends Component {
 	//
 	this.listEditor = new ListEditor(this, '#listeditor');
 	//
+	this.queryManager = new QueryManager(this, "#findGenesBox");
+	// 
 	this.translator     = new BTManager(this);
 	this.featureManager = new FeatureManager(this);
-	this.queryManager = new QueryManager(this, "#findGenesBox");
 	//
 	this.userPrefsStore = new KeyStore("user-preferences");
 	
@@ -98,6 +99,15 @@ class MGVApp extends Component {
 	let mgiFacet = this.facetManager.addFacet("HasCanonicalId",    f => f.canonical  ? "yes" : "no" );
 	d3.selectAll('input[name="mgiFacet"]').on("change", function(){
 	    mgiFacet.setValues(this.value === "" ? [] : [this.value]);
+	    self.zoomView.highlight();
+	});
+
+	// Is-in-current-list facet
+	let inCurrListFacet = this.facetManager.addFacet("InCurrList", f => {
+	    return this.currListIndex[f.id] ? "yes" : "no";
+	});
+	d3.selectAll('input[name="inCurrListFacet"]').on("change", function(){
+	    inCurrListFacet.setValues(this.value === "" ? [] : [this.value]);
 	    self.zoomView.highlight();
 	});
 

@@ -1,19 +1,39 @@
-class Feature {
+class GenomicInterval {
     constructor (cfg) {
+        this.genome  = cfg.genome;
         this.chr     = cfg.chr || cfg.chromosome;
         this.start   = parseInt(cfg.start);
         this.end     = parseInt(cfg.end);
         this.strand  = cfg.strand;
+    }
+    //----------------------------------------------
+    get length () {
+        return this.end - this.start + 1;
+    }
+}
+
+class Exon extends GenomicInterval {
+    constructor (cfg) {
+        super(cfg);
+	this.ID = cfg.primaryIdentifier;
+	this.chr;
+    }
+}
+
+class Feature extends GenomicInterval {
+    constructor (cfg) {
+	super(cfg);
         this.type    = cfg.type;
         this.biotype = cfg.biotype;
         this.mgpid   = cfg.mgpid || cfg.id;
         this.mgiid   = cfg.mgiid;
         this.symbol  = cfg.symbol;
-        this.genome  = cfg.genome;
 	this.contig  = parseInt(cfg.contig);
 	this.lane    = parseInt(cfg.lane);
         if (this.mgiid === ".") this.mgiid = null;
         if (this.symbol === ".") this.symbol = null;
+	//
+	this.exons = null; // list of exons. Null means not yet leaded.
     }
     //----------------------------------------------
     get ID () {
@@ -28,10 +48,6 @@ class Feature {
     //----------------------------------------------
     get label () {
         return this.symbol || this.mgpid;
-    }
-    //----------------------------------------------
-    get length () {
-        return this.end - this.start + 1;
     }
     //----------------------------------------------
     getMungedType () {

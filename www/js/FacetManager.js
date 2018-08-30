@@ -22,7 +22,7 @@ class FacetManager {
 	let show = null;
 	let hide = "none";
 	// FIXME: major reachover
-	this.app.zoomView.svgMain.select("g.strips").selectAll('rect.feature')
+	this.app.zoomView.svgMain.select("g.strips").selectAll('.feature')
 	    .style("display", f => this.test(f) ? show : hide);
     }
 } // end class FacetManager

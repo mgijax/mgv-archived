@@ -10,6 +10,7 @@ import {KeyStore} from './KeyStore';
 class FeatureManager {
     constructor (app) {
         this.app = app;
+	this.auxDataManager = this.app.queryManager.auxDataManager;
         this.id2feat = {};		// index from  feature ID to feature
 	this.canonical2feats = {};	// index from canonical ID -> [ features tagged with that id ]
 	this.symbol2feats = {}		// index from symbol -> [ features having that symbol ]
@@ -48,6 +49,21 @@ class FeatureManager {
 	}
 	// here y'go.
 	return f;
+    }
+    //
+    processExon (e) {
+        // console.log("process exon: ", e);
+	let feat = this.id2feat[e.gene.primaryIdentifier];
+	if (feat.exons === null)
+	    feat.exons = [];
+	feat.exons.push({
+	    ID: e.primaryIdentifier,
+	    transcriptIDs: e.transcripts.map(t => t.primaryIdentifier),
+	    chr: e.chromosome.primaryIdentifier,
+	    start: e.chromosomeLocation.start,
+	    end:   e.chromosomeLocation.end,
+	    feature: feat
+	});
     }
 
     //----------------------------------------------
@@ -95,12 +111,40 @@ class FeatureManager {
     }
 
     //----------------------------------------------
-    // Returns a promise for all the exons of all genes that overlap the given range
-    // in the given genome.
-    ensureExonsByRange (genome, chr, start, end) {
-	let ep = this.app.auxDataManager.exonsByRange(genome, chr, start, end);
-
+    // Returns a promise that resolves when all exons for the given set of gene ids.
+    // Gene IDs are genome-specific, NOT canonical.
+    //
+    ensureExonsByGeneIds (ids) {
+	// Map ids to Feature objects, filter for those where exons have not been retrieved yet
+	// Exons accumulate in their features - no cache eviction implemented yet. FIXME.
+	// 
+	let feats = (ids||[]).map(i => this.id2feat[i]).filter(f => {
+	    if (! f || f.exons !== null)
+	        return false;
+	    // make sure we only check for this feature once
+	    f.exons = [];
+	    return true;
+	});
+	if (feats.length === 0)
+	    return Promise.resolve();
+	return this.auxDataManager.exonsByGeneIds(feats.map(f=>f.ID)).then(exons => {
+	    exons.forEach( e => { this.processExon(e); });
+	});
     }
+
+    /*
+    //----------------------------------------------
+    // Returns a promise that resolves to all exons for genes in the specified genome
+    // that overlap the specified range.
+    //
+    ensureExonsByRange (genome, chr, start, end) {
+	return this.auxDataManager.exonsByRange(genome,chr,start,end).then(exons => {
+	    exons.forEach( e => {
+	        this.processExon(e);
+	    });
+	});
+    }
+    */
 
     //----------------------------------------------
     loadGenomes (genomes) {
@@ -108,11 +152,12 @@ class FeatureManager {
     }
 
     //----------------------------------------------
-    getCachedFeatures (genome, range) {
+    getCachedFeaturesByRange (genome, range) {
         let gc = this.cache[genome.name] ;
 	if (!gc) return [];
 	let cFeats = gc[range.chr];
 	if (!cFeats) return [];
+	// FIXME: should be smarter than testing every feature!
 	let feats = cFeats.filter(cf => overlaps(cf, range));
         return feats;	
     }
@@ -142,18 +187,26 @@ class FeatureManager {
     //----------------------------------------------
     // Returns a promise for the features in 
     // the specified ranges of the specified genome.
-    getFeatures (genome, ranges) {
-	return this.ensureFeaturesByGenome(genome).then(function() {
+    getFeaturesByRange (genome, ranges, getExons) {
+	let fids = []
+	let p = this.ensureFeaturesByGenome(genome).then(() => {
             ranges.forEach( r => {
-	        r.features = this.getCachedFeatures(genome, r) 
+	        r.features = this.getCachedFeaturesByRange(genome, r) 
 		r.genome = genome;
+		fids = fids.concat(r.features.map(f => f.ID))
 	    });
-	    return { genome, blocks:ranges };
-	}.bind(this));
+	    let results = { genome, blocks:ranges };
+	    return results;
+	});
+	if (getExons)
+	    p = p.then(results => {
+	        return this.ensureExonsByGeneIds(fids).then(()=>results);
+		});
+	return p;
     }
     //----------------------------------------------
     // Returns a promise for the features having the specified ids from the specified genome.
-    getFeaturesById (genome, ids) {
+    getFeaturesById (genome, ids, getExons) {
         return this.ensureFeaturesByGenome(genome).then( () => {
 	    let feats = [];
 	    let seen = new Set();
@@ -173,7 +226,11 @@ class FeatureManager {
 		let f = this.canonical2feats[i] || this.id2feat[i];
 		f && add(f);
 	    }
-	    return feats;
+	    if (getExons) {
+	        return this.ensureExonsByGeneIds(feats.map(f=>f.ID)).then(()=>feats);
+	    }
+	    else
+		return feats;
 	});
     }
     //----------------------------------------------
