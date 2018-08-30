@@ -1,23 +1,15 @@
+import config from './config';
 import { d3json, d3text } from './utils';
-
-// ---------------------------------------------
-// This belongs in a config but for now...
-let MouseMine = 'test'; // one of: public, test, dev
-
-let MINES = {
-    'dev' : 'http://bhmgimm-dev:8080/mousemine',
-    'test': 'http://test.mousemine.org/mousemine',
-    'public' : 'http://www.mousemine.org/mousemine',
-};
 
 // ---------------------------------------------
 // AuxDataManager - knows how to query an external source (i.e., MouseMine) for genes
 // annotated to different ontologies and for exons associated with specific genes or regions.
 class AuxDataManager {
     constructor () {
-	if (!MINES[MouseMine]) 
-	    throw "Unknown mine name: " + MouseMine;
-	this.baseUrl = MINES[MouseMine];
+	this.cfg = config.AuxDataManager;
+	if (!this.cfg.allMines[this.cfg.mousemine]) 
+	    throw "Unknown mine name: " + this.cfg.mousemine;
+	this.baseUrl = this.cfg.allMines[this.cfg.mousemine];
 	console.log("MouseMine url:", this.baseUrl);
         this.qUrl = this.baseUrl + '/service/query/results?';
 	this.rUrl = this.baseUrl + '/portal.do?class=SequenceFeature&externalids='
@@ -25,7 +17,7 @@ class AuxDataManager {
     }
     //----------------------------------------------
     getAuxData (q, format) {
-	console.log('Query: ' + q);
+	//console.log('Query: ' + q);
 	format = format || 'jsonobjects';
 	let query = encodeURIComponent(q);
 	let url = this.qUrl + `format=${format}&query=${query}`;

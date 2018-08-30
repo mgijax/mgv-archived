@@ -1,4 +1,4 @@
-import { config }          from './config';
+import CONFIG              from './config';
 import { parseCoords, formatCoords, d3tsv, d3json, initOptList, same, clip } from './utils';
 import { Genome }          from './Genome';
 import { Component }       from './Component';
@@ -18,6 +18,8 @@ class MGVApp extends Component {
     constructor (selector, cfg) {
 	super(null, selector);
 	this.app = this;
+	this.name = CONFIG.MGVApp.name;
+	this.version = CONFIG.MGVApp.version;
 	//
 	this.initialCfg = cfg;
 	//
@@ -182,8 +184,11 @@ class MGVApp extends Component {
 	self = this;
 	this.root = d3.select('#mgv');
 	
+	d3.select('#header label')
+	    .text(this.name)
+	    ;
 	d3.select('#version')
-	    .text('version ' + config.version)
+	    .text('version ' + this.version)
 	    ;
 	//
 	// TODO: refactor pagebox, draggable, and friends into a framework module,
