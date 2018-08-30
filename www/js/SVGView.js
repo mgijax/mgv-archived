@@ -1,3 +1,4 @@
+import config from './config';
 import { Component } from './Component';
 
 // ---------------------------------------------
@@ -9,11 +10,12 @@ class SVGView extends Component {
             .append("g")    // the margin-translated group
             .append("g")	  // main group for the drawing
 	    .attr("name","svgmain");
-	this.outerWidth = 100;
-	this.width = 100;
-	this.outerHeight = 100;
-	this.height = 100;
-	this.margins = {top: 18, right: 12, bottom: 12, left: 12};
+	let c = config.SVGView;
+	this.outerWidth = c.outerWidth;
+	this.width = c.width;
+	this.outerHeight = c.outerHeight;
+	this.height = c.height;
+	this.margins = Object.assign({}, c.margins);
 	this.rotation = 0;
 	this.translation = [0,0];
 	//

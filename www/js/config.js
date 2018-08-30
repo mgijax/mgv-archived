@@ -11,6 +11,13 @@ export default {
 	    'public' : 'http://www.mousemine.org/mousemine',
 	}
     },
+    SVGView : {
+	outerWidth : 100,
+	width : 100,
+	outerHeight : 100,
+	height : 100,
+	margins : {top: 18, right: 12, bottom: 12, left: 12}
+    },
     ZoomView : {
 	blockHeight : 60,
 	topOffset : 15,
@@ -23,5 +30,28 @@ export default {
 	dmode : 'comparison',// initial drawing mode. 'comparison' or 'reference'
 	wheelThreshold : 3,	// minimum wheel distance 
 	featureDetailThreshold : 2000000, // if width <= thresh, draw feature details.
+    },
+    QueryManager : {
+	searchTypes : [{
+	    method: "featuresByPhenotype",
+	    label: "...by phenotype or disease",
+	    template: "",
+	    placeholder: "Pheno/disease (MP/DO) term or IDs"
+	},{
+	    method: "featuresByFunction",
+	    label: "...by cellular function",
+	    template: "",
+	    placeholder: "Gene Ontology (GO) terms or IDs"
+	},{
+	    method: "featuresByPathway",
+	    label: "...by pathway",
+	    template: "",
+	    placeholder: "Reactome pathways names, IDs"
+	},{
+	    method: "featuresById",
+	    label: "...by symbol/ID",
+	    template: "",
+	    placeholder: "MGI names, synonyms, etc."
+	}]
     }
 };

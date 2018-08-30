@@ -249,7 +249,7 @@ function coordsAfterTransform (shape) {
     //
     let dshape = d3.select(shape);
     let svg = shape.closest("svg");
-    if (!svg) throw "Could not find svg ancestor.";
+    if (!svg) return null;
     let stype = shape.tagName.toLowerCase();
     let matrix = shape.getCTM();
     let p = svg.createSVGPoint();

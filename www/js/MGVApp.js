@@ -17,6 +17,8 @@ import { KeyStore }        from './KeyStore';
 class MGVApp extends Component {
     constructor (selector, cfg) {
 	super(null, selector);
+	this.globalConfig = CONFIG;
+	console.log(CONFIG);
 	this.app = this;
 	this.name = CONFIG.MGVApp.name;
 	this.version = CONFIG.MGVApp.version;
