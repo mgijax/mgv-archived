@@ -19,17 +19,19 @@ export default {
 	margins : {top: 18, right: 12, bottom: 12, left: 12}
     },
     ZoomView : {
-	blockHeight : 60,
-	topOffset : 15,
-	featHeight : 8,	// height of a rectangle representing a feature
+	topOffset : 15,		// Y offset to first strip
+	featHeight : 8,		// height of a rectangle representing a feature
 	laneGap : 2,	        // space between swim lanes
-	// laneHeight : this.featHeight + this.laneGap,
+	laneHeight : 10,	// == featHeight + laneGap
+	minLanes : 3,		// minimum number of swim lanes (each strand)
+	blockHeight : 60,	// == 2 * minLanes * laneHeight
 	minStripHeight : 75,    // height per genome in the zoom view
 	stripGap : 20,	// space between strips
 	maxSBgap : 20,	// max gap allowed between blocks.
 	dmode : 'comparison',// initial drawing mode. 'comparison' or 'reference'
 	wheelThreshold : 3,	// minimum wheel distance 
 	featureDetailThreshold : 2000000, // if width <= thresh, draw feature details.
+	wheelContextDelay : 300,  // ms delay after last wheel event before changing context
     },
     QueryManager : {
 	searchTypes : [{

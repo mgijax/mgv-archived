@@ -18,7 +18,7 @@ class BTManager {
     registerBlocks (aGenome, bGenome, blocks) {
 	let aname = aGenome.name;
 	let bname = bGenome.name;
-	console.log(`Registering blocks: ${aname} vs ${bname}`, blocks);
+	console.log(`Registering blocks: ${aname} vs ${bname}`, `#blocks=${blocks.length}`);
 	let blkFile = new BlockTranslator(aGenome,bGenome,blocks);
 	if( ! this.rcBlocks[aname]) this.rcBlocks[aname] = {};
 	if( ! this.rcBlocks[bname]) this.rcBlocks[bname] = {};

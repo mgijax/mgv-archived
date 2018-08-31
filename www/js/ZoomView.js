@@ -11,8 +11,8 @@ class ZoomView extends SVGView {
       //
       let self = this;
       //
+      this.drawCount = 0;
       this.cfg = config.ZoomView;
-      this.cfg.laneHeight = this.cfg.featHeight + this.cfg.laneGap;
       this.dmode = 'comparison';// drawing mode. 'comparison' or 'reference'
       // A feature may be rendered in one of two ways: as a simple rect, or as a group containing the 
       // rect and other stuff like text, an axis line, etc.
@@ -311,23 +311,25 @@ class ZoomView extends SVGView {
 		.attr('transform', cz => `translate(${-zd.deltaB * self.ppb},0)scale(${cz.xScale},1)`);
 	    self.drawFiducials();
 	    // Wait until wheel events have stopped for a while, then scroll the view.
-	    if (self.timeout)
+	    if (self.timeout){
+		console.log("Cleared timeout", self.timeout);
 	        window.clearTimeout(self.timeout);
+	    }
 	    self.timeout = window.setTimeout(() => {
+		console.log("Timeout!", self.timeout);
 		self.timeout = null;
 		let ccxt = self.app.getContext();
+		let ncxt;
 		if (ccxt.landmark) {
-		    self.app.setContext({ delta: ccxt.delta + zd.deltaB });
-		    zd.deltaB = 0;
+		    ncxt = { delta: ccxt.delta + zd.deltaB };
 		}
 		else {
-		    self.app.setContext({ 
-		        start: ccxt.start + zd.deltaB,
-		        end: ccxt.end + zd.deltaB
-			});
-		    zd.deltaB = 0;
+		    ncxt = { start: ccxt.start + zd.deltaB, end: ccxt.end + zd.deltaB };
 		}
-	    }, 100);
+		self.app.setContext(ncxt);
+		zd.deltaB = 0;
+	    }, self.cfg.wheelContextDelay);
+	    console.log("Set timeout", self.timeout);
 	});
 
 
@@ -391,6 +393,29 @@ class ZoomView extends SVGView {
 	    this.hiFeats[h] = h;
 	}
     }
+    //----------------------------------------------
+    get laneGap () {
+        return this.cfg.laneGap;
+    }
+    set laneGap (g) {
+        this.cfg.laneGap = g;
+	this.cfg.laneHeight = this.cfg.featHeight + this.cfg.laneGap;
+	this.cfg.blockHeight = this.cfg.laneHeight * this.cfg.minLanes * 2;
+	this.update();
+    }
+
+    //----------------------------------------------
+    get featHeight () {
+        return this.cfg.featHeight;
+    }
+    set featHeight (h) {
+        this.cfg.featHeight = h;
+	this.cfg.laneHeight = this.cfg.featHeight + this.cfg.laneGap;
+	this.cfg.blockHeight = this.cfg.laneHeight * this.cfg.minLanes * 2;
+	this.update();
+    }
+
+    //----------------------------------------------
     get highlighted () {
         return this.hiFeats ? Object.keys(this.hiFeats) : [];
     }
@@ -1024,6 +1049,9 @@ class ZoomView extends SVGView {
     // Draws the zoom view panel with the given data.
     //
     draw (data) {
+	//
+	this.drawCount += 1;
+	console.log('Draw', this.drawCount, new Date());
 	// 
 	let self = this;
         // Is ZoomView currently closed?
@@ -1098,11 +1126,10 @@ class ZoomView extends SVGView {
 	// Strip underlay
 	newzs.append('rect')
 	    .attr('class','underlay')
-	    .attr('y', -this.cfg.blockHeight/2)
-	    .attr('height', this.cfg.blockHeight)
 	    .style('width','100%')
 	    .style('opacity',0)
 	    ;
+	    
 	// Group for sBlocks
 	newzs.append('g')
 	    .attr('name', 'sBlocks');
@@ -1124,6 +1151,19 @@ class ZoomView extends SVGView {
 	    .append('title')
 	        .text('Drag up/down to reorder the genomes.')
 	    ;
+	// Updates
+	zstrips.select('.zoomStripEndCap')
+	    .attr('height', this.cfg.blockHeight + 10)
+	    .attr('y', -this.cfg.blockHeight / 2)
+	    ;
+	zstrips.select('[name="genomeLabel"]')
+	    .attr('y', this.cfg.blockHeight/2 + 20)
+	    ;
+	zstrips.select('.underlay')
+	    .attr('y', -this.cfg.blockHeight/2)
+	    .attr('height', this.cfg.blockHeight)
+	    ;
+	    
 	// translate strips into position
 	let offset = this.cfg.topOffset;
 	let rHeight = 0;

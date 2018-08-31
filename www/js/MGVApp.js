@@ -433,7 +433,7 @@ class MGVApp extends Component {
 		contents[0].sort( (a,b) => {
 		    let ai = contentIds.indexOf(a.getAttribute('id'));
 		    let bi = contentIds.indexOf(b.getAttribute('id'));
-		    return ai - bi;
+		    return ai === -1 ? 1 : bi === -1 ? -1 : ai - bi;
 		});
 		contents.order();
 	    });
