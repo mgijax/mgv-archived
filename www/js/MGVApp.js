@@ -216,7 +216,8 @@ class MGVApp extends Component {
 		    self.showStatus(d3.select(this).attr('title'), d3.event.clientX, d3.event.clientY);
 		})
 		;
-	//
+	// 
+	// Add open/close button to closables and wire them up.
 	d3.selectAll('.closable')
 	    .append('i')
 		.attr('class','material-icons button close')
@@ -227,6 +228,8 @@ class MGVApp extends Component {
 		    d3.select(this).attr('title','Click to ' +  (p.classed('closed') ? 'open' : 'close') + '.')
 		    self.setPrefsFromUI();
 		});
+	//
+	// Set up draggables.
 	d3.selectAll('.content-draggable > *')
 	    .append('i')
 		.attr('title','Drag up/down to reposition.')
