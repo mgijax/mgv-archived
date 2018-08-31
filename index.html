@@ -34,7 +34,7 @@
 	<!-- Left column. -->
 	<div id="leftcolumn" name="leftcolumn" class="flexcolumn closable content-draggable">
 
-	    <!-- Reference genomne. -->
+	    <!-- Reference genome. -->
 	    <div id="refGenomeBox" 
 	    title="Select one genome as the reference. The reference genome determines how coordinates are interpreted. It is drawn with a blue bar at the left end and with a transparent background."
 	    class="refGenome pagebox flexcolumn closable">
@@ -140,50 +140,57 @@
 		</form>
 	    </div>
 
-	    <!-- Facet: feature type -->
-	    <div id="featureTypeBox" class="colorKey facet pagebox flexcolumn closable"
-		title="Show/hide features by type. Click on a swatch to show that type. Click on multiple swatches to show multiple types. Unclicking all swatches has the same effect as click all."
-	    >
-		<label>Feature types</label>
-	    </div>
+	    <div id="Filters"
+	        title="Limit what is displayed by different criteria. Filters are additive." 
+		class="pagebox flexcolumn closable">
 
-	    <!-- Facet: has MGI id -->
-	    <div id="mgiFacetBox" 
-		title="Show/hide features that are associated with known canonical genes."
-	        class="mgiFacet facet pagebox flexcolumn closable">
-		<label>Has canonical ID</label>
-		<div>
-		    <input type="radio" name="mgiFacet" value="yes" />
-		    <span>Yes</span>
-		</div>
-		<div>
-		    <input type="radio" name="mgiFacet" value="no" />
-		    <span>No</span>
-		</div>
-		<div>
-		    <input type="radio" name="mgiFacet" value="" checked />
-		    <span>Don't care</span>
-		</div>
-	    </div>
+		<label>Filters</label>
 
-	    <!-- Facet: is highlighted -->
-	    <div id="hiFacetBox" 
-		title="Show/hide features that are currently highlighted."
-		class="hiFacet facet pagebox flexcolumn closable">
-		<label>Is highlighted</label>
-		<div>
-		    <input type="radio" name="hiFacet" value="yes" />
-		    <span>Yes</span>
+		<!-- Facet: feature type -->
+		<div id="featureTypeBox" class="colorKey facet pagebox flexcolumn closable"
+		    title="Show/hide features by type. Click on a swatch to show that type. Click on multiple swatches to show multiple types. Unclicking all swatches has the same effect as click all."
+		>
+		    <label>Feature types</label>
 		</div>
-		<div>
-		    <input type="radio" name="hiFacet" value="no" />
-		    <span>No</span>
+
+		<!-- Facet: has MGI id -->
+		<div id="mgiFacetBox" 
+		    title="Show/hide features that are associated with known canonical genes."
+		    class="mgiFacet facet pagebox flexcolumn closable">
+		    <label>Has canonical ID</label>
+		    <div>
+			<input type="radio" name="mgiFacet" value="yes" />
+			<span>Yes</span>
+		    </div>
+		    <div>
+			<input type="radio" name="mgiFacet" value="no" />
+			<span>No</span>
+		    </div>
+		    <div>
+			<input type="radio" name="mgiFacet" value="" checked />
+			<span>Don't care</span>
+		    </div>
 		</div>
-		<div>
-		    <input type="radio" name="hiFacet" value="" checked />
-		    <span>Don't care</span>
+
+		<!-- Facet: is highlighted -->
+		<div id="hiFacetBox" 
+		    title="Show/hide features that are currently highlighted."
+		    class="hiFacet facet pagebox flexcolumn closable">
+		    <label>Is highlighted</label>
+		    <div>
+			<input type="radio" name="hiFacet" value="yes" />
+			<span>Yes</span>
+		    </div>
+		    <div>
+			<input type="radio" name="hiFacet" value="no" />
+			<span>No</span>
+		    </div>
+		    <div>
+			<input type="radio" name="hiFacet" value="" checked />
+			<span>Don't care</span>
+		    </div>
 		</div>
-	    </div>
+            </div>
 	</div>
 
 	<!-- Middle column -->
