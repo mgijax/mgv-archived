@@ -19,7 +19,7 @@ export default {
 	margins : {top: 18, right: 12, bottom: 12, left: 12}
     },
     ZoomView : {
-	topOffset : 15,		// Y offset to first strip
+	topOffset : 20,		// Y offset to first strip (should = stripGap, so technically redundant)
 	featHeight : 8,		// height of a rectangle representing a feature
 	laneGap : 2,	        // space between swim lanes
 	laneHeight : 10,	// == featHeight + laneGap

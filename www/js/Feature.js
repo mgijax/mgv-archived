@@ -33,7 +33,9 @@ class Feature extends GenomicInterval {
         if (this.mgiid === ".") this.mgiid = null;
         if (this.symbol === ".") this.symbol = null;
 	//
-	this.exons = null; // list of exons. Null means not yet leaded.
+	this.exonsLoaded = false;
+	this.exons = [];
+	this.transcripts = [];
     }
     //----------------------------------------------
     get ID () {

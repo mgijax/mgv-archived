@@ -1,5 +1,6 @@
 import {d3json, d3tsv, overlaps, subtract} from './utils';
 import {Feature} from './Feature';
+import {FeaturePacker} from './FeaturePacker';
 import {KeyStore} from './KeyStore';
 
 //----------------------------------------------
@@ -30,6 +31,8 @@ class FeatureManager {
 	// Create a new Feature
 	f = new Feature(d);
 	f.genome = genome
+	// index from transcript ID -> transcript
+	f.tindex = {};
 	// Register it.
 	this.id2feat[f.ID] = f;
 	// genome cache
@@ -54,16 +57,26 @@ class FeatureManager {
     processExon (e) {
         // console.log("process exon: ", e);
 	let feat = this.id2feat[e.gene.primaryIdentifier];
-	if (feat.exons === null)
-	    feat.exons = [];
-	feat.exons.push({
+	let exon = {
 	    ID: e.primaryIdentifier,
 	    transcriptIDs: e.transcripts.map(t => t.primaryIdentifier),
 	    chr: e.chromosome.primaryIdentifier,
 	    start: e.chromosomeLocation.start,
 	    end:   e.chromosomeLocation.end,
 	    feature: feat
+	};
+	exon.transcriptIDs.forEach( tid => {
+	    let t = feat.tindex[tid];
+	    if (!t) {
+	        t = { ID: tid, feature: feat, exons: [], start: Infinity, end: 0 };
+		feat.transcripts.push(t);
+		feat.tindex[tid] = t;
+	    }
+	    t.exons.push(exon);
+	    t.start = Math.min(t.start, exon.start);
+	    t.end = Math.max(t.end, exon.end);
 	});
+	feat.exons.push(exon);
     }
 
     //----------------------------------------------
@@ -74,15 +87,6 @@ class FeatureManager {
     // (I.e., registering the same feature multiple times is ok)
     //
     processFeatures (genome, feats) {
-	feats.sort( (a,b) => {
-	    if (a.chr < b.chr)
-		return -1;
-	    else if (a.chr > b.chr)
-		return 1;
-	    else
-		return a.start - b.start;
-	});
-	this.fStore.set(genome.name, feats);
 	return feats.map(d => this.processFeature(genome, d));
     }
 
@@ -94,8 +98,17 @@ class FeatureManager {
 	    if (data === undefined) {
 		console.log("Requesting:", genome.name, );
 		let url = `./data/genomedata/${genome.name}-features.tsv`;
-		return d3tsv(url).then( feats => {
-		    feats = this.processFeatures(genome, feats);
+		return d3tsv(url).then( rawfeats => {
+		    rawfeats.sort( (a,b) => {
+			if (a.chr < b.chr)
+			    return -1;
+			else if (a.chr > b.chr)
+			    return 1;
+			else
+			    return a.start - b.start;
+		    });
+		    this.fStore.set(genome.name, rawfeats);
+		    let feats = this.processFeatures(genome, rawfeats);
 		});
 	    }
 	    else {
@@ -119,10 +132,9 @@ class FeatureManager {
 	// Exons accumulate in their features - no cache eviction implemented yet. FIXME.
 	// 
 	let feats = (ids||[]).map(i => this.id2feat[i]).filter(f => {
-	    if (! f || f.exons !== null)
+	    if (! f || f.exonsLoaded)
 	        return false;
-	    // make sure we only check for this feature once
-	    f.exons = [];
+	    f.exonsLoaded = true;
 	    return true;
 	});
 	if (feats.length === 0)

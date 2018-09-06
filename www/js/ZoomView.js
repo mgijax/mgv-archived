@@ -129,10 +129,13 @@ class ZoomView extends SVGView {
           .attr('class','strips');
         this.axis = this.svgMain.append('g')
           .attr('class','axis');
-        this.floatingText = this.svgMain.append('text')
+	// 
+        this.floatingText = this.svgMain.append('g')
           .attr('class','floatingText');
+	this.floatingText.append('rect');
+	this.floatingText.append('text');
+	//
         this.cxtMenu = this.root.select('[name="cxtMenu"]');
-        //
 	//
 	r.select('.button.close')
 	    .on('click', () => this.update());
@@ -215,8 +218,33 @@ class ZoomView extends SVGView {
 		this.highlight(); 
 	}.bind(this);
 
+	// Handle key events
+	d3.select(window).on('keypress', () => {
+	    let e = d3.event;
+	    if (e.key === 'x' || e.code === 'KeyX'){
+	        this.spreadTranscripts = ! this.spreadTranscripts;
+	    }
+	    else if (e.key === '+' || e.code === 'Equal' && e.shiftKey) {
+	        this.featHeight = this.featHeight * 1.67;
+	    }
+	    else if (e.key === '-' || e.code === 'Minus') {
+	        this.featHeight = this.featHeight / 1.67;
+	    }
+	})
+
 	// 
         this.svg
+	  .on('dblclick', () => {
+	      let t = d3.event.target;
+	      let tgt = d3.select(t);
+	      let felt = t.closest('.feature');
+	      if (felt) {
+		  // user double clicked on a feature
+		  // make it the landmark
+		  let f = felt.__data__;
+		  this.app.setContext({landmark:f.id, ref:f.genome.name, delta: 0});
+	      }
+	  })
 	  .on('click', () => {
 	      let t = d3.event.target;
 	      let tgt = d3.select(t);
@@ -224,15 +252,10 @@ class ZoomView extends SVGView {
 	          this.dealWithUnwantedClickEvent = false;
 		  return;
 	      }
-	      if (t.tagName == 'rect' && (t.classList.contains('feature') || t.parentNode.classList.contains('feature'))) {
+	      let felt = t.closest('.feature');
+	      if (felt) {
 		  // user clicked on a feature
-		  fClickHandler(t.__data__, d3.event);
-		  this.highlight();
-	          this.app.contextChanged();
-	      }
-	      else if (t.tagName == 'rect' && t.classList.contains('exon')) {
-		  // user clicked on a feature
-		  fClickHandler(t.__data__.feature, d3.event);
+		  fClickHandler(felt.__data__, d3.event);
 		  this.highlight();
 	          this.app.contextChanged();
 	      }
@@ -312,11 +335,9 @@ class ZoomView extends SVGView {
 	    self.drawFiducials();
 	    // Wait until wheel events have stopped for a while, then scroll the view.
 	    if (self.timeout){
-		console.log("Cleared timeout", self.timeout);
 	        window.clearTimeout(self.timeout);
 	    }
 	    self.timeout = window.setTimeout(() => {
-		console.log("Timeout!", self.timeout);
 		self.timeout = null;
 		let ccxt = self.app.getContext();
 		let ncxt;
@@ -329,9 +350,7 @@ class ZoomView extends SVGView {
 		self.app.setContext(ncxt);
 		zd.deltaB = 0;
 	    }, self.cfg.wheelContextDelay);
-	    console.log("Set timeout", self.timeout);
 	});
-
 
 	// Button: Drop down menu in zoom view
 	this.root.select('.menu > .button')
@@ -394,6 +413,18 @@ class ZoomView extends SVGView {
 	}
     }
     //----------------------------------------------
+    get featHeight () {
+        return this.cfg.featHeight;
+    }
+    set featHeight (h) {
+	let r = this.cfg.laneGap / this.cfg.featHeight;
+        this.cfg.featHeight = h;
+	this.cfg.laneGap = r * h;
+	this.cfg.laneHeight = this.cfg.featHeight + this.cfg.laneGap;
+	this.cfg.blockHeight = this.cfg.laneHeight * this.cfg.minLanes * 2;
+	this.update();
+    }
+    //----------------------------------------------
     get laneGap () {
         return this.cfg.laneGap;
     }
@@ -403,15 +434,13 @@ class ZoomView extends SVGView {
 	this.cfg.blockHeight = this.cfg.laneHeight * this.cfg.minLanes * 2;
 	this.update();
     }
-
     //----------------------------------------------
-    get featHeight () {
-        return this.cfg.featHeight;
+    get stripGap () {
+        return this.cfg.stripGap;
     }
-    set featHeight (h) {
-        this.cfg.featHeight = h;
-	this.cfg.laneHeight = this.cfg.featHeight + this.cfg.laneGap;
-	this.cfg.blockHeight = this.cfg.laneHeight * this.cfg.minLanes * 2;
+    set stripGap (g) {
+        this.cfg.stripGap = g;
+	this.cfg.topOffset = g;
 	this.update();
     }
 
@@ -426,14 +455,14 @@ class ZoomView extends SVGView {
 	x = x-sr.x-12;
 	y = y-sr.y;
 	let anchor = x < 60 ? 'start' : this.width-x < 60 ? 'end' : 'middle';
-	this.floatingText
+	this.floatingText.select('text')
 	    .text(text)
 	    .style('text-anchor',anchor)
 	    .attr('x', x)
 	    .attr('y', y)
     }
     hideFloatingText () {
-	this.floatingText.text('');
+	this.floatingText.select('text').text('');
     }
     //----------------------------------------------
     initContextMenu (items,obj) {
@@ -1051,7 +1080,6 @@ class ZoomView extends SVGView {
     draw (data) {
 	//
 	this.drawCount += 1;
-	console.log('Draw', this.drawCount, new Date());
 	// 
 	let self = this;
         // Is ZoomView currently closed?
@@ -1301,12 +1329,16 @@ class ZoomView extends SVGView {
     //
     drawFeatures (sblocks) {
 	// before doing anything else...
-	if (this.clearAll)
+	if (this.clearAll) {
+	    // if we are changing between detailed and simple features, have to delete existing rendered features first
+	    // because the structures are incompatible. Ugh. 
 	    sblocks.selectAll('.feature').remove();
+	}
 	// ok, now that's taken care of...
         let self = this;
 	//
 	// never draw the same feature twice in one rendering pass
+	// Can happen in complex sblocks where the relationship in not 1:1
 	let drawn = new Set();	// set of IDs of drawn features
 	let filterDrawn = function (f) {
 	    // returns true if we've not seen this one before.
@@ -1331,15 +1363,13 @@ class ZoomView extends SVGView {
 	    newFeats.append('rect')
 		.style('fill', f => self.app.cscale(f.getMungedType()))
 		;
-	    newFeats.append('line')
-	        .attr('class','axis')
-	        ;
 	    newFeats.append('g')
-	        .attr('class','exons')
+	        .attr('class','transcripts')
+		.attr('transform','translate(0,0)')
 		;
 	}
 	else {
-	    // draw simple features
+	    // simplest style: draw features as just a rectangle
 	    newFeats = feats.enter().append('rect')
 		.attr('class', f => 'feature' + (f.strand==='-' ? ' minus' : ' plus'))
 		.attr('name', f => f.ID)
@@ -1353,33 +1383,40 @@ class ZoomView extends SVGView {
 	    let blkElt = featElt.closest('.sBlock');
 	    return blkElt.__data__;
 	}
-	// Returns the scene x coordinate for the given feature.
+	// Sets and returns the scene x coordinate for the given feature.
 	let fx = function(f) {
 	    let b = fBlock(this);
-	    return b.xscale(Math.max(f.start,b.start))
+	    let x = b.xscale(Math.max(f.start,b.start))
+	    f.x = x;
+	    return x;
 	};
-	// Returns the scene width for the given feature.
+	// Sets and returns the scene width for the given feature.
 	let fw = function (f) {
 	    let b = fBlock(this);
 	    if (f.end < b.start || f.start > b.end) return 0;
-	    return Math.abs(b.xscale(Math.min(f.end,b.end)) - b.xscale(Math.max(f.start,b.start))) + 1;
+	    let width = Math.abs(b.xscale(Math.min(f.end,b.end)) - b.xscale(Math.max(f.start,b.start))) + 1;
+	    f.width = width;
+	    return width;
 	};
-	// Returns the scene y coordinate (px) for the given feature.
+	// Sets and returns the scene y coordinate (px) for the given feature.
 	let fy = function (f) {
 	       let b = fBlock(this);
-	       if (f.strand == '+'){
+	       let y;
+	       if (f.strand === '+'){
 		   if (b.flip) 
-		       return self.cfg.laneHeight*f.lane - self.cfg.featHeight; 
+		       y = self.cfg.laneHeight*f.lane - self.cfg.featHeight; 
 		   else 
-		       return -self.cfg.laneHeight*f.lane;
+		       y = -self.cfg.laneHeight*f.lane;
 	       }
 	       else {
 		   // f.lane is negative for '-' strand
 		   if (b.flip) 
-		       return self.cfg.laneHeight*f.lane;
+		       y = self.cfg.laneHeight*f.lane;
 		   else
-		       return -self.cfg.laneHeight*f.lane - self.cfg.featHeight; 
+		       y = -self.cfg.laneHeight*f.lane - self.cfg.featHeight; 
 	       }
+	       f.y = y;
+	       return y;
 	   };
 
 	// Set position and size attributes of the overall feature rect.
@@ -1392,19 +1429,39 @@ class ZoomView extends SVGView {
 
 	// draw detailed feature
 	if (this.showFeatureDetails) {
-	    // draw axis line
-	    feats.select('line')
-	        .attr('x1', fx)
-		.attr('y1', fy)
-		.attr('x2', function (f) { return fx.bind(this)(f) + fw.bind(this)(f) - 1 })
-		.attr('y2', fy)
-		.attr('transform',`translate(0,${this.cfg.featHeight/2})`)
-		.attr('stroke', f => this.app.cscale(f.getMungedType()))
+	    // draw transcripts
+	    let tgrps = feats.select('g.transcripts');
+	    let transcripts = tgrps.selectAll('.transcript')
+	        .data( f => f.transcripts, t => t.ID )
 		;
-	    // draw exons
-	    let fData = feats.data();
-	    let geneIds = fData.map(f => f.ID);
-	    let egrps = feats.select('g.exons');
+	    let newts = transcripts.enter().append('g')
+	        .attr('class','transcript')
+		;
+	    newts.append('line');
+	    newts.append('rect');
+	    newts.append('g')
+	        .attr('class','exons')
+		;
+	    transcripts.exit().remove();
+	    // draw transcript axis lines
+	    transcripts.select('line')
+	        .attr('x1', fx)
+		.attr('y1', function(t) {return fy.bind(this)(t.feature)})
+		.attr('x2', function (t) { return fx.bind(this)(t) + fw.bind(this)(t) - 1 })
+		.attr('y2', function(t) {return fy.bind(this)(t.feature)})
+		.attr('transform',`translate(0,${this.cfg.featHeight/2})`)
+		.attr('stroke', t => this.app.cscale(t.feature.getMungedType()))
+		;
+	    transcripts.select('rect')
+		.attr('x', fx)
+		.attr('y', function(t) {return fy.bind(this)(t.feature)})
+		.attr('width', fw)
+		.attr('height', this.cfg.featHeight)
+		.style('fill', t => this.app.cscale(t.feature.getMungedType()))
+		.style('fill-opacity', 0)
+		;
+
+	    let egrps = transcripts.select('g.exons');
 	    let exons = egrps.selectAll('.exon')
 		.data(f => f.exons || [], e => e.ID)
 		;
@@ -1421,6 +1478,8 @@ class ZoomView extends SVGView {
 	        .attr('width', fw)
 	        .attr('height', this.cfg.featHeight)
 		;
+	    //
+	    this.spreadTranscripts = this.spreadTranscripts; 
 	}
     }
 
@@ -1466,7 +1525,7 @@ class ZoomView extends SVGView {
 		  // for each highlighted feature, add its rectangle to the list
 		  let k = ff.id;
 		  if (!self.stacks[k]) self.stacks[k] = []
-		  // if showing feature details, .feature is a group with the rect as the first child.
+		  // if showing feature details, .feature is a group with the rect as the 1st child.
 		  // otherwise, .feature is the rect itself.
 		  self.stacks[k].push(this.tagName === 'g' ? this.childNodes[0] : this)
 	      }
@@ -1619,6 +1678,30 @@ class ZoomView extends SVGView {
 	    }
 	}
 	
+    }
+    //----------------------------------------------
+    get spreadTranscripts () {
+        return this._spreadTranscripts;
+    }
+    set spreadTranscripts (v) {
+	let self = this;
+        this._spreadTranscripts = v ? true : false;
+	// translate each transcript into position
+	let xps = this.svgMain.selectAll('.feature .transcripts').selectAll('.transcript');
+	xps.attr('transform', (xp,i) => `translate(0,${ v ? (i * this.cfg.laneHeight * (xp.feature.strand === '-' ? 1 : -1)) : 0})`);
+	// translate the feature rectangle and set its height
+	let frs = this.svgMain.selectAll('.feature > rect')
+	    .attr('height', (f,i) => {
+		let nLanes = Math.max(1, v ? f.transcripts.length : 1);
+	        return this.cfg.laneHeight * nLanes - this.cfg.laneGap;
+	    })
+	    .attr('transform', function (f, i) {
+		let dt = d3.select(this);
+		let dy = parseFloat(dt.attr('height')) - self.cfg.laneHeight + self.cfg.laneGap;
+		return `translate(0,${ f.strand === '-' || !v ? 0 : -dy})`;
+	    })
+	    ;
+	window.setTimeout( () => this.highlight(), 500 );
     }
     //----------------------------------------------
     hideFiducials () {

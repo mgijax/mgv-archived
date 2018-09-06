@@ -709,11 +709,15 @@ label > i.material-icons {
     display: none;
 }
 
+#zoomView .transcript {
+    transition: transform 0.5s;
+}
 
 #zoomView svg rect.feature, 
 #zoomView svg .feature rect {
     fill : #aaa;
     stroke: none;
+    transition: transform 0.5s, height 0.5s;
 }
 #zoomView svg rect.feature.detailed, 
 #zoomView svg .feature.detailed > rect {

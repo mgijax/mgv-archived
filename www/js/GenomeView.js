@@ -152,7 +152,7 @@ class GenomeView extends SVGView {
 	    // Turn it 90 deg.
 
 	    // Set the height of the SVG area to 1 chromosome's width
-	    this.setGeom({ height: this.totalChrWidth, rotation: -90, translation: [-this.totalChrWidth/2,30] });
+	    this.setGeom({ height: this.totalChrWidth, rotation: -90, translation: [-this.totalChrWidth/2+10,30] });
 	    // 
 	    let delta = 10;
 	    rg.xscale = d3.scale.ordinal()
