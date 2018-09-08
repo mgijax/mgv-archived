@@ -155,6 +155,15 @@ class AuxDataManager {
 		    <constraint path="Gene.canonical.primaryIdentifier" op="=" value="${ident}"/>
 		    ${gs}</query>`;
 		break;
+
+            case 'transcript':
+		view = 'Transcript.gene.canonical.primaryIdentifier';
+		gs = `<constraint path="Transcript.strain.name" op="ONE OF">${vals}</constraint>`
+		q = `<query name="transcriptSequencesByCanonicalId" model="genomic" view="Transcript.primaryIdentifier" >
+		    <constraint path="Transcript.gene.canonical.primaryIdentifier" op="=" value="${ident}"/>
+		    ${gs}</query>`;
+	        break;
+
 	    case 'exon':
 		view = 'Exon.gene.canonical.primaryIdentifier';
 		gs = `<constraint path="Exon.strain.name" op="ONE OF">${vals}</constraint>`
@@ -180,6 +189,11 @@ class AuxDataManager {
 		    <constraint path="Gene.primaryIdentifier" op="=" value="${ident}"/>
 		  </query>`;
 		break;
+            case 'transcript':
+		q = `<query name="transcriptSequencesById" model="genomic" view="Transcript.primaryIdentifier" >
+		    <constraint path="Transcript.gene.primaryIdentifier" op="=" value="${ident}"/>
+		  </query>`;
+	        break;
 	    case 'exon':
 		q = `<query name="exonSequencesById" model="genomic" view="Exon.primaryIdentifier" >
 		    <constraint path="Exon.gene.primaryIdentifier" op="=" value="${ident}"/>

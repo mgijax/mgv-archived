@@ -101,6 +101,14 @@ class ZoomView extends SVGView {
 	    handler: (f) => { 
 		this.app.downloadFasta(f, 'genomic', this.app.vGenomes.map(vg=>vg.label));
 	    }
+        },{
+	    name: 'txpSeqDownload',
+	    label: 'Transcript sequences', 
+	    icon: 'cloud_download',
+	    tooltip: 'Download transcript sequences of this feature from currently displayed genomes.',
+	    handler: (f) => { 
+		this.app.downloadFasta(f, 'transcript', this.app.vGenomes.map(vg=>vg.label));
+	    }
 	},{
 	    name: 'cdsSeqDownload',
 	    label: 'CDS sequences', 
