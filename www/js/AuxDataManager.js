@@ -2,7 +2,7 @@ import { d3json, d3text } from './utils';
 
 // ---------------------------------------------
 // This belongs in a config but for now...
-let MouseMine = 'test'; // one of: public, test, dev
+let MouseMine = 'public'; // one of: public, test, dev
 
 let MINES = {
     'dev' : 'http://bhmgimm-dev:8080/mousemine',
