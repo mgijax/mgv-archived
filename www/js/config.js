@@ -23,6 +23,8 @@ export default {
 	featHeight : 8,		// height of a rectangle representing a feature
 	laneGap : 2,	        // space between swim lanes
 	laneHeight : 10,	// == featHeight + laneGap
+	laneGapMinor : 2,	// space between minor lanes (between transcripts)
+	laneHeightMinor : 10,	// == featHeight + laneGapMinor
 	minLanes : 3,		// minimum number of swim lanes (each strand)
 	blockHeight : 60,	// == 2 * minLanes * laneHeight
 	minStripHeight : 75,    // height per genome in the zoom view

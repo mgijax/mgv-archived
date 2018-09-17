@@ -20,7 +20,6 @@ class ZoomView extends SVGView {
       this._showFeatureDetails = false; // if true, show transcript/exon structure
       this._showAllLabels = true; // if true, show all feature labels (only if showFeatureDetail = true)
       this.clearAll = false; // if true, remove/rerender all existing features on next draw
-
       //
       // IDs of Features we're highlighting. May be feature's ID  or canonical IDr./
       // hiFeats is an obj whose keys are the IDs
@@ -1359,7 +1358,7 @@ class ZoomView extends SVGView {
 	    feats.select('text.label')
 	        .attr('x', f => f.x + f.width / 2)
 		.attr('y', f => f.y - 1)
-		.style('font-size', Math.max(6, this.laneGap - 2))
+		.style('font-size', this.laneGap)
 		.style('text-anchor', 'middle')
 		.text(f => this.showAllLabels ? (f.symbol || f.ID) : '')
 		;
@@ -1634,6 +1633,7 @@ class ZoomView extends SVGView {
     set featHeight (h) {
         this.cfg.featHeight = h;
 	this.cfg.laneHeight = this.cfg.featHeight + this.cfg.laneGap;
+	this.cfg.laneHeightMinor = this.cfg.featHeight + this.cfg.laneGapMinor;
 	this.cfg.blockHeight = this.cfg.laneHeight * this.cfg.minLanes * 2;
 	this.update();
     }
@@ -1705,16 +1705,16 @@ class ZoomView extends SVGView {
         this._spreadTranscripts = v ? true : false;
 	// translate each transcript into position
 	let xps = this.svgMain.selectAll('.feature .transcripts').selectAll('.transcript');
-	xps.attr('transform', (xp,i) => `translate(0,${ v ? (i * this.cfg.laneHeight * (xp.feature.strand === '-' ? 1 : -1)) : 0})`);
+	xps.attr('transform', (xp,i) => `translate(0,${ v ? (i * this.cfg.laneHeightMinor * (xp.feature.strand === '-' ? 1 : -1)) : 0})`);
 	// translate the feature rectangle and set its height
 	let frs = this.svgMain.selectAll('.feature > rect')
 	    .attr('height', (f,i) => {
 		let nLanes = Math.max(1, v ? f.transcripts.length : 1);
-	        return this.cfg.laneHeight * nLanes - this.cfg.laneGap;
+	        return this.cfg.laneHeightMinor * nLanes - this.cfg.laneGapMinor;
 	    })
 	    .attr('transform', function (f, i) {
 		let dt = d3.select(this);
-		let dy = parseFloat(dt.attr('height')) - self.cfg.laneHeight + self.cfg.laneGap;
+		let dy = parseFloat(dt.attr('height')) - self.cfg.laneHeightMinor + self.cfg.laneGapMinor;
 		return `translate(0,${ f.strand === '-' || !v ? 0 : -dy})`;
 	    })
 	    ;
