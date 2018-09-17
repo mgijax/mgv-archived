@@ -210,10 +210,11 @@ class FeatureManager {
 	    let results = { genome, blocks:ranges };
 	    return results;
 	});
-	if (getExons)
+	if (getExons) {
 	    p = p.then(results => {
 	        return this.ensureExonsByGeneIds(fids).then(()=>results);
 		});
+	}
 	return p;
     }
     //----------------------------------------------

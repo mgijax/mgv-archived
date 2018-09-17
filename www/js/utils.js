@@ -142,7 +142,7 @@ function formatCoords (chr, start, end) {
 	start = c.start;
 	end = c.end;
     }
-    return `${chr}:${start}..${end}`
+    return `${chr}:${Math.round(start)}..${Math.round(end)}`
 }
 //----------------------------------------------
 // Returns true iff the two ranges overlap by at least 1.

@@ -55,6 +55,29 @@
 		<select id="compGenomes" size="10"></select>
 	    </div>
 
+	    <!-- Browser settings.
+	    <div id="settings" 
+	    title="Change browser settings."
+	    class="settings pagebox flexcolumn closable">
+		<label>Settings</label>
+		<div class="setting flexrow">
+		    <label>Feature height</label>
+		    <span><input name="featHeight" type="number" min="1" value="10" step="1"
+		     title="Height of a feature in pixels."/>px</span>
+		</div>
+		<div class="setting flexrow">
+		    <label>Lane gap</label>
+		    <span><input name="laneGap" type="number" min="0" value="2" step="1"
+		     title="Width of space bewteen lanes in pixels."/>px</span>
+		</div>
+		<div class="setting flexrow">
+		    <label>Detail threshold</label>
+		    <span><input name="detailThreshold" type="number" min="0" value="2" step="0.5"
+		     title="View size (in Mb) below which intron/exon boundaries are shown."/>Mb</span>
+		</div>
+	    </div>
+	    -->
+
 	    <!-- Find genes (aka create lists). -->
 	    <div id="findGenesBox" 
 	    title="Search MouseMine for genes annotated to specified diseases, pathways, etc. Pick a search type, enter a search term and hit enter. Results are returned in a new list (see MyLists)."
@@ -145,12 +168,18 @@
 		</form>
 	    </div>
 
-	    <div id="Filters"
+	    <div id="filters"
 	        title="Limit what is displayed by different criteria. Filters are additive." 
 		class="pagebox flexcolumn closable">
 
 		<label>Filters</label>
 
+		<!-- Facet: feature type -->
+		<div id="featureTypeBox" class="colorKey facet pagebox flexcolumn closable"
+		title="Show/hide features by type. Click on a swatch to show that type. Click on multiple swatches to show multiple types. Unclicking all swatches has the same effect as click all."
+				    		>
+		<label>Feature types</label>
+		</div>
 		<!-- Facet: is in currList -->
 		<div id="inCurrList" 
 		    title="Show/hide features that are in the currently displayed list."
@@ -289,7 +318,8 @@
 		</div>
 		<div name="svgcontainer" class="flexrow">
 		    <!-- the SVG element for the zoom view panel -->
-		    <svg></svg>
+		    <svg>
+		    </svg>
 		</div>
 	    </div>
 	</div>

@@ -2,6 +2,7 @@ import config from './config';
 import { SVGView } from './SVGView';
 import { Feature } from './Feature';
 import { prettyPrintBases, clip, parseCoords, formatCoords, coordsAfterTransform, removeDups } from './utils';
+import { FeaturePacker } from './FeaturePacker';
 
 // ---------------------------------------------
 class ZoomView extends SVGView {
@@ -16,7 +17,8 @@ class ZoomView extends SVGView {
       this.dmode = 'comparison';// drawing mode. 'comparison' or 'reference'
       // A feature may be rendered in one of two ways: as a simple rect, or as a group containing the 
       // rect and other stuff like text, an axis line, etc.
-      this.showFeatureDetails = false; // if true, show exon structure
+      this._showFeatureDetails = false; // if true, show transcript/exon structure
+      this._showAllLabels = true; // if true, show all feature labels (only if showFeatureDetail = true)
       this.clearAll = false; // if true, remove/rerender all existing features on next draw
 
       //
@@ -86,14 +88,6 @@ class ZoomView extends SVGView {
 	    tooltip: 'Download genomic sequences for this feature from currently displayed genomes.',
 	    handler: (f) => { 
 		this.app.downloadFasta(f, 'genomic', this.app.vGenomes.map(vg=>vg.label));
-	    }
-        },{
-	    name: 'txpSeqDownload',
-	    label: 'Transcript sequences', 
-	    icon: 'cloud_download',
-	    tooltip: 'Download transcript sequences of this feature from currently displayed genomes.',
-	    handler: (f) => { 
-		this.app.downloadFasta(f, 'transcript', this.app.vGenomes.map(vg=>vg.label));
 	    }
 	},{
 	    name: 'txpSeqDownload',
@@ -232,11 +226,20 @@ class ZoomView extends SVGView {
 	    if (e.key === 'x' || e.code === 'KeyX'){
 	        this.spreadTranscripts = ! this.spreadTranscripts;
 	    }
+	    else if (e.key === 't' || e.code === 'KeyT'){
+	        this.showAllLabels = ! this.showAllLabels;
+	    }
 	    else if (e.key === '+' || e.code === 'Equal' && e.shiftKey) {
-	        this.featHeight = this.featHeight * 1.67;
+		if (e.ctrlKey)
+		    this.laneGap = this.laneGap + 2;
+		else
+		    this.featHeight = this.featHeight + 2;
 	    }
 	    else if (e.key === '-' || e.code === 'Minus') {
-	        this.featHeight = this.featHeight / 1.67;
+		if (e.ctrlKey)
+		    this.laneGap = Math.max(2, this.laneGap - 2);
+		else
+		    this.featHeight = Math.max(2, this.featHeight - 2);
 	    }
 	})
 
@@ -409,68 +412,6 @@ class ZoomView extends SVGView {
 		r.classed('reference', isC);
 		self.app.setContext({dmode: r.classed('comparison') ? 'comparison' : 'reference'});
 	    });
-    }
-    //----------------------------------------------
-    set highlighted (hls) {
-	if (typeof(hls) === 'string')
-	    hls = [hls];
-	//
-	this.hiFeats = {};
-        for(let h of hls){
-	    this.hiFeats[h] = h;
-	}
-    }
-    //----------------------------------------------
-    get featHeight () {
-        return this.cfg.featHeight;
-    }
-    set featHeight (h) {
-	let r = this.cfg.laneGap / this.cfg.featHeight;
-        this.cfg.featHeight = h;
-	this.cfg.laneGap = r * h;
-	this.cfg.laneHeight = this.cfg.featHeight + this.cfg.laneGap;
-	this.cfg.blockHeight = this.cfg.laneHeight * this.cfg.minLanes * 2;
-	this.update();
-    }
-    //----------------------------------------------
-    get laneGap () {
-        return this.cfg.laneGap;
-    }
-    set laneGap (g) {
-        this.cfg.laneGap = g;
-	this.cfg.laneHeight = this.cfg.featHeight + this.cfg.laneGap;
-	this.cfg.blockHeight = this.cfg.laneHeight * this.cfg.minLanes * 2;
-	this.update();
-    }
-    //----------------------------------------------
-    get stripGap () {
-        return this.cfg.stripGap;
-    }
-    set stripGap (g) {
-        this.cfg.stripGap = g;
-	this.cfg.topOffset = g;
-	this.update();
-    }
-
-    //----------------------------------------------
-    get highlighted () {
-        return this.hiFeats ? Object.keys(this.hiFeats) : [];
-    }
-
-    //----------------------------------------------
-    showFloatingText (text, x, y) {
-	let sr = this.svg.node().getBoundingClientRect();
-	x = x-sr.x-12;
-	y = y-sr.y;
-	let anchor = x < 60 ? 'start' : this.width-x < 60 ? 'end' : 'middle';
-	this.floatingText.select('text')
-	    .text(text)
-	    .style('text-anchor',anchor)
-	    .attr('x', x)
-	    .attr('y', y)
-    }
-    hideFloatingText () {
-	this.floatingText.select('text').text('');
     }
     //----------------------------------------------
     initContextMenu (items,obj) {
@@ -722,17 +663,6 @@ class ZoomView extends SVGView {
     }
 
     //----------------------------------------------
-    // Based on the given coordinate range, sets the showFeatureDetails flag to true or false.
-    // Also sets the clearAll flag to true if the showFeatureDetails flag changed value.
-    //
-    setShowFeatureDetails (c) {
-	//
-	let prevSFD = this.showFeatureDetails;
-	this.showFeatureDetails = (c.end - c.start + 1) <= this.cfg.featureDetailThreshold;
-	this.clearAll = prevSFD !== this.showFeatureDetails;
-    }
-
-    //----------------------------------------------
     // Updates the ZoomView to show the given coordinate range from the reg genome and the corresponding
     // range(s) in each comparison genome.
     //
@@ -749,7 +679,7 @@ class ZoomView extends SVGView {
 	let promises = [];
 
 	//
-	this.setShowFeatureDetails(c);
+	this.showFeatureDetails = (c.end - c.start + 1) <= this.cfg.featureDetailThreshold;
 
 	// First request is for the the reference genome. Get all the features in the range.
 	promises.push(mgv.featureManager.getFeaturesByRange(mgv.rGenome, [{
@@ -832,7 +762,7 @@ class ZoomView extends SVGView {
 		// the ref genome range
 		rCoords = r;
 		//
-		this.setShowFeatureDetails(r);
+		this.showFeatureDetails = (r.end - r.start + 1) <= this.cfg.featureDetailThreshold;
 		//
 	        rrs = [{
 		    chr    : r.chr,
@@ -871,7 +801,7 @@ class ZoomView extends SVGView {
 	this.genomes = this.context.genomes;
 	this.dmode = this.context.dmode;
 	this.cmode = this.context.cmode;
-	this.app.translator.ready().then(() => {
+	return this.app.translator.ready().then(() => {
 	    let p;
 	    if (this.cmode === 'mapped')
 		p = this.updateViaMappedCoordinates(this.app.coords);
@@ -880,6 +810,7 @@ class ZoomView extends SVGView {
 	    p.then( data => {
 		this.draw(this.mungeData(data));
 	    });
+	    return p;
 	});
     }
 
@@ -1022,6 +953,31 @@ class ZoomView extends SVGView {
     }
 
     //----------------------------------------------
+    // Lays out the features within an sblock
+    layoutSBFeatures (sb) {
+	let fx = function(f) {
+	    f.x = sb.xscale(Math.max(f.start,sb.start))
+	    f.width = Math.abs(sb.xscale(Math.min(f.end,sb.end)) - sb.xscale(Math.max(f.start,sb.start))) + 1;
+	    if (f.end < sb.start || f.start > sb.end) f.width = 0;
+	}
+	let fy = f => {
+	    f.y = -this.cfg.laneHeight*f.lane - (f.strand === '+' ? 0 : this.cfg.featHeight);
+	}
+        sb.features.forEach( f => {
+	    fx(f);
+	    fy(f);
+	    f.transcripts && f.transcripts.forEach( t => {
+	        fx(t);
+		t.y = f.y;
+		t.exons.forEach( e => {
+		    fx(e);
+		    e.y = f.y;
+		});
+	    });
+	});
+    }
+
+    //----------------------------------------------
     // Orders sblocks horizontally within each genome. Translates them into position.
     //
     layoutSBlocks (sblocks) {
@@ -1039,8 +995,7 @@ class ZoomView extends SVGView {
 	sblocks.each( function (b,i,j) { // b=block, i=index within strip, j=strip index
 	    let gd = this.__data__.genome;
 	    let blen = self.ppb * (b.end - b.start + 1); // total screen width of this sblock
-	    b.flip = b.ori === '-' && self.dmode === 'reference';
-	    b.xscale = d3.scale.linear().domain([b.start, b.end]).range( b.flip ? [blen, 0] : [0, blen] );
+	    b.xscale = d3.scale.linear().domain([b.start, b.end]).range( [0, blen] );
 	    //
 	    if (i===0) {
 		// first block in each strip inits
@@ -1064,6 +1019,8 @@ class ZoomView extends SVGView {
 	    }
 	    pend = dx + blen;
 	    d3.select(this).attr('transform', `translate(${dx},0)`);
+	    //
+	    self.layoutSBFeatures(b);
 	});
 	this.squish();
     }
@@ -1088,7 +1045,7 @@ class ZoomView extends SVGView {
     draw (data) {
 	//
 	this.drawCount += 1;
-	// 
+	//
 	let self = this;
         // Is ZoomView currently closed?
 	let closed = this.root.classed('closed');
@@ -1207,7 +1164,6 @@ class ZoomView extends SVGView {
 	    let s = this.stripsGrp.select(`.zoomStrip[name="${vg.name}"]`);
 	    s.classed('reference', d => d.genome === this.app.rGenome)
 	        .attr('transform', d => {
-		    //return `translate(0,${closed ? this.cfg.topOffset : g.genome.zoomY})`
 		    if (d.genome === this.app.rGenome)
 		        rHeight = d.stripHeight + d.zeroOffset;
 		    let o = offset + d.zeroOffset;
@@ -1251,7 +1207,7 @@ class ZoomView extends SVGView {
 	   .attr('class', b => 'block ' + 
 	       (b.ori==='+' ? 'plus' : b.ori==='-' ? 'minus': 'confused') + 
 	       (b.chr !== b.fChr ? ' translocation' : ''))
-	   .attr('x',     b => b.xscale(b.flip ? b.end : b.start))
+	   .attr('x',     b => b.xscale(b.start))
 	   .attr('y',     b => -this.cfg.blockHeight / 2)
 	   .attr('width', b => Math.max(4, Math.abs(b.xscale(b.end)-b.xscale(b.start))))
 	   .attr('height',this.cfg.blockHeight);
@@ -1375,9 +1331,12 @@ class ZoomView extends SVGView {
 	        .attr('class','transcripts')
 		.attr('transform','translate(0,0)')
 		;
+	    newFeats.append('text')
+	        .attr('class','label')
+		;
 	}
 	else {
-	    // simplest style: draw features as just a rectangle
+	    // simple style: draw features as just a rectangle
 	    newFeats = feats.enter().append('rect')
 		.attr('class', f => 'feature' + (f.strand==='-' ? ' minus' : ' plus'))
 		.attr('name', f => f.ID)
@@ -1386,57 +1345,24 @@ class ZoomView extends SVGView {
 	}
 	// NB: if you are looking for click handlers, they are at the svg level (see initDom above).
 
-	// returns the synteny block containing this feature
-	let fBlock = function (featElt) {
-	    let blkElt = featElt.closest('.sBlock');
-	    return blkElt.__data__;
-	}
-	// Sets and returns the scene x coordinate for the given feature.
-	let fx = function(f) {
-	    let b = fBlock(this);
-	    let x = b.xscale(Math.max(f.start,b.start))
-	    f.x = x;
-	    return x;
-	};
-	// Sets and returns the scene width for the given feature.
-	let fw = function (f) {
-	    let b = fBlock(this);
-	    if (f.end < b.start || f.start > b.end) return 0;
-	    let width = Math.abs(b.xscale(Math.min(f.end,b.end)) - b.xscale(Math.max(f.start,b.start))) + 1;
-	    f.width = width;
-	    return width;
-	};
-	// Sets and returns the scene y coordinate (px) for the given feature.
-	let fy = function (f) {
-	       let b = fBlock(this);
-	       let y;
-	       if (f.strand === '+'){
-		   if (b.flip) 
-		       y = self.cfg.laneHeight*f.lane - self.cfg.featHeight; 
-		   else 
-		       y = -self.cfg.laneHeight*f.lane;
-	       }
-	       else {
-		   // f.lane is negative for '-' strand
-		   if (b.flip) 
-		       y = self.cfg.laneHeight*f.lane;
-		   else
-		       y = -self.cfg.laneHeight*f.lane - self.cfg.featHeight; 
-	       }
-	       f.y = y;
-	       return y;
-	   };
-
 	// Set position and size attributes of the overall feature rect.
 	(this.showFeatureDetails ? feats.select('rect') : feats)
-	  .attr('x', fx)
-	  .attr('y', fy)
-	  .attr('width', fw)
+	  .attr('x', f => f.x)
+	  .attr('y', f => f.y)
+	  .attr('width', f => f.width)
 	  .attr('height', this.cfg.featHeight)
 	  ;
 
 	// draw detailed feature
 	if (this.showFeatureDetails) {
+	    // feature labels
+	    feats.select('text.label')
+	        .attr('x', f => f.x + f.width / 2)
+		.attr('y', f => f.y - 1)
+		.style('font-size', Math.max(6, this.laneGap - 2))
+		.style('text-anchor', 'middle')
+		.text(f => this.showAllLabels ? (f.symbol || f.ID) : '')
+		;
 	    // draw transcripts
 	    let tgrps = feats.select('g.transcripts');
 	    let transcripts = tgrps.selectAll('.transcript')
@@ -1453,20 +1379,22 @@ class ZoomView extends SVGView {
 	    transcripts.exit().remove();
 	    // draw transcript axis lines
 	    transcripts.select('line')
-	        .attr('x1', fx)
-		.attr('y1', function(t) {return fy.bind(this)(t.feature)})
-		.attr('x2', function (t) { return fx.bind(this)(t) + fw.bind(this)(t) - 1 })
-		.attr('y2', function(t) {return fy.bind(this)(t.feature)})
+	        .attr('x1', t => t.x)
+		.attr('y1', t => t.y)
+		.attr('x2', t => t.x + t.width - 1)
+		.attr('y2', t => t.y)
 		.attr('transform',`translate(0,${this.cfg.featHeight/2})`)
 		.attr('stroke', t => this.app.cscale(t.feature.getMungedType()))
 		;
 	    transcripts.select('rect')
-		.attr('x', fx)
-		.attr('y', function(t) {return fy.bind(this)(t.feature)})
-		.attr('width', fw)
+		.attr('x', t => t.x)
+		.attr('y', t => t.y)
+		.attr('width', t => t.width)
 		.attr('height', this.cfg.featHeight)
 		.style('fill', t => this.app.cscale(t.feature.getMungedType()))
 		.style('fill-opacity', 0)
+		.append('title')
+		    .text(t => 'transcript: '+t.ID)
 		;
 
 	    let egrps = transcripts.select('g.exons');
@@ -1476,14 +1404,12 @@ class ZoomView extends SVGView {
 	    exons.enter().append('rect')
 		.attr('class','exon')
 		.style('fill', e => this.app.cscale(e.feature.getMungedType()))
-		.append('title')
-		    .text(e => 'exon: '+e.ID)
 		    ;
 	    exons.exit().remove();
 	    exons.attr('name', e => e.primaryIdentifier)
-	        .attr('x', fx)
-	        .attr('y', function(e) {return fy.bind(this)(e.feature)})
-	        .attr('width', fw)
+	        .attr('x', e => e.x)
+	        .attr('y', e => e.y)
+	        .attr('width', e => e.width)
 	        .attr('height', this.cfg.featHeight)
 		;
 	    //
@@ -1686,6 +1612,89 @@ class ZoomView extends SVGView {
 	    }
 	}
 	
+    }
+    //----------------------------------------------
+    //----------------------------------------------
+    get highlighted () {
+        return this.hiFeats ? Object.keys(this.hiFeats) : [];
+    }
+    set highlighted (hls) {
+	if (typeof(hls) === 'string')
+	    hls = [hls];
+	//
+	this.hiFeats = {};
+        for(let h of hls){
+	    this.hiFeats[h] = h;
+	}
+    }
+    //----------------------------------------------
+    get featHeight () {
+        return this.cfg.featHeight;
+    }
+    set featHeight (h) {
+        this.cfg.featHeight = h;
+	this.cfg.laneHeight = this.cfg.featHeight + this.cfg.laneGap;
+	this.cfg.blockHeight = this.cfg.laneHeight * this.cfg.minLanes * 2;
+	this.update();
+    }
+    //----------------------------------------------
+    get laneGap () {
+        return this.cfg.laneGap;
+    }
+    set laneGap (g) {
+        this.cfg.laneGap = g;
+	this.cfg.laneHeight = this.cfg.featHeight + this.cfg.laneGap;
+	this.cfg.blockHeight = this.cfg.laneHeight * this.cfg.minLanes * 2;
+	this.update();
+    }
+    //----------------------------------------------
+    get stripGap () {
+        return this.cfg.stripGap;
+    }
+    set stripGap (g) {
+        this.cfg.stripGap = g;
+	this.cfg.topOffset = g;
+	this.update();
+    }
+    //----------------------------------------------
+    showFloatingText (text, x, y) {
+	let sr = this.svg.node().getBoundingClientRect();
+	x = x-sr.x-12;
+	y = y-sr.y;
+	let anchor = x < 60 ? 'start' : this.width-x < 60 ? 'end' : 'middle';
+	this.floatingText.select('text')
+	    .text(text)
+	    .style('text-anchor',anchor)
+	    .attr('x', x)
+	    .attr('y', y)
+    }
+    hideFloatingText () {
+	this.floatingText.select('text').text('');
+    }
+    //----------------------------------------------
+    get showFeatureDetails () {
+        return this._showFeatureDetails;
+    }
+    set showFeatureDetails (v) {
+	let prev = this.showFeatureDetails;
+        this._showFeatureDetails = v ? true : false;
+	this.clearAll = prev !== this.showFeatureDetails;
+	// 
+	this.root.classed('showingAllLabels', this.showingAllLabels);
+    }
+    //----------------------------------------------
+    get showAllLabels () {
+        return this._showAllLabels;
+    }
+    set showAllLabels (v) {
+        this._showAllLabels = v ? true : false;
+	this.svgMain.selectAll('.feature > .label')
+	   .text(f => this._showAllLabels && this.showFeatureDetails ? (f.symbol || f.ID) : '') ;
+	this.root.classed('showingAllLabels', this.showingAllLabels);
+    }
+    //----------------------------------------------
+    get showingAllLabels () {
+        return this.showFeatureDetails && this.showAllLabels;
     }
     //----------------------------------------------
     get spreadTranscripts () {

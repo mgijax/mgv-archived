@@ -262,6 +262,29 @@ label > i.material-icons {
 }
 
 /* -----------------------------------------
+ * Browser settings
+ * -----------------------------------------
+ */
+#settings .setting label {
+    font-size: 14px;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+#settings .setting input[type="number"] {
+    width: 28px;
+}
+
+/* -----------------------------------------
+ * Filters (Facets)
+ * -----------------------------------------
+ */
+#filters .facet label {
+    font-size: 14px;
+    font-weight: bold;
+}
+
+/* -----------------------------------------
  * Context menu
  * -----------------------------------------
  */
@@ -631,6 +654,10 @@ label > i.material-icons {
     display: flex; /* override closed style */
 }
 
+#zoomView.showingAllLabels g.fiducials .featLabel {
+    display: none;
+}
+
 #zoomView svg .brush rect {
    height: 10px;
 }
@@ -723,6 +750,11 @@ label > i.material-icons {
 #zoomView svg .feature.detailed > rect {
     fill-opacity : 0.3;
 }
+
+#zoomView .feature.detailed.highlight > text.label {
+    font-weight: bold;
+}
+
 #zoomView svg rect.feature.highlight,
 #zoomView svg .feature.highlight > rect {
     outline-style: solid;
@@ -738,6 +770,7 @@ label > i.material-icons {
     outline-width: 6px;
     animation: blinker 1s linear infinite;
 }
+
 @keyframes blinker {  
     50% { outline-width: 0px; }
 }

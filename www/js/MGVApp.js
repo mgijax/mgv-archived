@@ -264,6 +264,15 @@ class MGVApp extends Component {
 		    this.setPrefsFromUI();
 		}, 250);
 	    });
+	/*
+	// Display Settings Controls
+	d3.selectAll('#settings .setting input')
+	    .on('click', function () {
+	        let v = parseInt(this.value);
+		let n = this.attributes['name'].value;
+		self.zoomView[n] = v;
+	    });
+	*/
     }
     //----------------------------------------------
     // Dom initializtion that must wait until after genome meta data is loaded.
@@ -787,7 +796,7 @@ class MGVApp extends Component {
 		delta: cfg.delta 
 	    };
 	    //
-	    this.zoomView.update(cfg);
+	    let zp = this.zoomView.update(cfg);
 	    //
 	    this.genomeView.redraw();
 	    this.genomeView.setBrushCoords(this.coords);
@@ -795,7 +804,7 @@ class MGVApp extends Component {
 	    if (!quietly)
 	        this.contextChanged();
 	    //
-	    this.showBusy(false);
+	    zp.then(() => this.showBusy(false)).catch(() => this.showBusy(false));
 	});
 	return p;
     }
@@ -909,41 +918,6 @@ class MGVApp extends Component {
     pan (factor) {
         this.panzoom(factor, null);
     }	
-    //----------------------------------------------
-    // Zooms in/out by factor. New zoom width is factor * the current width.
-    // Factor > 1 zooms out, 0 < factor < 1 zooms in.
-    xzoom (factor) {
-	let len = this.coords.end - this.coords.start + 1;
-	let newlen = Math.round(factor * len);
-	let x = (this.coords.start + this.coords.end)/2;
-	if (this.cmode === 'mapped') {
-	    let newstart = Math.round(x - newlen/2);
-	    this.setContext({ chr: this.coords.chr, start: newstart, end: newstart + newlen - 1 });
-	}
-	else {
-	    this.setContext({ length: newlen });
-	}
-    }
-
-    //----------------------------------------------
-    // Pans the view left or right by factor. The distance moved is factor times the current zoom width.
-    // Negative values pan left. Positive values pan right. (Note that panning moves the "camera". Panning to the
-    // right makes the objects in the scene appear to move to the left, and vice versa.)
-    //
-    xpan (factor) {
-	let c = this.coords;
-	let chr = this.rGenome.chromosomes.filter(c => c.name === this.coords.chr)[0];
-	let width = c.end - c.start + 1;
-	let minD = -(c.start-1);
-	let maxD = chr.length - c.end;
-	let d = clip(factor * width, minD, maxD);
-	if (this.cmode === 'mapped') {
-	    this.setContext({ chr: c.chr, start: c.start+d, end: c.end+d });
-	}
-	else {
-	    this.setContext({ delta: this.lcoords.delta + d });
-	}
-    }
 
     //----------------------------------------------
     initFeatTypeControl (facet) {
