@@ -8,12 +8,16 @@ class DataGetter :
 
     def __init__ (self, odir) :
 	self.odir = odir
+	#
 	self.gFn = os.path.join(self.odir, 'allGenomes.tsv')
 	self.gFd = open(self.gFn, 'w')
+	#
 	self.cFn = None
 	self.cFd = None
+	#
 	self.fFn = None
 	self.fFd = None
+	#
 	self.lFd = sys.stderr
 
     def log(self, s):

@@ -7,7 +7,6 @@
 
 source config.sh
 
-mkdir -p ${DDIR}
 mkdir -p ${GDIR}
 
 function copyGenomeSets {
