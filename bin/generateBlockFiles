@@ -12,11 +12,11 @@
 
 source config.sh
 
-outdir="${SDIR}"
+outdir="${GDIR}"
 mkdir -p ${outdir}
 
 # get the list of feature files
-declare -a arr=(`ls ${SDIR}/mus_*-features.tsv`)
+declare -a arr=(`ls ${GDIR}/mus_*-features.tsv`)
 
 # 
 lim=$((${#arr[@]} - 1))

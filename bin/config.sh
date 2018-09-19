@@ -12,6 +12,6 @@ export SIZELIMIT="10"
 #
 BDIR="${DIR}/bin"
 DDIR="${DIR}/data/downloads"
-SDIR="${DIR}/data/genomedata"
+GDIR="${DIR}/data/genomedata"
 LOG="${DIR}/data/LOG"
 

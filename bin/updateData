@@ -8,74 +8,21 @@
 source config.sh
 
 mkdir -p ${DDIR}
-mkdir -p ${SDIR}
-
-function generateGenomeList {
-    # generate genome list file (a simple table of genome names and labels)
-    genomeList="${SDIR}/allGenomes.tsv"
-    echo "name	label" > "${genomeList}"
-    count=0
-    for sn in "${ALL_GENOME_NAMES[@]}"
-    do : 
-	slbl="${ALL_GENOME_LABELS[count]}"
-	echo "${sn}	${slbl}" >> "${genomeList}"
-	count=$(expr $count + 1)
-    done
-}
+mkdir -p ${GDIR}
 
 function copyGenomeSets {
     # copy the genomeSets file to the dataDir. This defines named sets of genomes
     # and will have cooresponding buttons in the browser for easy selection.
-    cp "${BDIR}/genomeSets.tsv" "${SDIR}/genomeSets.tsv"
-}
-
-# generate ENSEMBL to MGI id mapping file
-function generateMappingFile {
-    ensemblMappingFile="${DDIR}/ensembl2mgi.tsv"
-    python "${BDIR}/getEnsemblMgiMapping.py" > "${ensemblMappingFile}"
-}
-
-function download {
-   genome=$1
-   fname="${DDIR}/$2"
-   if [ "$genome" = "mus_musculus_c57bl6j" ]; then
-       url="${MGIBASEURL}/$2"
-       ismgi="--isMgi"
-   else
-       url="${BASEURL}/${genome}/$2"
-       ismgi="--isNotMgi"
-   fi
-   featFile="${SDIR}/${genome}-features.tsv"
-   chrFile="${SDIR}/${genome}-chromosomes.tsv"
-   ixFile="${SDIR}/${genome}-index.tsv"
-   #
-   echo ${genome}
-   echo "Downloading:" "${url}" to "${fname}"
-   curl -R -z ${fname} -o ${fname} $url
-   #
-   echo "Generating:" "${featFile}" "${chrFile}" "${ixFile}"
-   gunzip -c "${fname}" \
-       | grep -v "^#" \
-       | grep -v "Parent=" \
-       | grep -v biological_region \
-       | python "${BDIR}/prepGenomeFile.py" -s "${SIZELIMIT}" "$ismgi" -m "${ensemblMappingFile}" -o "${featFile}" -c "${chrFile}" 
+    cp "${BDIR}/genomeSets.tsv" "${GDIR}/genomeSets.tsv"
 }
 
 function generateFeatures {
-    for sn in "${ALL_GENOME_NAMES[@]}"
-    do : 
-	# For every genome name, there is an env var of that name containing the file name for that genome
-	# This gets the file name.
-	eval fname=\$$sn
-	# call the download function for this pair
-	download "${sn}" "${fname}"
-	echo ${sn}
-    done
+    python "${BDIR}/getDataFromMouseMine.py" "${GDIR}"
 }
 
 function generateTimestamp {
     # output timestamp
-    tsfile="${SDIR}"/TIMESTAMP.tsv
+    tsfile="${GDIR}"/TIMESTAMP.tsv
     echo "TIMESTAMP" > "${tsfile}"
     echo `date` >> "${tsfile}"
 }
@@ -85,8 +32,6 @@ function generateTimestamp {
 ##
 
 copyGenomeSets
-generateGenomeList
-generateMappingFile
 generateFeatures
 ./generateBlockFiles
 generateTimestamp
