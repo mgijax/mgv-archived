@@ -54,7 +54,7 @@ class Feature extends GenomicInterval {
     //----------------------------------------------
     getMungedType () {
 	return this.type === "gene" ?
-	    (this.biotype === "protein_coding" || this.biotype === "protein coding gene") ?
+	    this.biotype.indexOf('protein') >= 0 ?
 		"protein_coding_gene"
 		:
 		this.biotype.indexOf("pseudogene") >= 0 ?
