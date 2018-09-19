@@ -16,7 +16,7 @@ function copyGenomeSets {
 }
 
 function generateFeatures {
-    python "${BDIR}/getDataFromMouseMine.py" "${GDIR}"
+    ${PYTHON} "${BDIR}/getDataFromMouseMine.py" "${GDIR}"
 }
 
 function generateTimestamp {

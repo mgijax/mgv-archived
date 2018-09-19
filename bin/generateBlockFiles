@@ -43,8 +43,8 @@ for i in `seq 0 ${lim}`; do
             bfn="${bfn%.*}"
 	    bn="${bfn%-features}"
             # here we go...
-	    echo python sb.py ${noheader} --af ${a} --an ${an} --bf ${b} --bn ${bn} 
-	    python sb.py ${noheader} --af ${a} --an ${an} --bf ${b} --bn ${bn} >> ${outdir}/${ofn}
+	    echo ${PYTHON} sb.py ${noheader} --af ${a} --an ${an} --bf ${b} --bn ${bn} 
+	    ${PYTHON} sb.py ${noheader} --af ${a} --an ${an} --bf ${b} --bn ${bn} >> ${outdir}/${ofn}
 	    # After the first time thru, stop generating header lines.
 	    noheader="--noheader"
         done
