@@ -770,15 +770,13 @@ class ZoomView extends SVGView {
 	this.genomes = this.cfg.genomes;
 	this.dmode = this.cfg.dmode;
 	this.cmode = this.cfg.cmode;
-	this.app.translator.ready().then(() => {
-	    let p;
-	    if (this.cmode === 'mapped')
-		p = this.updateViaMappedCoordinates(this.app.coords);
-	    else
-		p = this.updateViaLandmarkCoordinates(this.app.lcoords);
-	    p.then( data => {
-		this.draw(this.mungeData(data));
-	    });
+	let p;
+	if (this.cmode === 'mapped')
+	    p = this.updateViaMappedCoordinates(this.app.coords);
+	else
+	    p = this.updateViaLandmarkCoordinates(this.app.lcoords);
+	p.then( data => {
+	    this.draw(this.mungeData(data));
 	});
     }
 

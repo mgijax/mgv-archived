@@ -767,8 +767,8 @@ class MGVApp extends Component {
 	    //
 	    this.zoomView.update(cfg);
 	    //
-	    this.genomeView.redraw();
 	    this.genomeView.setBrushCoords(this.coords);
+	    this.genomeView.redraw();
 	    //
 	    if (!quietly)
 	        this.contextChanged();
