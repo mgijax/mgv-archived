@@ -1,20 +1,20 @@
 #!/bin/bash
 if [ "${MGICONFIG}" = "" ]
 then
-    MGICONFIG="/usr/local/mgi/live/mgiconfig"
+    export MGICONFIG="/usr/local/mgi/live/mgiconfig"
 fi
 . ${MGICONFIG}/master.config.sh
 
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd ".." && pwd )"
-BIN="${DIR}/bin"
-OUTDIR="${DIR}/data"
-WORKINGDIR="${DIR}/work"
-PREVDIR="${DIR}/previous"
+export DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd ".." && pwd )"
+export BIN="${DIR}/bin"
+export OUTDIR="${DIR}/data"
+export WORKINGDIR="${DIR}/work"
+export PREVDIR="${DIR}/previous"
 
-PYTHON="python2.7"
-MOUSEMINE="http://www.mousemine.org/mousemine"
+export PYTHON="python2.7"
+export MOUSEMINE="http://www.mousemine.org/mousemine"
 
 # Max size in Mb for a feature. 
 # Features above this size are removed and reported.
-SIZELIMIT="10"
+export SIZELIMIT="10"
