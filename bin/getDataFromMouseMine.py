@@ -1,8 +1,9 @@
 import sys
 import urllib
 import os.path
+from os import environ as ENV
 
-MOUSEMINE="http://www.mousemine.org/mousemine"
+MOUSEMINE = ENV.get('MOUSEMINE', 'http://www.mousemine.org/mousemine')
 
 class DataGetter :
 

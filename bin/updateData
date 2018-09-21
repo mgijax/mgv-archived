@@ -8,20 +8,20 @@
 source config.sh
 
 #
-mkdir -p ${GDIR}
+mkdir -p ${OUTDIR}
 
 # Copy the genomeSets file to the dataDir. This defines named sets of genomes
 # and will have cooresponding buttons in the browser for easy selection.
-cp "${BDIR}/genomeSets.tsv" "${GDIR}/genomeSets.tsv"
+cp "${BIN}/genomeSets.tsv" "${OUTDIR}/genomeSets.tsv"
 
 # Generate feature files
-${PYTHON} "${BDIR}/getDataFromMouseMine.py" "${GDIR}"
+${PYTHON} "${BIN}/getDataFromMouseMine.py" "${OUTDIR}"
 
 # Generate synteny blocks
-${PYTHON} "${BDIR}/sb" --dir "${GDIR}" > "${GDIR}/blocks.tsv"
+${PYTHON} "${BIN}/sb" --dir "${OUTDIR}" > "${OUTDIR}/blocks.tsv"
 
 # Write timestamp
-tsfile="${GDIR}"/TIMESTAMP.tsv
+tsfile="${OUTDIR}"/TIMESTAMP.tsv
 echo "TIMESTAMP" > "${tsfile}"
 echo `date` >> "${tsfile}"
 
