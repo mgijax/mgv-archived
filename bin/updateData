@@ -7,32 +7,22 @@
 
 source config.sh
 
+#
 mkdir -p ${GDIR}
 
-function copyGenomeSets {
-    # copy the genomeSets file to the dataDir. This defines named sets of genomes
-    # and will have cooresponding buttons in the browser for easy selection.
-    cp "${BDIR}/genomeSets.tsv" "${GDIR}/genomeSets.tsv"
-}
+# Copy the genomeSets file to the dataDir. This defines named sets of genomes
+# and will have cooresponding buttons in the browser for easy selection.
+cp "${BDIR}/genomeSets.tsv" "${GDIR}/genomeSets.tsv"
 
-function generateFeatures {
-    ${PYTHON} "${BDIR}/getDataFromMouseMine.py" "${GDIR}"
-}
+# Generate feature files
+${PYTHON} "${BDIR}/getDataFromMouseMine.py" "${GDIR}"
 
-function generateTimestamp {
-    # output timestamp
-    tsfile="${GDIR}"/TIMESTAMP.tsv
-    echo "TIMESTAMP" > "${tsfile}"
-    echo `date` >> "${tsfile}"
-}
+# Generate synteny blocks
+${PYTHON} "${BDIR}/sb" --dir "${GDIR}" > "${GDIR}/blocks.tsv"
 
-##
-## Main prog
-##
-
-copyGenomeSets
-generateFeatures
-./generateBlockFiles
-generateTimestamp
+# Write timestamp
+tsfile="${GDIR}"/TIMESTAMP.tsv
+echo "TIMESTAMP" > "${tsfile}"
+echo `date` >> "${tsfile}"
 
 # THE END
