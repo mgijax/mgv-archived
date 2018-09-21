@@ -121,7 +121,7 @@ class MGVApp extends Component {
 	// Things are all wired up. Now let's get some data.
 	// Start with the file of all the genomes.
 	this.checkTimestamp().then( () => {
-	    d3tsv("./data/genomedata/allGenomes.tsv").then(data => {
+	    d3tsv("./data/allGenomes.tsv").then(data => {
 		// create Genome objects from the raw data.
 		this.allGenomes   = data.map(g => new Genome(g));
 		this.allGenomes.sort( (a,b) => {
@@ -137,7 +137,7 @@ class MGVApp extends Component {
 		    .reduce((acc,g) => { this.nl2genome[g.label] = acc[g.label] = g; return acc; }, {});
 
 		// Now preload all the chromosome files for all the genomes
-		let cdps = this.allGenomes.map(g => d3tsv(`./data/genomedata/${g.name}-chromosomes.tsv`));
+		let cdps = this.allGenomes.map(g => d3tsv(`./data/${g.name}-chromosomes.tsv`));
 		return Promise.all(cdps);
 	    })
 	    .then( data => {
@@ -155,7 +155,7 @@ class MGVApp extends Component {
     //----------------------------------------------
     checkTimestamp () {
         let tStore = new KeyStore('timestamp');
-	return d3tsv('./data/genomedata/TIMESTAMP.tsv').then( ts => {
+	return d3tsv('./data/TIMESTAMP.tsv').then( ts => {
 	    let newTimeStamp =  new Date(Date.parse(ts[0].TIMESTAMP));
 	    return tStore.get('TIMESTAMP').then( oldTimeStamp => {
 	        if (!oldTimeStamp || newTimeStamp > oldTimeStamp) {
@@ -269,7 +269,7 @@ class MGVApp extends Component {
 	    gNames = gNames.concat(selectedNames.filter(n => gNames.indexOf(n) === -1));
 	    self.setContext({ genomes: gNames });
 	});
-	d3tsv("./data/genomedata/genomeSets.tsv").then(sets => {
+	d3tsv("./data/genomeSets.tsv").then(sets => {
 	    // Create selection buttons.
 	    sets.forEach( s => s.genomes = s.genomes.split(",") );
 	    let cgb = d3.select('#compGenomesBox').selectAll('button').data(sets);

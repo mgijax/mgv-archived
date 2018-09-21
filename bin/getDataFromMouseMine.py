@@ -4,6 +4,7 @@ import os.path
 from os import environ as ENV
 
 MOUSEMINE = ENV.get('MOUSEMINE', 'http://www.mousemine.org/mousemine')
+MAX_SIZE  = int(ENV.get('SIZELIMIT', '0')) * 1000000
 
 class DataGetter :
 
@@ -114,6 +115,9 @@ class DataGetter :
 	    # coords into integers
 	    r[4] = int(r[4])
 	    r[5] = int(r[5])
+	    if r[5] - r[4] + 1 > MAX_SIZE > 0:
+		self.log('Feature too big (skipped): ' + self.formatRow(r))
+	        continue
 	    # convert strand from +1/-1 to just +/-
             r[6] = '-' if r[6] == '-1' else '+'
 	    # the outer join returns '""' in place of nulls.
@@ -150,7 +154,7 @@ class DataGetter :
 	ca = ContigAssigner()
 	sa_plus = SwimLaneAssigner()
 	sa_minus = SwimLaneAssigner()
-	txptCounts = self.getTranscriptCounts(g, c)
+	#txptCounts = self.getTranscriptCounts(g, c)
 	for f in self.getGenes(g, c):
 	    tp = 'pseudogene' if 'pseudo' in f[2] else 'gene'
 	    contig = ca.assignNext(f[4], f[5])
@@ -158,7 +162,8 @@ class DataGetter :
 		lane = sa_plus.assignNext(f[4], f[5])
 	    else:
 		lane = -sa_minus.assignNext(f[4], f[5])
-	    row = [f[3], f[4], f[5], f[6], contig, lane, tp, f[2], f[1], f[7] , f[8], txptCounts.get(f[1],1)]
+	    #row = [f[3], f[4], f[5], f[6], contig, lane, tp, f[2], f[1], f[7] , f[8], txptCounts.get(f[1],1)]
+	    row = [f[3], f[4], f[5], f[6], contig, lane, tp, f[2], f[1], f[7] , f[8]]
 	    self.fFd.write(self.formatRow(row))
 
     # Main program. 

@@ -5,24 +5,28 @@
 # Main script for building/updating the data files used by the viewer.
 #
 
-source config.sh
+source Configuration
 
 #
-mkdir -p ${OUTDIR}
+mkdir -p ${WORKINGDIR}
 
 # Copy the genomeSets file to the dataDir. This defines named sets of genomes
 # and will have cooresponding buttons in the browser for easy selection.
-cp "${BIN}/genomeSets.tsv" "${OUTDIR}/genomeSets.tsv"
+cp "${BIN}/genomeSets.tsv" "${WORKINGDIR}/genomeSets.tsv"
 
 # Generate feature files
-${PYTHON} "${BIN}/getDataFromMouseMine.py" "${OUTDIR}"
+${PYTHON} "${BIN}/getDataFromMouseMine.py" "${WORKINGDIR}"
 
 # Generate synteny blocks
-${PYTHON} "${BIN}/sb" --dir "${OUTDIR}" > "${OUTDIR}/blocks.tsv"
+${PYTHON} "${BIN}/sb.py" --dir "${WORKINGDIR}" > "${WORKINGDIR}/blocks.tsv"
 
 # Write timestamp
-tsfile="${OUTDIR}"/TIMESTAMP.tsv
+tsfile="${WORKINGDIR}"/TIMESTAMP.tsv
 echo "TIMESTAMP" > "${tsfile}"
 echo `date` >> "${tsfile}"
+
+# Switcheroo
+mv -f "${OUTDIR}" "${PREVDIR}"
+mv -f "${WORKINGDIR}" "${OUTDIR}"
 
 # THE END
