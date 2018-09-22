@@ -1,4 +1,5 @@
 import sys
+import os
 import argparse
 
 TAB = '\t'
@@ -629,76 +630,19 @@ def generate(a, b):
 # Yields:
 #    stream of SyntenyBlocs
 #    
-def generateFromFiles(aName, aFile, bName, bFile):
+def _generateFromFiles(aName, aFile, bName, bFile):
     global a
     global b
+    SyntenyBloc.COUNT = 0
+    BlockCover.COUNT  = 0
     a = Genome(aName).readFromFile(aFile)
     b = Genome(bName).readFromFile(bFile)
     for sbloc in generate(a, b):
         for r in sbloc.getRows():
 	    yield r
 
-#
-def format(lst):
-    return TAB.join(map(lambda x: str(x), lst))
-
-#-------------------------------------------------------------------------
-def getArgs ():
-    """
-    Sets up the parser for the command line args.
-    """
-    parser = argparse.ArgumentParser(description='Generate synteny blocks.')
-
-    parser.add_argument(
-	'--afile',
-	dest="afile",
-	required=True,
-	metavar='FILE', 
-	help='GFF3 file of features from genome A.')
-
-    parser.add_argument(
-	'--aname',
-	dest="aname",
-	required=True,
-	metavar='NAME', 
-	help='Name of genome A.')
-
-    parser.add_argument(
-	'--bfile',
-	dest="bfile",
-	required=True,
-	metavar='FILE', 
-	help='GFF3 file of features from genome B.')
-
-    parser.add_argument(
-	'--bname',
-	dest="bname",
-	required=True,
-	metavar='NAME', 
-	help='Name of genome B.')
-
-    parser.add_argument(
-	'--noheader',
-	dest="noHeader",
-	default=False,
-	action='store_true',
-	help='Suppress column label line (1st line). Default=false (ie, output the labels).')
-
-    return parser.parse_args()
-
-if __name__ == "__main__":
-    global sbg
-    if len(sys.argv) == 1:
-	class FakeArgs:
-	    pass
-        args = FakeArgs()
-	args.aname = "A/J"
-	args.afile = "../data/genomedata/mus_musculus_aj-features.tsv"
-	args.bname = "AKR/J"
-	args.bfile = "../data/genomedata/mus_musculus_akrj-features.tsv"
-    else:
-	args = getArgs()
-    allRows = list(generateFromFiles(args.aname, args.afile, args.bname, args.bfile))
+def generateFromFiles(aName, aFile, bName, bFile, noHeader):
+    allRows = list(_generateFromFiles(aName, aFile, bName, bFile))
     def _(ci):
 	allRows.sort(lambda x,y: x[ci]-y[ci])
 	i = -1
@@ -710,9 +654,39 @@ if __name__ == "__main__":
 	    r[ci] = i
     _(11) # sort on col bIndex and renumber
     _(6)  # sort on col aIndex and renumber
-    if not args.noHeader:
+    if not noHeader:
 	sys.stdout.write( format(SyntenyBloc.COLNAMES) + NL )
     for r in allRows:
 	sys.stdout.write( format(r) + NL )
 
+#
+def format(lst):
+    return TAB.join(map(lambda x: str(x), lst))
 
+#
+def getArgs ():
+    parser = argparse.ArgumentParser(description='Generate synteny blocks.')
+
+    parser.add_argument(
+	'--directory',
+	dest="odir",
+	required=True,
+	metavar='PATH', 
+	help='Directory containing the feature files.')
+    return parser.parse_args()
+
+#-------------------------------------------------------------------------
+if __name__ == "__main__":
+    global sbg
+    args = getArgs()
+    filenames = filter(lambda fn: fn.endswith('-features.tsv'), os.listdir(args.odir))
+    filenames.sort()
+    for i, fn1 in enumerate(filenames):
+	aname = fn1.replace('-features.tsv','')
+	afile = os.path.join(args.odir, fn1)
+        for j, fn2 in enumerate(filenames[i:]):
+	    bname = fn2.replace('-features.tsv','')
+	    bfile = os.path.join(args.odir, fn2)
+	    sys.stderr.write('%d %s vs %d %s\n' % (i, aname, i+j, bname))
+	    generateFromFiles(aname, afile, bname, bfile, i or j)
+#

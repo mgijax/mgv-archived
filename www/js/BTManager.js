@@ -54,7 +54,7 @@ class BTManager {
 	    }
 	    else {
 		// Third, load from server.
-		let fn = `./data/genomedata/blocks.tsv`
+		let fn = `./data/blocks.tsv`
 		console.log("Requesting block file from: " + fn);
 		this.serverRequest = d3tsv(fn).then(blocks => {
 		    let rbs = blocks.reduce( (a,b) => {

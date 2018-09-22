@@ -97,7 +97,7 @@ class FeatureManager {
 	return this.fStore.get(genome.name).then(data => {
 	    if (data === undefined) {
 		console.log("Requesting:", genome.name, );
-		let url = `./data/genomedata/${genome.name}-features.tsv`;
+		let url = `./data/${genome.name}-features.tsv`;
 		return d3tsv(url).then( rawfeats => {
 		    rawfeats.sort( (a,b) => {
 			if (a.chr < b.chr)

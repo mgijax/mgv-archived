@@ -5,34 +5,49 @@
 # Main script for building/updating the data files used by the viewer.
 #
 
-source config.sh
+source Configuration
 
-mkdir -p ${GDIR}
-
-function copyGenomeSets {
-    # copy the genomeSets file to the dataDir. This defines named sets of genomes
-    # and will have cooresponding buttons in the browser for easy selection.
-    cp "${BDIR}/genomeSets.tsv" "${GDIR}/genomeSets.tsv"
+function checkerror {
+    if [ $? != 0 ]; then
+	echo "Caught error. Exiting."
+	exit 1
+    fi 
 }
 
-function generateFeatures {
-    ${PYTHON} "${BDIR}/getDataFromMouseMine.py" "${GDIR}"
-}
+# Make sure working dir exists and is empty
+mkdir -p ${WORKINGDIR}
+rm -fr ${WORKINGDIR}/*
 
-function generateTimestamp {
-    # output timestamp
-    tsfile="${GDIR}"/TIMESTAMP.tsv
-    echo "TIMESTAMP" > "${tsfile}"
-    echo `date` >> "${tsfile}"
-}
+# Copy the genomeSets file to the dataDir. This defines named sets of genomes
+# and will have cooresponding buttons in the browser for easy selection.
+cp "${BIN}/genomeSets.tsv" "${WORKINGDIR}/genomeSets.tsv"
+checkerror
 
-##
-## Main prog
-##
+# Generate feature files
+${PYTHON} "${BIN}/getDataFromMouseMine.py" --dir "${WORKINGDIR}" $*
+checkerror
 
-copyGenomeSets
-generateFeatures
-./generateBlockFiles
-generateTimestamp
+# Generate synteny blocks
+${PYTHON} "${BIN}/syntenyBlocks.py" --dir "${WORKINGDIR}" > "${WORKINGDIR}/blocks.tsv"
+checkerror
+
+# Write timestamp
+tsfile="${WORKINGDIR}"/TIMESTAMP.tsv
+echo "TIMESTAMP" > "${tsfile}"
+checkerror
+echo `date` >> "${tsfile}"
+checkerror
+
+# Switcheroo
+if [ -d "${OUTDIR}" ] ; then
+    # output directory exists. save it as 'previous'
+    rm -fr "${PREVDIR}"
+    checkerror
+    mv -f "${OUTDIR}" "${PREVDIR}"
+    checkerror
+fi
+# rename the working dir
+mv -f "${WORKINGDIR}" "${OUTDIR}"
+checkerror
 
 # THE END

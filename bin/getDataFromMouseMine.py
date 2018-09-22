@@ -1,13 +1,27 @@
+#
+# getDataFromMouseMine.py
+#
+# Script that generates data files for MGV by querying MouseMine.
+# Usage:
+#    python getDataFromMouseMine.py PATH
+# where PATH specifies the output directory
+# 
+
 import sys
 import urllib
 import os.path
+from os import environ as ENV
+import argparse
 
-MOUSEMINE="http://www.mousemine.org/mousemine"
+MOUSEMINE = ENV.get('MOUSEMINE', 'http://www.mousemine.org/mousemine')
+Q_URL_TMPLT = MOUSEMINE + '/service/query/results?format=tab&query=%s'
+MAX_SIZE  = int(ENV.get('SIZELIMIT', '0')) * 1000000
 
 class DataGetter :
 
-    def __init__ (self, odir) :
+    def __init__ (self, odir, genomes) :
 	self.odir = odir
+	self.specifiedGenomes = genomes
 	#
 	self.gFn = os.path.join(self.odir, 'allGenomes.tsv')
 	self.gFd = open(self.gFn, 'w')
@@ -25,8 +39,7 @@ class DataGetter :
         self.lFd.write('\n')
 
     def doQuery (self, q) :
-	fmt = 'tab'
-	url = '%s/service/query/results?format=%s&query=%s' % (MOUSEMINE,fmt,urllib.quote_plus(q))
+	url = Q_URL_TMPLT % (urllib.quote_plus(q))
 	fd = urllib.urlopen(url)
 	for line in fd:
 	    toks = line[:-1].split('\t')
@@ -110,25 +123,52 @@ class DataGetter :
 	</query>''' % (g, c)
 
 	for r in self.doQuery(q):
-	    # coords into integers
-	    r[4] = int(r[4])
-	    r[5] = int(r[5])
-	    # convert strand from +1/-1 to just +/-
-            r[6] = '-' if r[6] == '-1' else '+'
-	    # the outer join returns '""' in place of nulls.
-	    # convert them to '.'
-	    r[7] = '.' if r[7] == '""' else r[7]
-	    r[8] = '.' if r[8] == '""' else r[8]
-	    yield r
+	    try:
+		# coords into integers
+		r[4] = int(r[4])
+		r[5] = int(r[5])
+		if r[5] - r[4] + 1 > MAX_SIZE > 0:
+		    self.log('Feature too big (skipped): ' + self.formatRow(r))
+		    continue
+		# convert strand from +1/-1 to just +/-
+		r[6] = '-' if r[6] == '-1' else '+'
+		# the outer join returns '""' in place of nulls.
+		# convert them to '.'
+		r[7] = '.' if r[7] == '""' else r[7]
+		r[8] = '.' if r[8] == '""' else r[8]
+		yield r
+	    except:
+	        self.log("ERROR: skipping row: " + str(r))
 
     def formatRow(self, row):
         return '\t'.join(map(str, row)) + '\n'
 
+    # Finds the number of transcripts for all genes on the specified chromosome in the specified genome
+    # Returns a dict mapping gene id -> count.
+    def getTranscriptCounts (self, g, c) :
+        q = '''<query
+	model="genomic"
+	view="
+	Transcript.primaryIdentifier
+	Transcript.gene.primaryIdentifier"
+	longDescription=""
+	sortOrder="Transcript.primaryIdentifier asc"
+	constraintLogic="A and B">
+	  <constraint path="Transcript.gene.strain.name" code="A" op="=" value="%s"/>
+	  <constraint path="Transcript.chromosome.primaryIdentifier" code="B" op="=" value="%s"/>
+	</query>''' % (g,c)
+	index = {}
+	for r in self.doQuery(q) :
+	    index[r[1]] = index.setdefault(r[1],0) + 1
+        return index
+
+    #
     def processGenes(self, g, c) :
 	# For all the genes on the specified chromosome of the specified genome...
 	ca = ContigAssigner()
 	sa_plus = SwimLaneAssigner()
 	sa_minus = SwimLaneAssigner()
+	#txptCounts = self.getTranscriptCounts(g, c)
 	for f in self.getGenes(g, c):
 	    tp = 'pseudogene' if 'pseudo' in f[2] else 'gene'
 	    contig = ca.assignNext(f[4], f[5])
@@ -136,6 +176,7 @@ class DataGetter :
 		lane = sa_plus.assignNext(f[4], f[5])
 	    else:
 		lane = -sa_minus.assignNext(f[4], f[5])
+	    #row = [f[3], f[4], f[5], f[6], contig, lane, tp, f[2], f[1], f[7] , f[8], txptCounts.get(f[1],1)]
 	    row = [f[3], f[4], f[5], f[6], contig, lane, tp, f[2], f[1], f[7] , f[8]]
 	    self.fFd.write(self.formatRow(row))
 
@@ -147,6 +188,10 @@ class DataGetter :
 	genomes.sort(lambda a,b: cmp(a[2],b[2]))
 	# For all the genomes we know about...
 	for g in genomes:
+	    #
+	    if self.specifiedGenomes and g[1] not in self.specifiedGenomes:
+		self.log('Skipping genome: ' + g[1])
+	        continue
 	    # Write genome record
 	    self.log(g[1])
 	    self.gFd.write('%s\t%s\n' % (g[2],g[1]))
@@ -189,6 +234,28 @@ class SwimLaneAssigner :
 	    self.lanes.append(fend) 
 	    return len(self.lanes)
 
+def getArgs ():
+    parser = argparse.ArgumentParser(description='Generate MGV data files from MouseMine.')
+
+    parser.add_argument(
+	'-d',
+	'--directory',
+	dest="odir",
+	required=True,
+	metavar='PATH', 
+	help='Where the output files go.')
+
+    parser.add_argument(
+	'-g',
+	'--genome',
+	dest="genomes",
+	metavar='NAME', 
+	action='append',
+	help='Specify a specific genome')
+
+    return parser.parse_args()
+
 if __name__ == "__main__":
-    DataGetter(sys.argv[1]).main()
+    args = getArgs()
+    DataGetter(args.odir, args.genomes).main()
 
