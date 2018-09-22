@@ -19,8 +19,9 @@ MAX_SIZE  = int(ENV.get('SIZELIMIT', '0')) * 1000000
 
 class DataGetter :
 
-    def __init__ (self, odir) :
+    def __init__ (self, odir, genomes) :
 	self.odir = odir
+	self.specifiedGenomes = genomes
 	#
 	self.gFn = os.path.join(self.odir, 'allGenomes.tsv')
 	self.gFd = open(self.gFn, 'w')
@@ -187,6 +188,10 @@ class DataGetter :
 	genomes.sort(lambda a,b: cmp(a[2],b[2]))
 	# For all the genomes we know about...
 	for g in genomes:
+	    #
+	    if self.specifiedGenomes and g[1] not in self.specifiedGenomes:
+		self.log('Skipping genome: ' + g[1])
+	        continue
 	    # Write genome record
 	    self.log(g[1])
 	    self.gFd.write('%s\t%s\n' % (g[2],g[1]))
@@ -239,9 +244,18 @@ def getArgs ():
 	required=True,
 	metavar='PATH', 
 	help='Where the output files go.')
+
+    parser.add_argument(
+	'-g',
+	'--genome',
+	dest="genomes",
+	metavar='NAME', 
+	action='append',
+	help='Specify a specific genome')
+
     return parser.parse_args()
 
 if __name__ == "__main__":
     args = getArgs()
-    DataGetter(args.odir).main()
+    DataGetter(args.odir, args.genomes).main()
 
