@@ -1,9 +1,20 @@
+#
+# getDataFromMouseMine.py
+#
+# Script that generates data files for MGV by querying MouseMine.
+# Usage:
+#    python getDataFromMouseMine.py PATH
+# where PATH specifies the output directory
+# 
+
 import sys
 import urllib
 import os.path
 from os import environ as ENV
+import argparse
 
 MOUSEMINE = ENV.get('MOUSEMINE', 'http://www.mousemine.org/mousemine')
+Q_URL_TMPLT = MOUSEMINE + '/service/query/results?format=tab&query=%s'
 MAX_SIZE  = int(ENV.get('SIZELIMIT', '0')) * 1000000
 
 class DataGetter :
@@ -27,8 +38,7 @@ class DataGetter :
         self.lFd.write('\n')
 
     def doQuery (self, q) :
-	fmt = 'tab'
-	url = '%s/service/query/results?format=%s&query=%s' % (MOUSEMINE,fmt,urllib.quote_plus(q))
+	url = Q_URL_TMPLT % (urllib.quote_plus(q))
 	fd = urllib.urlopen(url)
 	for line in fd:
 	    toks = line[:-1].split('\t')
@@ -219,6 +229,19 @@ class SwimLaneAssigner :
 	    self.lanes.append(fend) 
 	    return len(self.lanes)
 
+def getArgs ():
+    parser = argparse.ArgumentParser(description='Generate MGV data files from MouseMine.')
+
+    parser.add_argument(
+	'-d',
+	'--directory',
+	dest="odir",
+	required=True,
+	metavar='PATH', 
+	help='Where the output files go.')
+    return parser.parse_args()
+
 if __name__ == "__main__":
-    DataGetter(sys.argv[1]).main()
+    args = getArgs()
+    DataGetter(args.odir).main()
 

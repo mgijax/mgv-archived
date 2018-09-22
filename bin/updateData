@@ -23,11 +23,11 @@ cp "${BIN}/genomeSets.tsv" "${WORKINGDIR}/genomeSets.tsv"
 checkerror
 
 # Generate feature files
-${PYTHON} "${BIN}/getDataFromMouseMine.py" "${WORKINGDIR}"
+${PYTHON} "${BIN}/getDataFromMouseMine.py" --dir "${WORKINGDIR}"
 checkerror
 
 # Generate synteny blocks
-${PYTHON} "${BIN}/sb.py" --dir "${WORKINGDIR}" > "${WORKINGDIR}/blocks.tsv"
+${PYTHON} "${BIN}/syntenyBlocks.py" --dir "${WORKINGDIR}" > "${WORKINGDIR}/blocks.tsv"
 checkerror
 
 # Write timestamp
@@ -38,6 +38,8 @@ echo `date` >> "${tsfile}"
 checkerror
 
 # Switcheroo
+rm -fr "${PREVDIR}"
+checkerror
 mv -f "${OUTDIR}" "${PREVDIR}"
 checkerror
 mv -f "${WORKINGDIR}" "${OUTDIR}"
