@@ -12,6 +12,7 @@ import urllib
 import os.path
 from os import environ as ENV
 import argparse
+import json
 
 MOUSEMINE = ENV.get('MOUSEMINE', 'http://www.mousemine.org/mousemine')
 Q_URL_TMPLT = MOUSEMINE + '/service/query/results?format=tab&query=%s'
@@ -22,10 +23,10 @@ class DataGetter :
     def __init__ (self, odir, genomes) :
 	self.odir = odir
 	self.specifiedGenomes = genomes
-	#
+	# allGenomes file
 	self.gFn = os.path.join(self.odir, 'allGenomes.tsv')
 	self.gFd = open(self.gFn, 'w')
-	#
+	# chromosome file
 	self.cFn = None
 	self.cFd = None
 	#
@@ -161,14 +162,61 @@ class DataGetter :
 	for r in self.doQuery(q) :
 	    index[r[1]] = index.setdefault(r[1],0) + 1
         return index
+    #
+    def getTranscripts (self, g, c) :
+	# Query returns transcripts and their exons.
+        q = '''<query
+	model="genomic"
+	view="
+	Transcript.gene.primaryIdentifier
+	Transcript.primaryIdentifier
+	Transcript.chromosome.primaryIdentifier
+	Transcript.chromosomeLocation.start
+	Transcript.chromosomeLocation.end
+	Transcript.chromosomeLocation.strand
+	Transcript.exons.chromosomeLocation.start
+	Transcript.exons.length"
+	constraintLogic="A and B"
+	sortOrder="Transcript.primaryIdentifier ASC Transcript.exons.chromosomeLocation.start ASC"
+	>
+	  <constraint path="Transcript.strain.name" op="=" value="%s" code="A" />
+	  <constraint path="Transcript.chromosome.primaryIdentifier" op="=" value="%s" code="B" />
+	</query>
+	''' % (g, c)
+	#
+	lastTid = None
+	lastT = None
+	for r in self.doQuery(q):
+	    gid     =     r[0]
+	    tid     =     r[1]
+	    tChr    =     r[2]
+	    tStart  = int(r[3])
+	    tEnd    = int(r[4])
+	    tStrand =     r[5]
+	    eStart  = int(r[6])
+	    eLength = int(r[7])
+	    eOffset = eStart - tStart
+	    if tid != lastTid:
+	        if lastT:
+		    yield lastT
+		lastTid = tid
 
+		lastT = [ tChr, '.', 'transcript', tStart, tEnd, '.', tStrand, '.', 
+		        { 'ID':tid, 'gene_id':gid, 'eOffsets':[eOffset], 'eLengths':[eLength] } ]
+	    else:
+		lastT[8]['eOffsets'].append( eOffset )
+		lastT[8]['eLengths'].append( eLength )
+	#
+	if lastT:
+	    yield lastT
     #
     def processGenes(self, g, c) :
 	# For all the genes on the specified chromosome of the specified genome...
 	ca = ContigAssigner()
 	sa_plus = SwimLaneAssigner()
 	sa_minus = SwimLaneAssigner()
-	#txptCounts = self.getTranscriptCounts(g, c)
+	#for t in self.getTranscripts(g, c):
+	    #print t
 	for f in self.getGenes(g, c):
 	    tp = 'pseudogene' if 'pseudo' in f[2] else 'gene'
 	    contig = ca.assignNext(f[4], f[5])
@@ -179,6 +227,16 @@ class DataGetter :
 	    #row = [f[3], f[4], f[5], f[6], contig, lane, tp, f[2], f[1], f[7] , f[8], txptCounts.get(f[1],1)]
 	    row = [f[3], f[4], f[5], f[6], contig, lane, tp, f[2], f[1], f[7] , f[8]]
 	    self.fFd.write(self.formatRow(row))
+	    attrs = {
+	        'ID' : f[1],
+		'canonical_id' : f[7],
+		'canonical_symbol' : f[8],
+		'lane' : lane,
+		'contig': contig,
+		'biotype' : f[2],
+	    }
+	    gffrow = [f[3], '.', tp, f[4], f[5], '.', f[6], '.', attrs]
+	    print json.dumps(gffrow)
 
     # Main program. 
     def main (self):
@@ -208,6 +266,7 @@ class DataGetter :
 		# Write chromosome record
 		self.log(c[0])
 		self.cFd.write('%s\t%s\n' % (c[0],c[1]))
+		# 
 		self.processGenes(g[1], c[0])
 
 class ContigAssigner :
