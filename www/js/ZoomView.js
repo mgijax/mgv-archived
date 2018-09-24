@@ -800,16 +800,13 @@ class ZoomView extends SVGView {
 	this.genomes = this.context.genomes;
 	this.dmode = this.context.dmode;
 	this.cmode = this.context.cmode;
-	return this.app.translator.ready().then(() => {
-	    let p;
-	    if (this.cmode === 'mapped')
-		p = this.updateViaMappedCoordinates(this.app.coords);
-	    else
-		p = this.updateViaLandmarkCoordinates(this.app.lcoords);
-	    p.then( data => {
-		this.draw(this.mungeData(data));
-	    });
-	    return p;
+	let p;
+	if (this.cmode === 'mapped')
+	    p = this.updateViaMappedCoordinates(this.app.coords);
+	else
+	    p = this.updateViaLandmarkCoordinates(this.app.lcoords);
+	p.then( data => {
+	    this.draw(this.mungeData(data));
 	});
     }
 
@@ -1059,11 +1056,20 @@ class ZoomView extends SVGView {
 	    let dtxt = d ? ` (${d > 0 ? '+' : ''}${prettyPrintBases(d)})` : '';
 	    lmtxt = `Aligned on ${rf.symbol || rf.id}${dtxt}`;
 	}
+	// display landmark text
+	d3.select('#zoomView .zoomCoords div[name="lmtxt"] span')
+	    .text(lmtxt);
+	d3.select('#zoomView .zoomCoords div[name="lmtxt"] i')
+	    .text(lmtxt?'highlight_off':'')
+	    .style('font-size','12px')
+	    .style('color','red')
+	    .on('click', () => {
+		this.app.setContext(this.app.coords);
+	    })
+	    ;
 	// disable the R/C button in landmark mode
 	this.root.selectAll('[name="zoomcontrols"] [name="zoomDmode"] .button')
 	    .attr('disabled', this.cmode === 'landmark' || null);
-	// display landmark text
-	d3.select('#zoomView .zoomCoords span').text( lmtxt );
 	
 	// the reference genome block (always just 1 of these).
 	let rData = data.filter(dd => dd.genome === this.app.rGenome)[0];
