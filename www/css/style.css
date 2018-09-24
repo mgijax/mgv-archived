@@ -689,11 +689,11 @@ label > i.material-icons {
     transition: transform 0.3s;
 }
 
-#zoomView div.zoomCoords span {
+#zoomView div.zoomCoords div[name="lmtxt"] {
     font-size: smaller;
+    justify-content: flex-start;
     position: absolute;
-    top: 17px;
-    left 0px;
+    top: 18px;
 }
 
 /* R/N toggle - for showing/changing drawing mode between reference order and comparison (native) order */
