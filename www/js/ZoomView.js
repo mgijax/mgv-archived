@@ -808,6 +808,7 @@ class ZoomView extends SVGView {
 	p.then( data => {
 	    this.draw(this.mungeData(data));
 	});
+	return p;
     }
 
     // ------------------------------------
