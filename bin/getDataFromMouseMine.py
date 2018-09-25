@@ -17,6 +17,7 @@ import json
 MOUSEMINE = ENV.get('MOUSEMINE', 'http://www.mousemine.org/mousemine')
 Q_URL_TMPLT = MOUSEMINE + '/service/query/results?format=tab&query=%s'
 MAX_SIZE  = int(ENV.get('SIZELIMIT', '0')) * 1000000
+BLOCKSIZE = 2000000
 
 class DataGetter :
 
@@ -96,6 +97,7 @@ class DataGetter :
 	return self.doQuery(q)
 
     # Returns an iterator over genes on the specified chromosome for the specified genome.
+    # Genes are sorted by start position on the chromosome.
     # Args:
     #    g (string) the name of the genome, eg, "A/J"
     #    c (string) the chromosome, eg, "13"
@@ -141,30 +143,16 @@ class DataGetter :
 	    except:
 	        self.log("ERROR: skipping row: " + str(r))
 
+    # Formats a row (array of values) as a tab-delimited string.
     def formatRow(self, row):
         return '\t'.join(map(str, row)) + '\n'
 
-    # Finds the number of transcripts for all genes on the specified chromosome in the specified genome
-    # Returns a dict mapping gene id -> count.
-    def getTranscriptCounts (self, g, c) :
-        q = '''<query
-	model="genomic"
-	view="
-	Transcript.primaryIdentifier
-	Transcript.gene.primaryIdentifier"
-	longDescription=""
-	sortOrder="Transcript.primaryIdentifier asc"
-	constraintLogic="A and B">
-	  <constraint path="Transcript.gene.strain.name" code="A" op="=" value="%s"/>
-	  <constraint path="Transcript.chromosome.primaryIdentifier" code="B" op="=" value="%s"/>
-	</query>''' % (g,c)
-	index = {}
-	for r in self.doQuery(q) :
-	    index[r[1]] = index.setdefault(r[1],0) + 1
-        return index
-    #
+    # Returns an iterator over all the transcripts on the specified chromosome of
+    # the specified genome. Each transcript contains its exons in the form of a list of 
+    # offsets and a list of lengths. Transcripts are returned sorted by start position.
     def getTranscripts (self, g, c) :
-	# Query returns transcripts and their exons.
+	# Query returns all exons of all transcripts. Exons are aggregated to a list of
+	# offsets and lengths for each transcript.
         q = '''<query
 	model="genomic"
 	view="
@@ -175,9 +163,10 @@ class DataGetter :
 	Transcript.chromosomeLocation.end
 	Transcript.chromosomeLocation.strand
 	Transcript.exons.chromosomeLocation.start
-	Transcript.exons.length"
+	Transcript.exons.length
+	Transcript.gene.chromosomeLocation.start"
 	constraintLogic="A and B"
-	sortOrder="Transcript.primaryIdentifier ASC Transcript.exons.chromosomeLocation.start ASC"
+	sortOrder="Transcript.chromosomeLocation.start ASC Transcript.primaryIdentifier ASC Transcript.exons.chromosomeLocation.start ASC"
 	>
 	  <constraint path="Transcript.strain.name" op="=" value="%s" code="A" />
 	  <constraint path="Transcript.chromosome.primaryIdentifier" op="=" value="%s" code="B" />
@@ -195,6 +184,7 @@ class DataGetter :
 	    tStrand =     r[5]
 	    eStart  = int(r[6])
 	    eLength = int(r[7])
+	    gStart  = int(r[8])
 	    eOffset = eStart - tStart
 	    if tid != lastTid:
 	        if lastT:
@@ -215,18 +205,15 @@ class DataGetter :
 	ca = ContigAssigner()
 	sa_plus = SwimLaneAssigner()
 	sa_minus = SwimLaneAssigner()
-	#for t in self.getTranscripts(g, c):
-	    #print t
-	for f in self.getGenes(g, c):
+	for i,f in enumerate(self.getGenes(g, c)):
 	    tp = 'pseudogene' if 'pseudo' in f[2] else 'gene'
 	    contig = ca.assignNext(f[4], f[5])
 	    if f[6] == '+':
 		lane = sa_plus.assignNext(f[4], f[5])
 	    else:
 		lane = -sa_minus.assignNext(f[4], f[5])
-	    #row = [f[3], f[4], f[5], f[6], contig, lane, tp, f[2], f[1], f[7] , f[8], txptCounts.get(f[1],1)]
-	    row = [f[3], f[4], f[5], f[6], contig, lane, tp, f[2], f[1], f[7] , f[8]]
-	    self.fFd.write(self.formatRow(row))
+	    #row = [f[3], f[4], f[5], f[6], contig, lane, tp, f[2], f[1], f[7] , f[8]]
+	    #self.fFd.write(self.formatRow(row))
 	    attrs = {
 	        'ID' : f[1],
 		'canonical_id' : f[7],
@@ -236,7 +223,85 @@ class DataGetter :
 		'biotype' : f[2],
 	    }
 	    gffrow = [f[3], '.', tp, f[4], f[5], '.', f[6], '.', attrs]
-	    print json.dumps(gffrow)
+	    yield gffrow
+
+    # Process all the transcripts on the specified chromosome of the specified genome.
+    # 
+    def processTranscripts (self, g, c, id2feat):
+	self.tdir = os.path.join(self.gdir, 'transcripts')
+	if not os.path.isdir(self.tdir):
+	    os.mkdir(self.tdir)
+	tFn = None
+	tFd = None
+	cBlk = None
+	seen = set()
+        for t in self.getTranscripts(g[1], c[0]):
+	    ta = t[8]
+	    gene = id2feat[ta['gene_id']]
+	    ga = gene[8]
+	    ga['transcript_count'] = ga.setdefault('transcript_count',0) + 1
+	    # Figure out which output file this goes in. May reopen a 
+	    # file we've seen before.
+	    gStart = gene[3]
+	    gBlock = gStart / BLOCKSIZE
+	    fn = 'chr%s.%d.json' % (c[0], gBlock)
+	    if gBlock != cBlk:
+	        if tFd:
+		    tFd.close()
+		tFn = os.path.join(self.tdir, fn)
+		mode = 'a' if gBlock in seen else 'w'
+		self.log('Opening ' + tFn + ' in mode ' + mode)
+		tFd = open(tFn, mode)
+		if mode == 'w':
+		    tFd.write('[\n')
+	    cBlk = gBlock
+	    sep = ',' if cBlk in seen else ''
+	    tFd.write(sep + json.dumps(t) + '\n')
+	    seen.add(cBlk)
+	if tFd:
+	    tFd.close()
+
+
+    #
+    def processGenome (self, g) :
+	self.gdir = os.path.join(self.odir, g[2])
+	if not os.path.isdir(self.gdir) :
+	    os.mkdir(self.gdir)
+	# Init chromosome file for this genome
+	self.cFn = os.path.join(self.gdir, 'chromosomes.tsv')
+	self.cFd = open(self.cFn, 'w')
+	self.cFd.write('chromosome\tlength\n')
+	# Init feature file for this genome
+	self.fFn = os.path.join(self.gdir, 'features.json')
+	self.fFd = open(self.fFn, 'w')
+	self.fFd.write('[\n')
+	# Process features and transcripts one chromosome at a time
+	sep = ''
+	for c in self.getChromosomes(g[1]):
+	    # Write chromosome record
+	    self.log(c[0])
+	    self.cFd.write('%s\t%s\n' % (c[0],c[1]))
+	    # Get all the features for this chromosome and index by id
+	    # Load genes into memory. Then stream all transcripts+exons to files.
+	    # All the transcripts/exons for a given gene are output to a file whose
+	    # name is computed (in part) from the gene's start position.
+	    # Along the way, increment transcript counts in the cached genes.
+	    # Then write the genes.
+	    feats = []
+	    id2feat = {}
+	    for f in self.processGenes(g[1], c[0]):
+		feats.append(f)
+		id2feat[f[8]['ID']] = f
+	    # Now process all transcripts on this chromosome
+	    self.processTranscripts(g, c, id2feat)
+	    # Output the features
+	    for f in feats:
+		self.fFd.write(sep + json.dumps(f) + '\n')
+		sep = ','
+	# close files
+	self.fFd.write(']\n')
+	self.fFd.close()
+	self.cFd.close()
 
     # Main program. 
     def main (self):
@@ -246,29 +311,17 @@ class DataGetter :
 	genomes.sort(lambda a,b: cmp(a[2],b[2]))
 	# For all the genomes we know about...
 	for g in genomes:
-	    #
+	    # g == [primaryIdentifier, name, filename]
 	    if self.specifiedGenomes and g[1] not in self.specifiedGenomes:
 		self.log('Skipping genome: ' + g[1])
-	        continue
-	    # Write genome record
-	    self.log(g[1])
-	    self.gFd.write('%s\t%s\n' % (g[2],g[1]))
-	    # Init chromosome file
-	    self.cFn = os.path.join(self.odir, '%s-chromosomes.tsv'%g[2])
-	    self.cFd = open(self.cFn, 'w')
-	    self.cFd.write('chromosome\tlength\n')
-	    # Init feature file
-	    self.fFn = os.path.join(self.odir, '%s-features.tsv'%g[2])
-	    self.fFd = open(self.fFn, 'w')
-	    self.fFd.write('chromosome\tstart\tend\tstrand\tcontig\tlane\ttype\tbiotype\tid\tmgiid\tsymbol\n')
-	    # Process features a chromosome at a time
-	    for c in self.getChromosomes(g[1]):
-		# Write chromosome record
-		self.log(c[0])
-		self.cFd.write('%s\t%s\n' % (c[0],c[1]))
-		# 
-		self.processGenes(g[1], c[0])
+	    else:
+		# Write genome record
+		self.log("Processing " + g[1])
+		self.gFd.write('%s\t%s\n' % (g[2],g[1]))
+		self.processGenome(g)
+	self.gFd.close()
 
+#
 class ContigAssigner :
     def __init__ (self) :
         self.contig = 0
@@ -280,6 +333,7 @@ class ContigAssigner :
 	self.hwm = max(self.hwm, fend)
 	return self.contig
 
+#
 class SwimLaneAssigner :
     def __init__ (self):
         self.lanes = []
