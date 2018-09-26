@@ -21,7 +21,7 @@ BLOCKSIZE = 2000000
 
 class DataGetter :
 
-    def __init__ (self, odir, genomes) :
+    def __init__ (self, odir, genomes, doTranscripts) :
 	self.odir = odir
 	self.specifiedGenomes = genomes
 	# allGenomes file
@@ -35,10 +35,12 @@ class DataGetter :
 	self.fFd = None
 	#
 	self.lFd = sys.stderr
+	#
+        self.doTranscripts = doTranscripts
 
-    def log(self, s):
+    def log(self, s, writeNL = True):
         self.lFd.write(s)
-        self.lFd.write('\n')
+        if writeNL: self.lFd.write('\n')
 
     def doQuery (self, q) :
 	url = Q_URL_TMPLT % (urllib.quote_plus(q))
@@ -237,7 +239,10 @@ class DataGetter :
 	seen = set()
         for t in self.getTranscripts(g[1], c[0]):
 	    ta = t[8]
-	    gene = id2feat[ta['gene_id']]
+	    gene = id2feat.get(ta['gene_id'], None)
+	    if not gene:
+		self.log("Skipping transcript (gene not found): " + str(t))
+	        continue
 	    ga = gene[8]
 	    ga['transcript_count'] = ga.setdefault('transcript_count',0) + 1
 	    # Figure out which output file this goes in. May reopen a 
@@ -250,7 +255,7 @@ class DataGetter :
 		    tFd.close()
 		tFn = os.path.join(self.tdir, fn)
 		mode = 'a' if fn in seen else 'w'
-		self.log('Opening ' + tFn + ' in mode ' + mode)
+		self.log(str(gBlock) + ' ', False)
 		tFd = open(tFn, mode)
 		if mode == 'w':
 		    tFd.write('[\n')
@@ -260,12 +265,13 @@ class DataGetter :
 	    seen.add(fn)
 	if tFd:
 	    tFd.close()
+	self.log('')
 	for fn in seen:
 	    fd = open(os.path.join(self.tdir, fn), 'a')
 	    fd.write(']\n')
 	    fd.close()
 
-    #
+    # Reads data for one genome from mousemine and writes files to disk.
     def processGenome (self, g) :
 	self.gdir = os.path.join(self.odir, g[2])
 	if not os.path.isdir(self.gdir) :
@@ -281,8 +287,8 @@ class DataGetter :
 	# Process features and transcripts one chromosome at a time
 	sep = ''
 	for c in self.getChromosomes(g[1]):
-	    # Write chromosome record
 	    self.log(c[0])
+	    # Write chromosome record
 	    self.cFd.write('%s\t%s\n' % (c[0],c[1]))
 	    # Get all the features for this chromosome and index by id
 	    # Load genes into memory. Then stream all transcripts+exons to files.
@@ -295,8 +301,9 @@ class DataGetter :
 	    for f in self.processGenes(g[1], c[0]):
 		feats.append(f)
 		id2feat[f[8]['ID']] = f
-	    # Now process all transcripts on this chromosome
-	    #self.processTranscripts(g, c, id2feat)
+	    if self.doTranscripts:
+		# Now process all transcripts on this chromosome
+		self.processTranscripts(g, c, id2feat)
 	    # Output the features
 	    for f in feats:
 		self.fFd.write(sep + json.dumps(f) + '\n')
@@ -369,9 +376,17 @@ def getArgs ():
 	action='append',
 	help='Specify a specific genome. Repeat to specify multiple genomes.')
 
+    parser.add_argument(
+	'-t',
+	'--transcripts',
+	dest="doTranscripts",
+	action='store_true',
+	default=False,
+	help='Also generate transcript files.')
+
     return parser.parse_args()
 
 if __name__ == "__main__":
     args = getArgs()
-    DataGetter(args.odir, args.genomes).main()
+    DataGetter(args.odir, args.genomes, args.doTranscripts).main()
 

@@ -721,6 +721,5 @@ if __name__ == "__main__":
 	    bname = gn2
 	    bfile = os.path.join(args.odir, gn2, 'features.json')
 	    sys.stderr.write('%d %s vs %d %s\n' % (i, aname, i+j, bname))
-	    sys.stderr.write('%s vs %s\n' % (afile, bfile))
 	    generateFromFiles(aname, afile, bname, bfile, i or j)
 ###
