@@ -77,7 +77,6 @@ class BTManager {
     // for translating coordinates between the current ref strain and the current comparison strains.
     //
     ready () {
-	console.log("BTManager.ready:: ref=", this.app.rGenome, 'comps=', this.app.cGenomes);
 	let promises = this.app.cGenomes.map(cg => this.getBlockFile(this.app.rGenome, cg));
 	return Promise.all(promises)
     }
