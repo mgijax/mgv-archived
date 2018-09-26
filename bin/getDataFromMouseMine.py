@@ -249,18 +249,21 @@ class DataGetter :
 	        if tFd:
 		    tFd.close()
 		tFn = os.path.join(self.tdir, fn)
-		mode = 'a' if gBlock in seen else 'w'
+		mode = 'a' if fn in seen else 'w'
 		self.log('Opening ' + tFn + ' in mode ' + mode)
 		tFd = open(tFn, mode)
 		if mode == 'w':
 		    tFd.write('[\n')
 	    cBlk = gBlock
-	    sep = ',' if cBlk in seen else ''
+	    sep = ',' if fn in seen else ''
 	    tFd.write(sep + json.dumps(t) + '\n')
-	    seen.add(cBlk)
+	    seen.add(fn)
 	if tFd:
 	    tFd.close()
-
+	for fn in seen:
+	    fd = open(os.path.join(self.tdir, fn), 'a')
+	    fd.write(']\n')
+	    fd.close()
 
     #
     def processGenome (self, g) :
@@ -293,7 +296,7 @@ class DataGetter :
 		feats.append(f)
 		id2feat[f[8]['ID']] = f
 	    # Now process all transcripts on this chromosome
-	    self.processTranscripts(g, c, id2feat)
+	    #self.processTranscripts(g, c, id2feat)
 	    # Output the features
 	    for f in feats:
 		self.fFd.write(sep + json.dumps(f) + '\n')
@@ -364,7 +367,7 @@ def getArgs ():
 	dest="genomes",
 	metavar='NAME', 
 	action='append',
-	help='Specify a specific genome')
+	help='Specify a specific genome. Repeat to specify multiple genomes.')
 
     return parser.parse_args()
 
