@@ -1,6 +1,16 @@
+#
+# syntenyBlocks.py
+#
+# Infers synteny blocks among a set of annotated genomes.
+#
+# Infers synteny blocks for a pair of genomes based on 
+# 1. gene annotations in each genome
+# 2. an assertion of 'equivalence' between individual features
+# 
 import sys
 import os
 import argparse
+import json
 
 TAB = '\t'
 NL  = '\n'
@@ -49,16 +59,24 @@ class Region:
 # chromosome      start   end     strand  contig  lane    type    biotype id      mgiid   symbol
 #
 class Feature (Region):
-    def __init__(self, genome, colNames, values):
+    def __init__(self, genome, gffobj):
 	self.genome = genome
-        for i,c in enumerate(colNames):
-	    v = values[i]
-	    if c in ['start','end','contig','lane']:
-	        v = int(v)
-	    setattr(self, c, v)
+	self.chr        = gffobj[0]
+	self.start      = gffobj[3]
+	self.end        = gffobj[4]
+	self.strand     = gffobj[6]
+	self.contig     = gffobj[8]['contig']
+	self.lane       = gffobj[8]['lane']
+	self.type       = gffobj[2]
+	self.biotype    = gffobj[8]['biotype']
+	self.id         = gffobj[8]['ID']
+	self.canonical  = gffobj[8].get('canonical_id',None)
+	self.symbol     = gffobj[8].get('canonical_symbol',None)
 
     def __str__(self):
-        return '{ %s }' % ', '.join(['%s:%s' % (c, getattr(self, c)) for c in ['id','symbol','canonical','genome','chr','start','end','strand']])
+        return '{ %s }' % ', '.join(
+	    ['%s:%s' % (c, getattr(self, c)) for c in 
+	        ['id','symbol','canonical','genome','chr','start','end','strand']])
 
     def __repr__(self):
         return str(self)
@@ -113,7 +131,18 @@ class Genome:
     # Mapped to these names:
     # chr      start   end     strand  contig  lane    type    biotype id      canonical   symbol
     # 
-    def	readFromFile(self, fname):
+    def readFromFile(self, fname):
+	fd = open(fname, 'r')
+	self.feats = [ Feature(self, f) for f in json.load(fd) ]
+	fd.close()
+	for count, f in enumerate(self.feats):
+	    f.index = count
+	    self.id2feat[f.id] = f
+	    self.cid2feats.setdefault(f.canonical, []).append(f)
+	self.contigs = self.buildContigCover()
+	return self;
+
+    def	xreadFromFile(self, fname):
 	self.feats = []
 	fd = open(fname, 'r')
 	colNames = fd.readline()[:-1].replace('chromosome','chr').replace('mgiid','canonical').split(TAB)
@@ -668,6 +697,7 @@ def getArgs ():
     parser = argparse.ArgumentParser(description='Generate synteny blocks.')
 
     parser.add_argument(
+	'-d',
 	'--directory',
 	dest="odir",
 	required=True,
@@ -679,14 +709,18 @@ def getArgs ():
 if __name__ == "__main__":
     global sbg
     args = getArgs()
-    filenames = filter(lambda fn: fn.endswith('-features.tsv'), os.listdir(args.odir))
-    filenames.sort()
-    for i, fn1 in enumerate(filenames):
-	aname = fn1.replace('-features.tsv','')
-	afile = os.path.join(args.odir, fn1)
-        for j, fn2 in enumerate(filenames[i:]):
-	    bname = fn2.replace('-features.tsv','')
-	    bfile = os.path.join(args.odir, fn2)
+    genomes = []
+    for n in os.listdir(args.odir):
+	if os.path.isdir(os.path.join(args.odir, n)):
+	    genomes.append(n)
+    genomes.sort()
+    for i, gn1 in enumerate(genomes):
+	aname = gn1
+	afile = os.path.join(args.odir, gn1, 'features.json')
+        for j, gn2 in enumerate(genomes[i:]):
+	    bname = gn2
+	    bfile = os.path.join(args.odir, gn2, 'features.json')
 	    sys.stderr.write('%d %s vs %d %s\n' % (i, aname, i+j, bname))
+	    sys.stderr.write('%s vs %s\n' % (afile, bfile))
 	    generateFromFiles(aname, afile, bname, bfile, i or j)
-#
+###
