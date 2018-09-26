@@ -746,7 +746,6 @@ class MGVApp extends Component {
 	    //
 	    this.cmode = cfg.cmode;
 	    //
-	    return this.translator.ready();
 	}).then(() => {
 	    //
 	    if (!cfg) return;
@@ -765,15 +764,17 @@ class MGVApp extends Component {
 		delta: cfg.delta 
 	    };
 	    //
-	    this.zoomView.update(cfg);
-	    //
-	    this.genomeView.setBrushCoords(this.coords);
-	    this.genomeView.redraw();
-	    //
-	    if (!quietly)
-	        this.contextChanged();
-	    //
-	    this.showBusy(false);
+	    this.translator.ready().then(() => {
+		this.zoomView.update(cfg);
+		//
+		this.genomeView.setBrushCoords(this.coords);
+		this.genomeView.redraw();
+		//
+		if (!quietly)
+		    this.contextChanged();
+		//
+		this.showBusy(false);
+	    });
 	});
 	return p;
     }
