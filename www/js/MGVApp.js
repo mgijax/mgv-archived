@@ -152,7 +152,7 @@ class MGVApp extends Component {
 		    .reduce((acc,g) => { this.nl2genome[g.label] = acc[g.label] = g; return acc; }, {});
 
 		// Now preload all the chromosome files for all the genomes
-		let cdps = this.allGenomes.map(g => d3tsv(`./data/${g.name}-chromosomes.tsv`));
+		let cdps = this.allGenomes.map(g => d3tsv(`./data/${g.name}/chromosomes.tsv`));
 		return Promise.all(cdps);
 	    })
 	    .then( data => {

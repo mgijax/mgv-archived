@@ -24,15 +24,15 @@ class FeatureManager {
     }
  
     //----------------------------------------------
+    // Args:
+    //   d (parsed GFF row)
     processFeature (genome, d) {
+	let ID = d[8]['ID'];
 	// If we've already got this one in the cache, return it.
-	let f = this.id2feat[d.ID];
+	let f = ID ? this.id2feat[ID] : null;
 	if (f) return f;
 	// Create a new Feature
-	f = new Feature(d);
-	f.genome = genome
-	// index from transcript ID -> transcript
-	f.tindex = {};
+	f = new Feature(genome, ID, d);
 	// Register it.
 	this.id2feat[f.ID] = f;
 	// genome cache
@@ -97,8 +97,8 @@ class FeatureManager {
 	return this.fStore.get(genome.name).then(data => {
 	    if (data === undefined) {
 		console.log("Requesting:", genome.name, );
-		let url = `./data/${genome.name}-features.tsv`;
-		return d3tsv(url).then( rawfeats => {
+		let url = `./data/${genome.name}/features.json`;
+		return d3json(url).then( rawfeats => {
 		    rawfeats.sort( (a,b) => {
 			if (a.chr < b.chr)
 			    return -1;
