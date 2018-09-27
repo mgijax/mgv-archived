@@ -16,10 +16,6 @@ class BlockTranslator {
         blk.bStart = parseInt(blk.bStart);
         blk.aEnd   = parseInt(blk.aEnd);
         blk.bEnd   = parseInt(blk.bEnd);
-        blk.aLength   = parseInt(blk.aLength);
-        blk.bLength   = parseInt(blk.bLength);
-        blk.blockCount   = parseInt(blk.blockCount);
-        blk.blockRatio   = parseFloat(blk.blockRatio);
 	blk.abMap = d3.scale.linear()
 	    .domain([blk.aStart,blk.aEnd])
 	    .range( blk.blockOri==="-" ? [blk.bEnd,blk.bStart] : [blk.bStart,blk.bEnd]);

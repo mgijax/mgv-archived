@@ -568,19 +568,15 @@ class SyntenyBloc:
 	      "aGenome",
 	      "bGenome",
 	      "blockId",
-	      "blockCount",
 	      "blockOri",
-	      "blockRatio",
 	      "aIndex",
 	      "aChr",
 	      "aStart",
 	      "aEnd",
-	      "aLength",
 	      "bIndex",
 	      "bChr",
 	      "bStart",
 	      "bEnd",
-	      "bLength",
 	    ]
     #
     def getRows(self):
@@ -592,19 +588,15 @@ class SyntenyBloc:
 		self.aGenome.name,
 		self.bGenome.name,
 		"%s_%d" % (self.id, i),
-		self.count,
 		self.ori,
-		"%1.2f" % (float(aa.length) / bb.length),
 		aa.index,
 		aa.chr,
 		aa.start,
 		aa.end,
-		aa.length,
 		bb.index,
 		bb.chr,
 		bb.start,
 		bb.end,
-		bb.length
 	    ]
 	    rows.append( r )
 	return rows
@@ -681,8 +673,8 @@ def generateFromFiles(aName, aFile, bName, bFile, noHeader):
 	        i += 1
 	    prev = r[ci]
 	    r[ci] = i
-    _(11) # sort on col bIndex and renumber
-    _(6)  # sort on col aIndex and renumber
+    _(8) # sort on bIndex and renumber
+    _(4)  # sort on aIndex and renumber
     if not noHeader:
 	sys.stdout.write( format(SyntenyBloc.COLNAMES) + NL )
     for r in allRows:
