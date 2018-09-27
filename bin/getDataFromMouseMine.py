@@ -128,22 +128,19 @@ class DataGetter :
 	</query>''' % (g, c)
 
 	for r in self.doQuery(q):
-	    try:
-		# coords into integers
-		r[4] = int(r[4])
-		r[5] = int(r[5])
-		if r[5] - r[4] + 1 > MAX_SIZE > 0:
-		    self.log('Feature too big (skipped): ' + self.formatRow(r))
-		    continue
-		# convert strand from +1/-1 to just +/-
-		r[6] = '-' if r[6] == '-1' else '+'
-		# the outer join returns '""' in place of nulls.
-		# convert them to '.'
-		r[7] = '.' if r[7] == '""' else r[7]
-		r[8] = '.' if r[8] == '""' else r[8]
-		yield r
-	    except:
-	        self.log("ERROR: skipping row: " + str(r))
+	    # coords into integers
+	    r[4] = int(r[4])
+	    r[5] = int(r[5])
+	    if r[5] - r[4] + 1 > MAX_SIZE > 0:
+		self.log('Feature too big (skipped): ' + self.formatRow(r))
+		continue
+	    # convert strand from +1/-1 to just +/-
+	    r[6] = '-' if r[6] == '-1' else '+'
+	    # the outer join returns '""' in place of nulls.
+	    # convert them to '.'
+	    r[7] = '.' if r[7] == '""' else r[7]
+	    r[8] = '.' if r[8] == '""' else r[8]
+	    yield r
 
     # Formats a row (array of values) as a tab-delimited string.
     def formatRow(self, row):
