@@ -3,6 +3,7 @@ import urllib
 import os.path
 
 MOUSEMINE="http://www.mousemine.org/mousemine"
+MAX_SIZE=10000000
 
 class DataGetter :
 
@@ -105,21 +106,33 @@ class DataGetter :
 	sortOrder="Gene.chromosomeLocation.start ASC"
 	>
 	<join path="Gene.canonical" style="OUTER"/>
+
+	<join path="Gene.sequenceOntologyTerm" style="OUTER"/>
+
 	<constraint path="Gene.strain.name" op="=" value="%s"/>
 	<constraint path="Gene.chromosome.primaryIdentifier" op="=" value="%s"/>
 	</query>''' % (g, c)
 
 	for r in self.doQuery(q):
-	    # coords into integers
-	    r[4] = int(r[4])
-	    r[5] = int(r[5])
-	    # convert strand from +1/-1 to just +/-
-            r[6] = '-' if r[6] == '-1' else '+'
-	    # the outer join returns '""' in place of nulls.
-	    # convert them to '.'
-	    r[7] = '.' if r[7] == '""' else r[7]
-	    r[8] = '.' if r[8] == '""' else r[8]
-	    yield r
+		# Currently there is a bug in MouseMine where ncRNA strain genes have null 
+		# SO term references. Not sure why. As a workaround, use OUTER join in query
+		# and convert any blanks to 'ncRNA_gene'. 
+		#
+		r[2] = r[2] if r[2] != '""' else 'ncRNA_gene'
+		#
+		# coords into integers
+		r[4] = int(r[4])
+		r[5] = int(r[5])
+		if r[5] - r[4] + 1 > MAX_SIZE > 0:
+		    self.log('Feature too big (skipped): ' + self.formatRow(r))
+		    continue
+		# convert strand from +1/-1 to just +/-
+		r[6] = '-' if r[6] == '-1' else '+'
+		# the outer join returns '""' in place of nulls.
+		# convert them to '.'
+		r[7] = '.' if r[7] == '""' else r[7]
+		r[8] = '.' if r[8] == '""' else r[8]
+		yield r
 
     def formatRow(self, row):
         return '\t'.join(map(str, row)) + '\n'
