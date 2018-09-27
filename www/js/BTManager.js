@@ -50,7 +50,7 @@ class BTManager {
 	    }
 	    else if (this.serverRequest) {
 	        // if there is an outstanding request, wait until it's done and try again.
-		this.serverRequest.then(()=>this.getBlockFile(aGenome, bGenome));
+		return this.serverRequest.then(()=>this.getBlockFile(aGenome, bGenome));
 	    }
 	    else {
 		// Third, load from server.
@@ -58,15 +58,15 @@ class BTManager {
 		console.log("Requesting block file from: " + fn);
 		this.serverRequest = d3tsv(fn).then(blocks => {
 		    let rbs = blocks.reduce( (a,b) => {
-		    let k = b.aGenome + '-' + b.bGenome;
-		    if (!(k in a)) a[k] = [];
-		        a[k].push(b);
-			return a;
-		    }, {});
+			let k = b.aGenome + '-' + b.bGenome;
+			if (!(k in a)) a[k] = [];
+			    a[k].push(b);
+			    return a;
+			}, {});
 		    for (let n in rbs) {
 		        this.blockStore.set(n, rbs[n]);
 		    }
-		});
+		}).then(() => this.getBlockFile(aGenome, bGenome));
 		return this.serverRequest;
 	    }
 	});
