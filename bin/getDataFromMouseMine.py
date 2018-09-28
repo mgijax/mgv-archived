@@ -180,7 +180,7 @@ class DataGetter :
 	    tChr    =     r[2]
 	    tStart  = int(r[3])
 	    tEnd    = int(r[4])
-	    tStrand =     r[5]
+	    tStrand = '-' if r[5] == '-1' else '+'
 	    eStart  = int(r[6])
 	    eLength = int(r[7])
 	    gStart  = int(r[8])
