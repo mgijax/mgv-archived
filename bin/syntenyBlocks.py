@@ -65,8 +65,6 @@ class Feature (Region):
 	self.start      = gffobj[3]
 	self.end        = gffobj[4]
 	self.strand     = gffobj[6]
-	self.contig     = gffobj[8]['contig']
-	self.lane       = gffobj[8]['lane']
 	self.type       = gffobj[2]
 	self.biotype    = gffobj[8]['biotype']
 	self.id         = gffobj[8]['ID']
@@ -108,15 +106,19 @@ class Genome:
     # Build a block cover from this information.
     def buildContigCover(self):
 	b = None
-	c = None
 	blocks = []
+        hwm = 0
+	cchr = None
         for f in self.feats:
-	    if f.contig != c:
+	    if cchr and cchr != f.chr:
+	        hwm = 0
+	    if hwm < f.start:
 	        b = Block(f)
-		c = f.contig
 		blocks.append(b)
 	    else:
 	        b.addFeature(f)
+	    cchr = f.chr
+	    hwm = max(hwm, f.end)
 	return BlockCover(self, blocks)
 
     # Reads the features for this genome from the given file and stores them in self.feats.
@@ -166,7 +168,11 @@ class Genome:
 # add negighboring features/blocks).
 class Block (Region):
     def __init__(self, f, update=False):
-	Region.__init__(self, f.genome, f.chr, f.start, f.end)
+	try:
+	    Region.__init__(self, f.genome, f.chr, f.start, f.end)
+	except:
+	    print f
+	    raise
 	self.index = -1	# index in my genome
 	self.partners = set() # join partners in other genome
 	self.pOri = ""        # orientation of self/partners, "+", "-", or "" (unset)

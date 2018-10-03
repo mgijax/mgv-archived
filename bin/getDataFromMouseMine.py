@@ -201,24 +201,12 @@ class DataGetter :
     #
     def processGenes(self, g, c) :
 	# For all the genes on the specified chromosome of the specified genome...
-	ca = ContigAssigner()
-	sa_plus = SwimLaneAssigner()
-	sa_minus = SwimLaneAssigner()
 	for i,f in enumerate(self.getGenes(g, c)):
 	    tp = 'pseudogene' if 'pseudo' in f[2] else 'gene'
-	    contig = ca.assignNext(f[4], f[5])
-	    if f[6] == '+':
-		lane = sa_plus.assignNext(f[4], f[5])
-	    else:
-		lane = -sa_minus.assignNext(f[4], f[5])
-	    #row = [f[3], f[4], f[5], f[6], contig, lane, tp, f[2], f[1], f[7] , f[8]]
-	    #self.fFd.write(self.formatRow(row))
 	    attrs = {
 	        'ID' : f[1],
 		'canonical_id' : f[7],
 		'canonical_symbol' : f[8],
-		'lane' : lane,
-		'contig': contig,
 		'biotype' : f[2],
 	    }
 	    gffrow = [f[3], '.', tp, f[4], f[5], '.', f[6], '.', attrs]
@@ -267,6 +255,15 @@ class DataGetter :
 	    fd = open(os.path.join(self.tdir, fn), 'a')
 	    fd.write(']\n')
 	    fd.close()
+
+    def assertSorted(self, feats):
+	prev = None
+        for i,f in enumerate(feats):
+	    if prev and f[0] != prev[0]:
+	        prev = None
+	    if prev and f[3] < prev[3]:
+	        raise RuntimeError("Features are not sorted at position %d" % i)
+	    prev = f
 
     # Reads data for one genome from mousemine and writes files to disk.
     def processGenome (self, g) :
@@ -327,32 +324,6 @@ class DataGetter :
 		self.gFd.write('%s\t%s\n' % (g[2],g[1]))
 		self.processGenome(g)
 	self.gFd.close()
-
-#
-class ContigAssigner :
-    def __init__ (self) :
-        self.contig = 0
-	self.hwm = None
-
-    def assignNext(self, fstart, fend):
-        if self.hwm is None or fstart > self.hwm:
-	    self.contig += 1
-	self.hwm = max(self.hwm, fend)
-	return self.contig
-
-#
-class SwimLaneAssigner :
-    def __init__ (self):
-        self.lanes = []
-
-    def assignNext (self, fstart, fend) :
-	for i, hwm in enumerate(self.lanes):
-	    if fstart > hwm:
-		self.lanes[i] = fend
-		return i+1
-	else:
-	    self.lanes.append(fend) 
-	    return len(self.lanes)
 
 def getArgs ():
     parser = argparse.ArgumentParser(description='Generate MGV data files from MouseMine.')
