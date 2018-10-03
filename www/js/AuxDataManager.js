@@ -12,8 +12,9 @@ class AuxDataManager {
 	this.baseUrl = this.cfg.allMines[this.cfg.mousemine];
 	console.log("MouseMine url:", this.baseUrl);
         this.qUrl = this.baseUrl + '/service/query/results?';
-	this.rUrl = this.baseUrl + '/portal.do?class=SequenceFeature&externalids='
+	this.rUrl = this.baseUrl + '/portal.do?class=SequenceFeature&externalids=';
 	this.faUrl = this.baseUrl + '/service/query/results/fasta?';
+	this.seqSliceUrl = this.baseUrl + '/service/sequence?';
     }
     //----------------------------------------------
     getAuxData (q, format) {
@@ -91,6 +92,22 @@ class AuxDataManager {
 	    'Exon.chromosomeLocation.end',
 	    'Exon.strain.name'
 	].join(' ');
+    }
+    //
+    sequenceSlice (genome, chr, start, end) {
+        let q = ` <query model="genomic"
+	    view="Chromosome.sequence.residues">
+	    <constraint path="Chromosome.primaryIdentifier" op="=" value="${chr}" />
+	    <constraint path="Chromosome.strain.name" op="=" value="${genome}" />
+	    </query>`
+	let query = encodeURIComponent(q);
+	let url = this.seqSliceUrl + `start=${start}&end=${end}&query=${query}`;
+	return d3json(url).then(data => {
+	    let result = data.features[0]
+	    result.genome = genome;
+	    result.chr = chr;
+	    return result;
+	});
     }
     // Returns a promise for all exons from the given genome where the exon's gene overlaps the given coordinates.
     exonsByRange	(genome, chr, start, end) {

@@ -1,7 +1,8 @@
 import {d3json, d3tsv, overlaps, subtract} from './utils';
 import {Feature} from './Feature';
-import {FeaturePacker} from './FeaturePacker';
 import {KeyStore} from './KeyStore';
+import config from './config';
+import { ContigAssigner, SwimLaneAssigner, FeaturePacker } from './Layout';
 
 //----------------------------------------------
 // How the app loads feature data. Provides two calls:
@@ -10,6 +11,7 @@ import {KeyStore} from './KeyStore';
 //
 class FeatureManager {
     constructor (app) {
+	this.cfg = config.FeatureManager;
         this.app = app;
 	this.auxDataManager = this.app.queryManager.auxDataManager;
         this.id2feat = {};		// index from  feature ID to feature
@@ -19,6 +21,7 @@ class FeatureManager {
 	this.cache = {};		// {genome.name -> {chr.name -> list of blocks}}
 	this.mineFeatureCache = {};	// auxiliary info pulled from MouseMine 
 	this.loadedGenomes = new Set(); // the set of Genomes that have been fully loaded
+	this.transcriptFiles = {};	// map from file name to promise for that file.
 	//
 	this.fStore = new KeyStore('features'); // maps genome name -> list of features
     }
@@ -53,32 +56,17 @@ class FeatureManager {
 	// here y'go.
 	return f;
     }
-    //
-    processExon (e) {
-        // console.log("process exon: ", e);
-	let feat = this.id2feat[e.gene.primaryIdentifier];
-	let exon = {
-	    ID: e.primaryIdentifier,
-	    transcriptIDs: e.transcripts.map(t => t.primaryIdentifier),
-	    chr: e.chromosome.primaryIdentifier,
-	    start: e.chromosomeLocation.start,
-	    end:   e.chromosomeLocation.end,
-	    feature: feat
-	};
-	exon.transcriptIDs.forEach( tid => {
-	    let t = feat.tindex[tid];
-	    if (!t) {
-	        t = { ID: tid, feature: feat, exons: [], start: Infinity, end: 0 };
-		feat.transcripts.push(t);
-		feat.tindex[tid] = t;
-	    }
-	    t.exons.push(exon);
-	    t.start = Math.min(t.start, exon.start);
-	    t.end = Math.max(t.end, exon.end);
+    //---------------------------------------------
+    assertSorted (feats) {
+	let prev = null;
+        feats.forEach((f,i) => {
+	    if (prev && f.chr !== prev.chr)
+	        prev = null;
+	    if (prev && f.start < prev.start)
+	        throw 'Features are not sorted at position ' + i;
+	    prev = f;
 	});
-	feat.exons.push(exon);
     }
-
     //----------------------------------------------
     // Processes the "raw" features returned by the server.
     // Turns them into Feature objects and registers them.
@@ -87,7 +75,31 @@ class FeatureManager {
     // (I.e., registering the same feature multiple times is ok)
     //
     processFeatures (genome, feats) {
-	return feats.map(d => this.processFeature(genome, d));
+	let cta;	// contig assigner
+	let swa_p;	// swim lane assigner for plus strand
+	let swa_m;	// swim lane assigner for minus strand
+	let fp;		// feature packer
+	let prev;	// previous feature
+	// turn raw features into Feature objects
+	feats = feats.map(d => this.processFeature(genome, d));
+	// assign lanes
+	feats.forEach(f => {
+	    if (f.chr != prev) {
+	        cta = new ContigAssigner();
+		swa_p = new SwimLaneAssigner();
+		swa_m = new SwimLaneAssigner();
+		fp = new FeaturePacker(0);
+	    }
+	    f.contig = cta.assignNext(f.start, f.end);
+	    f.lane = f.strand === '+' ? 
+	        swa_p.assignNext(f.start, f.end)
+		:
+		-swa_m.assignNext(f.start, f.end);
+	    f.lane2 = fp.assignNext(f.start, f.end, Math.max(1, f.transcript_count), f.symbol)
+	    prev = f.chr;
+	});
+	//this.assertSorted(feats);
+	return feats;
     }
 
     //----------------------------------------------
@@ -99,14 +111,6 @@ class FeatureManager {
 		console.log("Requesting:", genome.name, );
 		let url = `./data/${genome.name}/features.json`;
 		return d3json(url).then( rawfeats => {
-		    rawfeats.sort( (a,b) => {
-			if (a.chr < b.chr)
-			    return -1;
-			else if (a.chr > b.chr)
-			    return 1;
-			else
-			    return a.start - b.start;
-		    });
 		    this.fStore.set(genome.name, rawfeats);
 		    let feats = this.processFeatures(genome, rawfeats);
 		});
@@ -124,39 +128,66 @@ class FeatureManager {
     }
 
     //----------------------------------------------
+    processTranscript (t) {
+	let gid = t[8]['gene_id'];
+	let feat = this.id2feat[gid];
+	let tt = {
+	    ID: t[8]['ID'],
+	    chr: t[0],
+	    start: t[3],
+	    end: t[4],
+	    strand: t[6],
+	    feature: feat,
+	}
+	tt.exons = t[8]['eOffsets'].map( (o,i) => {
+	    let start = t[3] + o;
+	    let end = start + t[8]['eLengths'][i] - 1;
+	    return {ID:'?', start:start, end:end, feature:feat}
+	});
+	feat.transcripts.push(tt);
+    }
+
+    //----------------------------------------------
+    loadTranscriptFile (feat) {
+	let genome = feat.genome.name;
+	let chr = feat.chr;
+	let blk = Math.floor(feat.start/this.cfg.transcriptBlockSize);
+	let url = `data/${genome}/transcripts/chr${chr}.${blk}.json`;
+	let p = this.transcriptFiles[url];
+	if (!p) {
+	    p = this.transcriptFiles[url] = d3json(url).then(transcripts => {
+		transcripts.forEach(t => this.processTranscript(t));
+		console.log('Loaded transcripts: ' + url);
+	    });
+	}
+	return p;
+    }
+
+    //----------------------------------------------
     // Returns a promise that resolves when all exons for the given set of gene ids.
     // Gene IDs are genome-specific, NOT canonical.
     //
-    ensureExonsByGeneIds (ids) {
+    ensureTranscriptsByGeneIds (ids) {
 	// Map ids to Feature objects, filter for those where exons have not been retrieved yet
 	// Exons accumulate in their features - no cache eviction implemented yet. FIXME.
 	// 
-	let feats = (ids||[]).map(i => this.id2feat[i]).filter(f => {
-	    if (! f || f.exonsLoaded)
-	        return false;
-	    f.exonsLoaded = true;
-	    return true;
-	});
-	if (feats.length === 0)
-	    return Promise.resolve();
-	return this.auxDataManager.exonsByGeneIds(feats.map(f=>f.ID)).then(exons => {
-	    exons.forEach( e => { this.processExon(e); });
-	});
+	let feats = (ids||[]).map(i => this.id2feat[i]).filter(f => f);
+	let promises = feats.map(f => {
+	    let genome = f.genome.name;
+	    let chr = f.chr;
+	    let blk = Math.floor(f.start/this.cfg.transcriptBlockSize);
+	    let url = `data/${genome}/transcripts/chr${chr}.${blk}.json`;
+	    let p = this.transcriptFiles[url];
+	    if (!p) {
+	        p = this.transcriptFiles[url] = d3json(url).then(transcripts => {
+		    transcripts.forEach(t => this.processTranscript(t));
+		    console.log('Loaded transcripts: ' + url);
+		});
+	    }
+	    return p;
+	})
+	return Promise.all(promises);
     }
-
-    /*
-    //----------------------------------------------
-    // Returns a promise that resolves to all exons for genes in the specified genome
-    // that overlap the specified range.
-    //
-    ensureExonsByRange (genome, chr, start, end) {
-	return this.auxDataManager.exonsByRange(genome,chr,start,end).then(exons => {
-	    exons.forEach( e => {
-	        this.processExon(e);
-	    });
-	});
-    }
-    */
 
     //----------------------------------------------
     loadGenomes (genomes) {
@@ -212,14 +243,14 @@ class FeatureManager {
 	});
 	if (getExons) {
 	    p = p.then(results => {
-	        return this.ensureExonsByGeneIds(fids).then(()=>results);
+	        return this.ensureTranscriptsByGeneIds(fids).then(()=>results);
 		});
 	}
 	return p;
     }
     //----------------------------------------------
     // Returns a promise for the features having the specified ids from the specified genome.
-    getFeaturesById (genome, ids, getExons) {
+    getFeaturesById (genome, ids) {
         return this.ensureFeaturesByGenome(genome).then( () => {
 	    let feats = [];
 	    let seen = new Set();
@@ -239,11 +270,7 @@ class FeatureManager {
 		let f = this.canonical2feats[i] || this.id2feat[i];
 		f && add(f);
 	    }
-	    if (getExons) {
-	        return this.ensureExonsByGeneIds(feats.map(f=>f.ID)).then(()=>feats);
-	    }
-	    else
-		return feats;
+	    return feats;
 	});
     }
     //----------------------------------------------

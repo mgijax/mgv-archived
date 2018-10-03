@@ -73,7 +73,7 @@ class FeaturePacker {
 	// overlapping features.
         this.buffer = [];
     }
-    assignNext (fstart, fend, fheight) {
+    assignNext (fstart, fend, fheight, fsymbol) {
 	// remove buffer items that do not overlap the new feature
         this.buffer = this.buffer.filter(ff => {
 	    return fstart <= ff.fend && fend >= ff.fstart;
@@ -84,8 +84,8 @@ class FeaturePacker {
 	// NB: remember, positive y is down in screen coords
 	let minGap = fheight + 2*this.ygap;
 	let y = 0; // start off at baseline
-	let i = 0;
-	for (i in this.buffer) {
+	let i;
+	for (i = 0; i < this.buffer.length; i++) {
 	    let ff = this.buffer[i];
 	    // distance between current y and top of next block in buffer
 	    let gapSize = ff.y - y;
@@ -98,7 +98,7 @@ class FeaturePacker {
 	// Found y for new block's baseline. Want position at top of block.
 	y += this.ygap;
 	// Insert into buffer. Maintain y sort.
-	this.buffer.splice(i,0, {fstart, fend, fheight, y});
+	this.buffer.splice(i, 0, {fstart, fend, fheight, y, fsymbol});
 	// here ya go
 	return y;
     }

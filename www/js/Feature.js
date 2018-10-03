@@ -11,14 +11,10 @@ class Feature {
 	this.ID      = ID;
 	this.canonical = ga['canonical_id'];
         this.symbol  = ga['canonical_symbol'];
-	this.contig  = parseInt(ga['contig']);
-	this.lane    = parseInt(ga['lane']);
 	//
-	this.exonsLoaded = false;
-	this.exons = [];
+	this.transcript_count = ga['transcript_count'] || 0;
 	this.transcripts = [];
-	// index from transcript ID -> transcript
-	this.tindex = {};
+	this.transcriptsLoaded = false;
     }
     //
     get length () {

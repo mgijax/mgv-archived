@@ -3,6 +3,9 @@ export default {
 	name :	"Multiple Genome Viewer (MGV)",
 	version :	"1.0.0", // use semantic versioning
     },
+    FeatureManager : {
+        transcriptBlockSize : 2000000
+    },
     AuxDataManager : {
 	mousemine : 'test',
 	allMines : {
@@ -21,19 +24,19 @@ export default {
     ZoomView : {
 	topOffset : 20,		// Y offset to first strip (should = stripGap, so technically redundant)
 	featHeight : 8,		// height of a rectangle representing a feature
-	laneGap : 2,	        // space between swim lanes
-	laneHeight : 10,	// == featHeight + laneGap
+	laneGap : 8,	        // space between swim lanes, also defines font size
+	laneHeight : 18,	// == featHeight + laneGap
 	laneGapMinor : 2,	// space between minor lanes (between transcripts)
 	laneHeightMinor : 10,	// == featHeight + laneGapMinor
 	minLanes : 3,		// minimum number of swim lanes (each strand)
 	blockHeight : 60,	// == 2 * minLanes * laneHeight
 	minStripHeight : 75,    // height per genome in the zoom view
-	stripGap : 20,	// space between strips
-	maxSBgap : 20,	// max gap allowed between blocks.
-	dmode : 'comparison',// initial drawing mode. 'comparison' or 'reference'
+	stripGap : 20,	        // space between strips
+	maxSBgap : 20,	        // max gap allowed between blocks.
+	dmode : 'comparison',   // initial drawing mode. 'comparison' or 'reference'
 	wheelThreshold : 3,	// minimum wheel distance 
 	featureDetailThreshold : 2000000, // if width <= thresh, draw feature details.
-	wheelContextDelay : 300,  // ms delay after last wheel event before changing context
+	wheelContextDelay : 300,// ms delay after last wheel event before changing context
     },
     QueryManager : {
 	searchTypes : [{

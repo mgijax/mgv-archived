@@ -736,6 +736,9 @@ label > i.material-icons {
     display: none;
 }
 
+#zoomView .feature {
+    transition: transform 0.5s;
+}
 #zoomView .transcript {
     transition: transform 0.5s;
 }
