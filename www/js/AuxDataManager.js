@@ -101,7 +101,9 @@ class AuxDataManager {
 	    <constraint path="Chromosome.strain.name" op="=" value="${genome}" />
 	    </query>`
 	let query = encodeURIComponent(q);
-	let url = this.seqSliceUrl + `start=${start}&end=${end}&query=${query}`;
+	// FIXME: Weird. This web service appears to use 0-based coordinates, and want end to be 1 beyond the 
+	// last base you want returned. Have to convert from normal genome coordinates.
+	let url = this.seqSliceUrl + `start=${start-1}&end=${end}&query=${query}`;
 	return d3json(url).then(data => {
 	    let result = data.features[0]
 	    result.genome = genome;

@@ -88,7 +88,7 @@ class FeatureManager {
 	        cta = new ContigAssigner();
 		swa_p = new SwimLaneAssigner();
 		swa_m = new SwimLaneAssigner();
-		fp = new FeaturePacker(0);
+		fp = new FeaturePacker(1);
 	    }
 	    f.contig = cta.assignNext(f.start, f.end);
 	    f.lane = f.strand === '+' ? 

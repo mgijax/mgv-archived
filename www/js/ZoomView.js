@@ -1253,10 +1253,36 @@ class ZoomView extends SVGView {
 	sblocks.select('line.axis')
 	    .attr('x1', b => b.xscale(b.start))
 	    .attr('y1', 0)
-	    // if drawing expanded details, don't show axis line
 	    .attr('x2', b => b.xscale(this.showFeatureDetails && this.spreadTranscripts ? b.start : b.end))
 	    .attr('y2', 0)
 	    ;
+	// sequence
+	l0.append('text')
+	    .attr('class','sequence')
+	    .style('font-family','monospace')
+	    ;
+	sblocks.select('text.sequence')
+	    .each( function (b) {
+		let blen = b.end - b.start + 1;
+		if (blen < 2*self.width) {
+		    let adm = self.app.queryManager.auxDataManager;
+		    let p = adm.sequenceSlice(b.genome.label, b.chr, Math.floor(b.start), Math.floor(b.end));
+		    p.then(s => {
+			//console.log(s);
+			let bases = s.seq.split('');
+			d3.select(this)
+			    .html(bases.map(b => `<tspan class="${b}">${blen >= self.width ? '.' : b}</tspan>`).join(''))
+			    .style('font-size', '10px')
+			    ;
+			d3.select(this)
+			    .attr('transform',`scale(${self.width/this.getBBox().width},1)`)
+		    });
+		}
+		else
+		    d3.select(this).text('');
+	    })
+	    ;
+
 	// label
 	l0.append('text')
 	    .attr('class','blockLabel') ;
@@ -1412,19 +1438,35 @@ class ZoomView extends SVGView {
 	    let newts = transcripts.enter().append('g')
 	        .attr('class','transcript')
 		;
-	    newts.append('line');
+	    newts.append('polyline');
 	    newts.append('g').attr('class','exons');
 	    newts.append('rect').attr('class','overlay');
 
 	    transcripts.exit().remove();
 	    // draw transcript axis lines
-	    transcripts.select('line')
-	        .attr('x1', t => t.x)
-		.attr('y1', 0)
-		.attr('x2', t => t.x + t.width - 1)
-		.attr('y2', 0)
+	    transcripts.select('polyline')
+	        //.attr('x1', t => t.x)
+		//.attr('y1', 0)
+		//.attr('x2', t => t.x + t.width - 1)
+		//.attr('y2', 0)
+		.attr('points', t => {
+		    let ext = 10;
+		    let h   = 3;
+		    let x1, x2, y;
+		    if (t.strand === '+') {
+		        x1 = t.x;
+			x2 = t.x + t.width + ext;
+			return `${x1} 0 ${x2} 0 ${x2 - ext/2} ${-h} ${x2} 0 ${x2 - ext/2} ${h}`;
+		    }
+		    else {
+			x1 = t.x + t.width;
+		        x2 = t.x - ext;
+			return `${x1} 0 ${x2} 0 ${x2 + ext/2} ${-h} ${x2} 0 ${x2 + ext/2} ${h}`;
+		    }
+		})
 		.attr('transform',`translate(0,${this.cfg.featHeight/2})`)
 		.attr('stroke', t => this.app.cscale(t.feature.getMungedType()))
+		.style('fill','none')
 		;
 	    // draw the transcript rectangle
 	    transcripts.select('rect.overlay')

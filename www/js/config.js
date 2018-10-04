@@ -36,6 +36,7 @@ export default {
 	dmode : 'comparison',   // initial drawing mode. 'comparison' or 'reference'
 	wheelThreshold : 3,	// minimum wheel distance 
 	featureDetailThreshold : 2000000, // if width <= thresh, draw feature details.
+	sequenceDisplayThreshold: 1, // display sequence if pixels per base is at least this
 	wheelContextDelay : 300,// ms delay after last wheel event before changing context
     },
     QueryManager : {

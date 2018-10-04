@@ -832,6 +832,20 @@ label > i.material-icons {
 #zoomView .fiducials.hidden .featLabel {
    display: none;
 }
+
+#zoomView text.sequence tspan.g {
+    fill: red;
+}
+#zoomView text.sequence tspan.a {
+    fill: blue;
+}
+#zoomView text.sequence tspan.t {
+    fill: green;
+}
+#zoomView text.sequence tspan.c {
+    fill: purple;
+}
+
 /* -----------------------------------------
  * Facet: Feature Type
  * -----------------------------------------
