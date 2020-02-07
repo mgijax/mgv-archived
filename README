@@ -1,3 +1,5 @@
+OBSOLETE. This version of MGV has been retired.
+
 This is a prototype viewer for genome annotations from the Mouse Genomes Project.
 Pick one of the 19 annotated mouse strains as the "reference" strain and any number of the the others as "comparison"
 strains. Compare genome organizations! Spot annotation issues! Look at cool patterns and pretty colors!
